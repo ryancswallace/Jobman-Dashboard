@@ -73,4 +73,7 @@ func TestSessionCapacityAuditAndBoundedRetention(t *testing.T) {
 	if err := s.CheckSchema(ctx); err == nil {
 		t.Fatal("runtime accepted newer schema")
 	}
+	if err := s.Migrate(ctx); err == nil {
+		t.Fatal("migration command accepted an unknown newer schema")
+	}
 }

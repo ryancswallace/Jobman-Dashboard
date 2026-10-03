@@ -104,6 +104,29 @@ func (s *Store) Migrate(ctx context.Context) error {
 		return err
 	}
 	slices.Sort(names)
+	rows, err := tx.Query(ctx, "SELECT name FROM dashboard_schema_migrations")
+	if err != nil {
+		return err
+	}
+	unknown := false
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			rows.Close()
+			return err
+		}
+		if !slices.Contains(names, name) {
+			unknown = true
+		}
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return err
+	}
+	if unknown {
+		return fmt.Errorf("database contains a newer or unknown Dashboard migration; use a compatible binary")
+	}
 	for _, name := range names {
 		sql, err := migrations.ReadFile(name)
 		if err != nil {
