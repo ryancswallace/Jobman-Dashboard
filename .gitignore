@@ -1,0 +1,15 @@
+.DS_Store
+/bin/
+/coverage/
+/.local/
+*.log
+*.test
+.env
+.env.*
+!.env.example
+web/node_modules/
+web/dist/
+ios/.build/
+ios/**/.build/
+ios/DerivedData/
+ios/**/xcuserdata/
