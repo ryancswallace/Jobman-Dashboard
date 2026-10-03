@@ -4,21 +4,25 @@ public struct Workload: Codable, Sendable, Identifiable {
     public let resourceId: String; public let name: String?; public let kind: String
     public let deploymentId: String; public let namespaceId: String; public let createdAt: String
     public let totalChildren: String; public let counts: [String: String]
+    public let revision: String; public let asOf: String; public let updatedAt: String?
+    public let phase: String?; public let outcome: String?; public let arrayMode: String?
+    public let arrayPolicy: String?; public let unsatisfiedPolicy: String?
     public let concurrency: String?; public let failurePolicy: String?; public let arrayId: String?
     public var id: String { [deploymentId, namespaceId, kind, resourceId].map(APIPath.component).joined(separator: "/") }
     public var path: String { "/api/v1/deployments/\(APIPath.component(deploymentId))/namespaces/\(APIPath.component(namespaceId))/workloads/\(APIPath.component(kind))/\(APIPath.component(resourceId))" }
     enum CodingKeys: String, CodingKey {
-        case resourceId = "id", name, kind, deploymentId, namespaceId, createdAt, totalChildren, counts, concurrency, failurePolicy, arrayId
+        case resourceId = "id", name, kind, deploymentId, namespaceId, createdAt, totalChildren, counts, concurrency, failurePolicy, arrayId, revision, asOf, updatedAt, phase, outcome, arrayMode, arrayPolicy, unsatisfiedPolicy
     }
 }
 public struct WorkloadChild: Decodable, Sendable, Identifiable {
     public struct Dependency: Decodable, Sendable { public let upstreamNodeId: String; public let predicate: String; public let status: String }
     public let id: String; public let job: Job; public let readiness: String?; public let disposition: String?
     public let taskIndex: String?; public let dependencies: [Dependency]?
+    public let name: String?; public let index: String; public let dependencyCounts: [String: String]?
 }
 public struct WorkloadDetail: Decodable, Sendable {
     public let workload: Workload; public let children: [WorkloadChild]; public let nextCursor: String?
-    public let omittedNodes: String?; public let omittedEdges: String?
+    public let total: String; public let completeness: String; public let sources: [SourceStatus]; public let fetchedAt: String
 }
 public struct Target: Decodable, Sendable, Identifiable {
     public let targetId: String; public let deploymentId: String; public let namespaceId: String
@@ -26,14 +30,50 @@ public struct Target: Decodable, Sendable, Identifiable {
     public let generation: String?; public let capabilities: [String]
     public var id: String { [deploymentId, namespaceId, targetId].map(APIPath.component).joined(separator: "/") }
 }
-public struct Artifact: Decodable, Sendable, Identifiable {
-    public let id: String; public let name: String; public let sizeBytes: String; public let checksum: String?
-    public let publishedAt: String?; public let availability: String
+public typealias Artifact = DashboardAPI.Artifact
+extension DashboardAPI.Artifact: Identifiable {}
+public typealias GraphEdge = DashboardAPI.GraphEdge
+extension DashboardAPI.GraphEdge: Identifiable {
+    public var id: [String] { [fromJobId, toJobId] }
+}
+public struct GraphNeighborhood: Decodable, Sendable {
+    public let centerId: String; public let nodes: [WorkloadChild]; public let edges: [GraphEdge]
+    public let totalNodes: String; public let totalEdges: String
+    public let omittedNodes: String; public let omittedEdges: String
+    public let completeness: String; public let sources: [SourceStatus]; public let fetchedAt: String
+
+    public func validate(workload: Workload, center: String) throws {
+        try workload.validate(children: nodes, sources: sources)
+        guard centerId == center, nodes.contains(where: { $0.id == center }), edges.count <= 500,
+              Set(edges.map(\.id)).count == edges.count else { throw DashboardError.invalidResponse }
+        let jobs = Set(nodes.map { $0.job.id })
+        guard edges.allSatisfy({ jobs.contains($0.fromJobId) && jobs.contains($0.toJobId) }) else { throw DashboardError.invalidResponse }
+    }
+}
+extension Workload {
+    public func validate(children: [WorkloadChild], sources: [SourceStatus]) throws {
+        guard children.count <= 200, Set(children.map(\.id)).count == children.count,
+              children.allSatisfy({ $0.id == $0.job.id && $0.job.deploymentId == deploymentId && $0.job.namespaceId == namespaceId }),
+              sources.allSatisfy({ $0.deploymentId == deploymentId && $0.namespaceId == namespaceId })
+        else { throw DashboardError.invalidResponse }
+    }
+    public func validate(edges: [GraphEdge], node: String, direction: String, sources: [SourceStatus]) throws {
+        try validate(children: [], sources: sources)
+        guard edges.count <= 500, Set(edges.map(\.id)).count == edges.count,
+              edges.allSatisfy({ edge in
+                  switch direction {
+                  case "incoming": edge.toJobId == node
+                  case "outgoing": edge.fromJobId == node
+                  case "": edge.toJobId == node || edge.fromJobId == node
+                  default: false
+                  }
+              }) else { throw DashboardError.invalidResponse }
+    }
 }
 public struct LogChunk: Decodable, Sendable {
     public let text: String?
     public let bytesBase64: String?
-    public let stream: String; public let runId: String?; public let executionId: String?
+    public let stream: String; public let runId: String?; public let runNumber: String?; public let executionId: String?
     public let startOffset: String; public let endOffset: String; public let nextCursor: String?
     public let state: String; public let truncated: Bool?; public let capturedAt: String?
 }
