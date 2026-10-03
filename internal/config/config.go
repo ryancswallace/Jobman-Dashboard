@@ -22,15 +22,17 @@ const MaxConfigBytes int64 = 256 << 10
 const MaxSecretBytes int64 = 1 << 20
 
 type Config struct {
-	ConfigurationRevision int64      `json:"configurationRevision"`
-	PublicOrigin          string     `json:"publicOrigin"`
-	Listen                string     `json:"listen"`
-	WebRoot               string     `json:"webRoot"`
-	ServerTLS             ServerTLS  `json:"serverTLS"`
-	DatabaseURLFile       string     `json:"databaseURLFile"`
-	OIDC                  OIDC       `json:"oidc"`
-	Encryption            Encryption `json:"encryption"`
-	Controls              []Control  `json:"controls"`
+	ConfigurationRevision int64              `json:"configurationRevision"`
+	PublicOrigin          string             `json:"publicOrigin"`
+	Listen                string             `json:"listen"`
+	WebRoot               string             `json:"webRoot"`
+	ServerTLS             ServerTLS          `json:"serverTLS"`
+	DatabaseURLFile       string             `json:"databaseURLFile"`
+	OIDC                  OIDC               `json:"oidc"`
+	Encryption            Encryption         `json:"encryption"`
+	Controls              []Control          `json:"controls"`
+	LogBrokers            []RemoteBroker     `json:"logBrokers"`
+	LogMappings           []RemoteLogMapping `json:"logMappings"`
 }
 
 type ServerTLS struct {
@@ -85,30 +87,47 @@ func Load(path string) (Config, error) {
 // Decode rejects unknown keys, duplicate keys (including nested objects), nulls,
 // noncanonical key casing, trailing documents and oversized configuration.
 func Decode(reader io.Reader) (Config, error) {
-	data, err := io.ReadAll(io.LimitReader(reader, MaxConfigBytes+1))
-	if err != nil || len(data) > int(MaxConfigBytes) {
-		return Config{}, errors.New("configuration is unreadable or exceeds 256 KiB")
-	}
-	checker := json.NewDecoder(bytes.NewReader(data))
-	checker.UseNumber()
-	if err := checkKeys(checker, reflect.TypeFor[Config](), "configuration"); err != nil {
-		return Config{}, err
-	}
-	if _, err := checker.Token(); err != io.EOF {
-		return Config{}, errors.New("configuration must contain exactly one JSON object")
-	}
 	var config Config
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&config); err != nil {
-		// Do not include parser excerpts: they could contain an accidentally
-		// pasted inline credential even though that field is rejected.
-		return Config{}, errors.New("configuration has an invalid JSON value")
+	if err := DecodeDocument(reader, &config); err != nil {
+		return Config{}, err
 	}
 	if err := config.Validate(); err != nil {
 		return Config{}, err
 	}
+	if config.LogBrokers == nil {
+		config.LogBrokers = []RemoteBroker{}
+	}
+	if config.LogMappings == nil {
+		config.LogMappings = []RemoteLogMapping{}
+	}
 	return config, nil
+}
+
+// DecodeDocument applies identical strict, bounded structural validation to
+// each process configuration before its process-specific semantic validation.
+func DecodeDocument(reader io.Reader, destination any) error {
+	schema := reflect.TypeOf(destination)
+	if schema == nil || schema.Kind() != reflect.Pointer || schema.Elem().Kind() != reflect.Struct || reflect.ValueOf(destination).IsNil() {
+		return errors.New("configuration destination must be a struct pointer")
+	}
+	data, err := io.ReadAll(io.LimitReader(reader, MaxConfigBytes+1))
+	if err != nil || len(data) > int(MaxConfigBytes) {
+		return errors.New("configuration is unreadable or exceeds 256 KiB")
+	}
+	checker := json.NewDecoder(bytes.NewReader(data))
+	checker.UseNumber()
+	if err := checkKeys(checker, schema.Elem(), "configuration"); err != nil {
+		return err
+	}
+	if _, err := checker.Token(); err != io.EOF {
+		return errors.New("configuration must contain exactly one JSON object")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(destination); err != nil {
+		return errors.New("configuration has an invalid JSON value")
+	}
+	return nil
 }
 
 func checkKeys(decoder *json.Decoder, schema reflect.Type, path string) error {
@@ -231,11 +250,18 @@ func (c Config) Validate() error {
 	if !scopes["openid"] {
 		return errors.New("oidc.scopes must include openid")
 	}
-	if len(c.Controls) == 0 || len(c.Controls) > 32 {
+	if err := validateControls(c.Controls); err != nil {
+		return err
+	}
+	return validateRemoteLogs(c.Controls, c.LogBrokers, c.LogMappings)
+}
+
+func validateControls(controls []Control) error {
+	if len(controls) == 0 || len(controls) > 32 {
 		return errors.New("controls requires 1 to 32 explicitly configured sources")
 	}
 	ids, instances, origins := map[string]bool{}, map[string]bool{}, map[string]bool{}
-	for index, control := range c.Controls {
+	for index, control := range controls {
 		if !uuid(control.ID) || !uuid(control.ExpectedInstanceID) || ids[control.ID] || instances[control.ExpectedInstanceID] {
 			return fmt.Errorf("controls[%d] requires unique immutable source and instance UUIDs", index)
 		}

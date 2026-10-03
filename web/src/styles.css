@@ -1766,3 +1766,10 @@ body {
   color: var(--text);
   background: var(--bg);
 }
+
+.dependency-disclosure > summary {
+  cursor: pointer;
+  padding: 1rem 1.2rem;
+  color: var(--accent);
+  font-weight: 600;
+}

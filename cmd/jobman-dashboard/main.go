@@ -60,7 +60,7 @@ func run() error {
 	app := &httpapi.Server{Engine: engine, FixtureMode: true, Static: os.DirFS(*web), Auth: httpapi.AuthFunc(func(*http.Request) (monitoring.Actor, error) {
 		return monitoring.Actor{Account: api.Account{ID: fixtures.AccountID, DisplayName: "Lab Alice · synthetic fixture"}}, nil
 	})}
-	server := &http.Server{Addr: *listen, Handler: app.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 20 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
+	server := &http.Server{Addr: *listen, Handler: app.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 20 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 128 << 10}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	done := make(chan error, 1)

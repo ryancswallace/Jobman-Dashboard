@@ -1,7 +1,7 @@
 {
   "apiVersion": "0.1.0-alpha.1",
   "generator": "scripts/generate-contracts.py",
-  "openapiSha256": "f475a91dc30bbd369d310e9077700c2a6af63d616c0ef3518f552f4db1aae33e",
+  "openapiSha256": "1c76aefc7f864a5387b0bea06d5f2552e3af2510cb842ba6c212121c855c5bed",
   "operations": [
     "bootstrap",
     "job",
@@ -10,7 +10,10 @@
     "reports",
     "requestReport",
     "citation",
+    "graphEdges",
+    "graphNeighborhood",
     "workload",
+    "workloadChildren",
     "devices",
     "updateDevice",
     "inbox",
@@ -24,5 +27,5 @@
     "targets",
     "workloads"
   ],
-  "schemaCount": 46
+  "schemaCount": 51
 }

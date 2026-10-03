@@ -56,8 +56,8 @@ export function GraphView({
         <div>
           <h2>Graph neighborhood</h2>
           <p>
-            Current page · up to 200 nodes and 500 edges. Use the node list
-            below for complete navigation.
+            Selected node and its bounded neighborhood. Use the paginated node
+            and dependency lists for complete navigation.
           </p>
         </div>
       </div>
@@ -107,7 +107,7 @@ export function GraphView({
                   transform={`translate(${position.x},${position.y})`}
                   role="button"
                   tabIndex={0}
-                  aria-label={`${node.id}, ${node.job.phase}, ${node.readiness ?? "readiness unavailable"}`}
+                  aria-label={`${node.name ?? node.id}, ${node.job.phase}, ${node.readiness ?? "readiness unavailable"}`}
                   onClick={() => onSelect(node.id)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
@@ -127,7 +127,7 @@ export function GraphView({
                     }
                   />
                   <text x="12" y="24" className="graph-node-title">
-                    {node.id.slice(0, 23)}
+                    {(node.name ?? node.id).slice(0, 23)}
                   </text>
                   <text x="12" y="47" className="graph-node-status">
                     {title(node.disposition || node.job.phase)}
