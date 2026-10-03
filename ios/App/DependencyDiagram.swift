@@ -25,6 +25,11 @@ struct DependencyDiagram: View {
                                 var path = Path()
                                 path.move(to: CGPoint(x: a.x + width / 2, y: a.y))
                                 path.addLine(to: CGPoint(x: b.x - width / 2, y: b.y))
+                                let end = CGPoint(x: b.x - width / 2, y: b.y)
+                                let angle = atan2(b.y - a.y, (b.x - width / 2) - (a.x + width / 2))
+                                path.move(to: CGPoint(x: end.x - 8 * cos(angle - .pi / 6), y: end.y - 8 * sin(angle - .pi / 6)))
+                                path.addLine(to: end)
+                                path.addLine(to: CGPoint(x: end.x - 8 * cos(angle + .pi / 6), y: end.y - 8 * sin(angle + .pi / 6)))
                                 context.stroke(path, with: .color(.secondary), lineWidth: 1.5)
                             }
                         }.accessibilityHidden(true)

@@ -48,6 +48,8 @@ final class NativeAuthentication: NSObject, ASWebAuthenticationPresentationConte
         try config.validate()
         configuration = config
         credentialKey = connection.baseURL.absoluteString + "|" + config.issuer + "|" + config.clientId
+        // A new interactive account must never inherit an earlier account's refresh credential.
+        if let key = credentialKey { KeychainCredential.delete(key: key) }
         let attempt = try OAuthAttempt(configuration: config)
         guard let url = attempt.authorizationURL else { throw OAuthError.invalidConfiguration }
         let callback = try await authenticate(url: url)

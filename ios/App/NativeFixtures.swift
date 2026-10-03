@@ -12,8 +12,8 @@ enum NativeFixtures {
         return .testing(connection: try! DashboardConnection(address: "https://dashboard-fixtures.example.test"), session: URLSession(configuration: config))
     }
 
-    static func data(path: String) throws -> Data { try JSONSerialization.data(withJSONObject: response(path: path)) }
-    static func response(path: String) -> [String: Any] {
+    static func data(path: String, stream: String = "stdout") throws -> Data { try JSONSerialization.data(withJSONObject: response(path: path, stream: stream)) }
+    static func response(path: String, stream: String = "stdout") -> [String: Any] {
         let now = Date()
         let date: (Date) -> String = { ISO8601DateFormatter().string(from: $0) }
         let sources: [[String: Any]] = ["east", "west"].map { ["deploymentId": $0, "namespaceId": "research", "status": "available", "asOf": date(now), "fetchedAt": date(now)] }
@@ -33,8 +33,8 @@ enum NativeFixtures {
         if path == "/api/v1/overview" { return ["active":3,"awaitingExecution":2,"running":1,"evidenceAttention":0,"missingCompletionTime":0,"terminal":["success":7,"failure":1,"cancelled":0,"timed_out":0,"aborted":0,"lost":0,"unknown":0],"window":["from":date(now.addingTimeInterval(-86400)),"to":date(now)],"sources":sources,"completeness":"complete","fetchedAt":date(now)] }
         if path == "/api/v1/jobs" { return page([job(),job("west")]) }
         if path.hasSuffix("/logs") {
-            let bytes = Data("Synthetic log fixture\nAlignment exited with status 2.\nNo production data is shown.\n".utf8)
-            return ["bytesBase64":bytes.base64EncodedString(),"executionId":"execution-fixture","runId":"run-fixture","stream":"stdout","startOffset":"0","endOffset":String(bytes.count),"state":"complete","capturedAt":date(now)]
+            let bytes = Data("Synthetic \(stream) log fixture\nAlignment exited with status 2.\nNo production data is shown.\n".utf8)
+            return ["bytesBase64":bytes.base64EncodedString(),"executionId":"execution-fixture","runId":"run-fixture","stream":stream,"startOffset":"0","endOffset":String(bytes.count),"state":"complete","capturedAt":date(now)]
         }
         if path.hasSuffix("/artifacts") { return page([["id":"artifact-fixture","name":"synthetic-summary.txt","sizeBytes":"120","checksum":"synthetic-checksum","availability":"published","publishedAt":date(now)]]) }
         if path.contains("/citations/") { return ["id":"citation-fixture","label":"Synthetic exit evidence","text":"Synthetic source observation: exited with status 2.","startOffset":"0","endOffset":"48"] }
@@ -49,7 +49,7 @@ enum NativeFixtures {
                                           "disclosure":"metadata only","findings":[finding],"missingEvidence":[]]
             return page([report])
         }
-        if path.contains("/jobs/") { return ["job":job(path.contains("/west/") ? "west":"east"),"fetchedAt":date(now)] }
+        if path.contains("/jobs/") { return ["job":job(path.contains("/west/") ? "west":"east", path.split(separator: "/").last.map(String.init) ?? "job-042"),"fetchedAt":date(now)] }
         if path == "/api/v1/targets" { return page([["deploymentId":"east","namespaceId":"research","targetId":"slurm-batch","name":"Synthetic Slurm","state":"active","provider":"native","backend":"slurm","generation":"1","capabilities":["collections","arrays"]]]) }
         if path.contains("/workloads/") {
             let kind = path.contains("/graph") ? "graph" : path.contains("/array") ? "array" : "collection"
@@ -80,7 +80,8 @@ private final class FixtureProtocol: URLProtocol, @unchecked Sendable {
     override func startLoading() {
         do {
             let status = request.httpMethod == "GET" ? 200 : 422
-            let data = try request.httpMethod == "GET" ? NativeFixtures.data(path: request.url!.path) : JSONSerialization.data(withJSONObject: ["code":"fixture_read_only","message":"Synthetic previews do not mutate real services."])
+            let stream = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "stream" }?.value ?? "stdout"
+            let data = try request.httpMethod == "GET" ? NativeFixtures.data(path: request.url!.path, stream: stream) : JSONSerialization.data(withJSONObject: ["code":"fixture_read_only","message":"Synthetic previews do not mutate real services."])
             client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1", headerFields: ["Content-Type":"application/json"])!, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: data)
             client?.urlProtocolDidFinishLoading(self)

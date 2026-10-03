@@ -106,6 +106,7 @@ struct AlertEditor: View {
     @State private var error: String?
     @State private var watchNamespace: NamespaceRef?
     @State private var watchJobId = ""
+    @State private var confirmingDelete = false
     init(initial: AlertRule) { _rule = State(initialValue: initial) }
     var body: some View {
         NavigationStack {
@@ -159,7 +160,11 @@ struct AlertEditor: View {
                     Text("Rules begin from an established source checkpoint and apply to future eligible events. Source outages may leave activation pending.").font(.footnote)
                 }
                 if let error { ErrorMessage(error: error) }
+                if !rule.id.isEmpty { Section { Button("Delete alert rule", role: .destructive) { confirmingDelete = true } } }
             }.navigationTitle(rule.id.isEmpty ? "New alert rule" : "Edit alert rule")
+                .confirmationDialog("Delete this alert rule? Other matching rules will continue to apply.", isPresented: $confirmingDelete) {
+                    Button("Delete rule", role: .destructive) { Task { await delete() } }
+                }
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                     ToolbarItem(placement: .confirmationAction) { Button("Save") { Task { await save() } }.disabled(saving || rule.name.isEmpty || rule.namespaces.isEmpty || (rule.outcomeMode == "selected" && rule.outcomes.isEmpty) || (rule.scope == "watched_jobs" && rule.jobs.isEmpty)) }
@@ -170,6 +175,13 @@ struct AlertEditor: View {
         saving = true; defer { saving = false }
         do {
             let _: AlertRule = try await store.request(path: "/api/v1/rules" + (rule.id.isEmpty ? "" : "/\(APIPath.component(rule.id))"), method: rule.id.isEmpty ? "POST" : "PUT", body: JSONEncoder().encode(rule.input), revision: rule.id.isEmpty ? nil : rule.revision)
+            dismiss()
+        } catch { self.error = error.localizedDescription }
+    }
+    private func delete() async {
+        saving = true; defer { saving = false }
+        do {
+            let _: EmptyResponse = try await store.request(path: "/api/v1/rules/\(APIPath.component(rule.id))", method: "DELETE", revision: rule.revision)
             dismiss()
         } catch { self.error = error.localizedDescription }
     }
@@ -256,9 +268,14 @@ struct SettingsView: View {
         } catch { self.error = error.localizedDescription }
     }
     private func enableNotifications() async {
+        guard !store.previewMode else { error = "Synthetic previews do not request notification permission or register with APNs."; return }
         do {
             let granted = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
-            if granted { UIApplication.shared.registerForRemoteNotifications() }
+            if granted {
+                if let token = PushRegistration.token { await store.registerPush(token: token, enabled: true) }
+                else { PushRegistration.enableRequested = true }
+                UIApplication.shared.registerForRemoteNotifications()
+            }
             await checkNotifications()
         } catch { self.error = error.localizedDescription }
     }
@@ -279,9 +296,14 @@ private struct DeviceRow: View {
     let device: Device
     @State private var enabled: Bool?
     @State private var error: String?
+    @State private var removed = false
     var body: some View {
         VStack(alignment: .leading) {
-            Toggle(device.name, isOn: Binding(get: { enabled ?? device.enabled }, set: { value in Task { await update(value) } }))
+            if removed { Text("\(device.name) removed") }
+            else {
+                Toggle(device.name, isOn: Binding(get: { enabled ?? device.enabled }, set: { value in Task { await update(value) } }))
+                Button("Remove device", role: .destructive) { Task { await remove() } }
+            }
             Text("Permission: \(device.permission ?? "Unavailable")").font(.caption)
             if let error { ErrorMessage(error: error) }
         }
@@ -291,6 +313,12 @@ private struct DeviceRow: View {
             struct Change: Encodable { let enabled: Bool }
             let _: Device = try await store.request(path: "/api/v1/devices/\(APIPath.component(device.id))", method: "PATCH", body: JSONEncoder().encode(Change(enabled: value)))
             enabled = value; error = nil
+        } catch { self.error = error.localizedDescription }
+    }
+    private func remove() async {
+        do {
+            let _: EmptyResponse = try await store.request(path: "/api/v1/devices/\(APIPath.component(device.id))", method: "DELETE")
+            removed = true; error = nil
         } catch { self.error = error.localizedDescription }
     }
 }

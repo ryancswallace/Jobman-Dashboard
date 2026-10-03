@@ -150,7 +150,11 @@ struct JobDetailView: View {
             .sheet(isPresented: $watching) { AlertEditor(initial: AlertRule(name: "Watched job", scope: "watched_jobs", namespaces: [ref.namespace], jobs: [ref])) }
     }
     private func load() async {
-        do { let result: JobDetail = try await store.request(path: APIPath.job(ref)); detail = result; error = nil }
+        do {
+            let result: JobDetail = try await store.request(path: APIPath.job(ref))
+            guard result.job.ref == ref else { throw DashboardError.invalidResponse }
+            detail = result; error = nil
+        }
         catch is CancellationError {} catch { self.error = error.localizedDescription }
     }
 }
@@ -258,7 +262,8 @@ struct PagedRows<Item: Decodable & Sendable & Identifiable, Row: View>: View {
     @State private var lastPage: Page<Item>?
     @State private var evictedRows = 0
     var body: some View {
-        Group {
+        Section {
+            if !loaded && error == nil { ProgressView("Loading authorized items…") }
             ForEach(items, content: row)
             if evictedRows > 0 { Text("\(evictedRows) earlier rows removed from memory; reopen this view to restart.").font(.caption) }
             if let page = lastPage { SourceSummary(completeness: page.completeness, sources: page.sources, fetchedAt: page.fetchedAt) }

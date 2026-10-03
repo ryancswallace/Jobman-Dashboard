@@ -12,7 +12,13 @@ struct DeviceBinding: Codable, Sendable {
 @MainActor
 enum DeviceRevocations {
     private static var flushing = false
-    static func saveActive(_ binding: DeviceBinding) throws { try write(binding, account: "active") }
+    static func saveActive(_ binding: DeviceBinding) throws {
+        if let old: DeviceBinding = try read(account: "active"),
+           old.address != binding.address || old.deviceId != binding.deviceId || old.credential != binding.credential {
+            _ = try enqueueActive()
+        }
+        try write(binding, account: "active")
+    }
     static func enqueueActive() throws -> Bool {
         guard let active: DeviceBinding = try read(account: "active") else { return false }
         var queue: [DeviceBinding] = try read(account: "pending") ?? []

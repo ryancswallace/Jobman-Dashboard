@@ -9,6 +9,7 @@ From this directory:
 ```sh
 ./scripts/test-core.sh
 ./scripts/build-simulator.sh
+./scripts/test-ui.sh
 ```
 
 The Xcode project has a shared `JobmanDashboard` scheme and local `DashboardCore` Swift package. Full Xcode is required for iPhone builds and UI tests. The core test script also supports an existing Apple Command Line Tools installation with its bundled Swift Testing framework. Build outputs use a task-specific temporary directory; no signing credential is needed for simulator builds. Xcode needs its normal user-cache and CoreSimulator access.
@@ -16,10 +17,7 @@ The Xcode project has a shared `JobmanDashboard` scheme and local `DashboardCore
 Run UI tests on an installed simulator, substituting an available device from `xcrun simctl list devices available`:
 
 ```sh
-xcodebuild -project JobmanDashboard.xcodeproj -scheme JobmanDashboard \
-  -destination 'platform=iOS Simulator,name=iPhone 18 Pro' \
-  -derivedDataPath "$TMPDIR/jobman-dashboard-xcode-build" \
-  CODE_SIGNING_ALLOWED=NO test
+IOS_TEST_DESTINATION='platform=iOS Simulator,name=iPhone 18 Pro' ./scripts/test-ui.sh
 ```
 
 Project source references and the scheme are reproducible with `python3 scripts/generate-project.py`. Run it after adding/removing App or UITests Swift files. The generated OpenAPI client is included through `Sources/DashboardCore/DashboardAPI.generated.swift`, a relative symlink to the single checked-in `contracts/swift/DashboardAPI.generated.swift`. `GeneratedTransport.swift` supplies origin-pinned, authenticated, bounded HTTP behavior; the generated bootstrap result is mapped into application state. Other application models retain unknown enum values and 64-bit wire strings.
@@ -41,7 +39,7 @@ xcrun simctl launch booted org.jobman.dashboard --dashboard-ui-fixtures
 - Refresh credentials are device-only Keychain items accessible while unlocked. Access tokens stay in memory. Jobs, log bytes, reports and API caches are not written to persistent storage. The task-switcher cover conceals content when the scene is inactive.
 - Account/scope generations suppress late responses after a switch. Bootstrap refreshes discover grant changes; sensitive views are cleared when current authorization cannot be verified within the server freshness window. The server remains authoritative for every read.
 - Log requests use base64 bytes and decimal offsets. The client checks range length/order/stream identity, renders controls inert, caps each response at 256 KiB and the retained log buffer at 2 MiB, and labels evicted or truncated output. Scrolling pauses following; search applies only to loaded text.
-- Push payloads contain an opaque inbox ID. Opening it requires a current authenticated read over the private network. Registration binds a token to an account/installation, topic and APNs environment. Notification permission remains opt-in.
+- Push payloads contain an opaque inbox ID. Opening it requires a current authenticated read over the private network; cold-launch taps retain only that opaque ID until navigation subscribes. Registration binds a token to an account/installation, topic and APNs environment. Automatic token updates omit `enabled`, preserving an existing device preference and leaving a new binding disabled. Only the explicit Enable action sends `enabled: true`. Notification permission remains opt-in.
 - Sign-out removes local credentials and content immediately. A separate, narrow unbind credential may remain in a device-only Keychain queue until `/auth/native/device-revocations` is reachable. It can only revoke its specific account-device binding generation; it cannot authenticate, read jobs or attach another binding. Successful idempotent revocations remove the queue entry. No bearer token is retained for this queue. The UI reports pending server unbinding rather than claiming an offline logout reached the server.
 
 ## Signing and internal delivery
@@ -56,6 +54,6 @@ On October 3, 2026:
 
 - `scripts/test-core.sh`: **23 tests passed** using Apple Swift 6.3.3 / bundled Swift Testing. Tests exercise source-qualified IDs/routes, strict callback/state/PKCE behavior, unknown enums and large revisions, nullable aggregate counts, permission freshness and scope/account invalidation, exact log offsets/UTF-8 boundaries/memory limits, bounded graph layout/cycles, generated transport boundaries, safe errors and oversized responses.
 - `scripts/build-simulator.sh`: **passed** with Xcode 27.0 (27A266a), including the generated API integration and Debug-only synthetic UI mode. The generic simulator target requires no device signing.
-- Xcode project, entitlements, Info.plist and privacy manifest parse successfully. Native UI-test source exists; execution and rendered UI review are tracked separately from the build and core-test results.
+- Xcode project, entitlements, Info.plist and privacy manifest parse successfully. `scripts/test-ui.sh`: **two iPhone 18 Pro / iOS 27.0 UI tests passed**, including the final 16:41 EDT run: the real connection screen exposes no fake sign-in, and explicitly labeled synthetic fixtures support native Overview → Workloads → graph diagram/list → Inbox → Settings navigation. Attached simulator screenshots were inspected; the preview label is separated from navigation and remains visible across tabs. A blank-catalog lifecycle issue found by the first run was repaired before the passing run. These tests do not exercise live services. The UI test script uses its own temporary DerivedData directory so it does not conflict with a concurrent simulator build.
 
 These results do not prove real AD FS interoperability, current directory authorization, production log/report APIs, APNs delivery, internal signing/distribution, managed-device behavior, or release readiness. Follow the repository's implementation tracker and T01–T12 acceptance gates for those results.

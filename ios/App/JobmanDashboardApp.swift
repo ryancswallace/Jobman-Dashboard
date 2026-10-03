@@ -9,15 +9,15 @@ struct JobmanDashboardApp: App {
 
     var body: some Scene {
         WindowGroup {
-            Group {
-                if store.signedIn { DashboardTabs() } else { ConnectionView() }
-            }
-            .environment(store)
-            .safeAreaInset(edge: .top) {
+            VStack(spacing: 0) {
                 if store.previewMode {
                     Text("SYNTHETIC PREVIEW • No live sign-in or job data").font(.caption.bold()).frame(maxWidth: .infinity).padding(8).background(.yellow.opacity(0.25)).accessibilityIdentifier("fixtureBanner")
                 }
+                Group {
+                    if store.signedIn { DashboardTabs() } else { ConnectionView() }
+                }
             }
+            .environment(store)
             .tint(Color(red: 0.12, green: 0.43, blue: 0.42))
             .preferredColorScheme(store.bootstrap?.preferences.appearance == "dark" ? .dark : store.bootstrap?.preferences.appearance == "light" ? .light : nil)
             .overlay {
@@ -28,10 +28,17 @@ struct JobmanDashboardApp: App {
             }
             .onOpenURL { if let route = DashboardRoute(url: $0) { store.open(route) } }
             .onReceive(NotificationCenter.default.publisher(for: .dashboardInboxOpened)) { message in
-                if let id = message.userInfo?["inboxId"] as? String { store.open(.inbox(id)) }
+                if let id = notifications.consumePendingInbox() ?? (message.userInfo?["inboxId"] as? String) { store.open(.inbox(id)) }
+            }
+            .task {
+                if let id = notifications.consumePendingInbox() { store.open(.inbox(id)) }
             }
             .onReceive(NotificationCenter.default.publisher(for: .dashboardPushRegistered)) { message in
-                if let token = message.userInfo?["token"] as? String { Task { await store.registerPush(token: token) } }
+                if let token = message.userInfo?["token"] as? String {
+                    let enabled: Bool? = PushRegistration.enableRequested ? true : nil
+                    PushRegistration.enableRequested = false
+                    Task { await store.registerPush(token: token, enabled: enabled) }
+                }
             }
             .onChange(of: scenePhase) { _, phase in store.setActive(phase == .active) }
         }

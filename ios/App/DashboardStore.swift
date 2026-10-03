@@ -38,6 +38,7 @@ final class DashboardStore {
     private var listGeneration = UUID()
     private(set) var evictedJobRows = 0
     private var consecutiveRefreshFailures = 0
+    private var lastDataRefresh = Date.distantPast
     private(set) var previewMode = false
 
     init() {
@@ -78,6 +79,7 @@ final class DashboardStore {
             try activate(result)
             UserDefaults.standard.set(connection.baseURL.absoluteString, forKey: "dashboardAddress")
             refresh(); setActive(true)
+            if let token = PushRegistration.token { await registerPush(token: token) }
             if let pendingRoute { open(pendingRoute) }
         } catch {
             guard generation == sessionGeneration else { return }
@@ -87,6 +89,7 @@ final class DashboardStore {
 
     private func activate(_ value: Bootstrap) throws {
         guard value.apiVersion == "jobman.dashboard/v1" else { throw DashboardError.unsupportedContract }
+        try validateAuthorization(value)
         bootstrap = value
         let now = Date()
         let checked = value.authorizationCheckedAt ?? now
@@ -108,6 +111,7 @@ final class DashboardStore {
 
     func refresh() {
         guard signedIn, refreshTask == nil else { return }
+        lastDataRefresh = Date()
         let refreshID = UUID()
         refreshGeneration = refreshID
         refreshTask = Task { @MainActor in
@@ -115,12 +119,14 @@ final class DashboardStore {
             do {
                 let boot = try await fetchBootstrap()
                 guard boot.account.id == bootstrap?.account.id else { signOut(); return }
+                try validateAuthorization(boot)
                 let revoked = boundary.refreshAuthorization(namespaces: Set(boot.namespaces), checkedAt: boot.authorizationCheckedAt ?? Date(),
                                                             maximumAge: (boot.authorizationDeadline ?? Date()).timeIntervalSince(boot.authorizationCheckedAt ?? Date()))
                 let grantsChanged = authorizationVersions(boot) != bootstrap.map(authorizationVersions)
                 bootstrap = boot
                 if revoked || grantsChanged { try activate(boot); purgeContent(); path = []; inboxPath = [] }
                 scheduleExpiry()
+                if boot.namespaces.isEmpty { purgeContent(); error = "No namespaces are currently authorized for this account."; return }
                 guard let ticket = boundary.ticket() else { return }
                 let query = try scope.queryItems(authorized: boot.namespaces)
                 async let summary: Overview = request(path: "/api/v1/overview", query: query)
@@ -140,6 +146,7 @@ final class DashboardStore {
                 jobs = result.1
                 error = nil
                 consecutiveRefreshFailures = 0
+                lastDataRefresh = Date()
             } catch is CancellationError { }
             catch {
                 handle(error)
@@ -153,8 +160,15 @@ final class DashboardStore {
         let generation = sessionGeneration
         let ticket = boundary.ticket()
         let token = previewMode ? "synthetic-preview" : try await authentication.token()
-        let result: T = try await client.request(path: path, query: query, token: token, method: method, body: body,
-                                                 revision: revision, idempotencyKey: idempotencyKey ?? (method == "POST" ? UUID() : nil))
+        let result: T
+        do {
+            result = try await client.request(path: path, query: query, token: token, method: method, body: body,
+                                              revision: revision, idempotencyKey: idempotencyKey ?? (method == "POST" ? UUID() : nil))
+        } catch {
+            if generation == sessionGeneration, let value = error as? DashboardError,
+               [.authenticationRequired, .forbidden, .authorizationUnavailable].contains(value) { handle(value) }
+            throw error
+        }
         try Task.checkCancellation()
         guard generation == sessionGeneration else { throw CancellationError() }
         if !bypassFreshness {
@@ -229,11 +243,11 @@ final class DashboardStore {
             while !Task.isCancelled {
                 let seconds = bootstrap?.preferences.refreshSeconds ?? 5
                 // Authorization still refreshes every five seconds when data polling is manual.
-                let base = max(5, seconds)
-                let delay = consecutiveRefreshFailures == 0 ? Double(base) : min(60, Double(base) * pow(2, Double(min(consecutiveRefreshFailures, 4)))) * Double.random(in: 0.85...1.0)
-                try? await Task.sleep(for: .seconds(delay))
+                try? await Task.sleep(for: .seconds(5))
                 guard !Task.isCancelled else { break }
-                if seconds > 0 { refresh() }
+                let base = max(5, seconds)
+                let dataDelay = consecutiveRefreshFailures == 0 ? Double(base) : min(60, Double(base) * pow(2, Double(min(consecutiveRefreshFailures, 4)))) * Double.random(in: 0.85...1.0)
+                if seconds > 0, Date().timeIntervalSince(lastDataRefresh) >= dataDelay { refresh() }
                 else { await refreshAccessOnly() }
             }
         }
@@ -243,10 +257,12 @@ final class DashboardStore {
         do {
             let boot = try await fetchBootstrap()
             guard boot.account.id == bootstrap?.account.id else { signOut(); return }
+            try validateAuthorization(boot)
             let removed = boundary.refreshAuthorization(namespaces: Set(boot.namespaces), checkedAt: boot.authorizationCheckedAt ?? Date(),
                                                          maximumAge: (boot.authorizationDeadline ?? Date()).timeIntervalSince(boot.authorizationCheckedAt ?? Date()))
+            let grantsChanged = authorizationVersions(boot) != bootstrap.map(authorizationVersions)
             bootstrap = boot
-            if removed { purgeContent(); path = [] }
+            if removed || grantsChanged { try activate(boot); purgeContent(); path = []; inboxPath = [] }
             scheduleExpiry()
         } catch { handle(error) }
     }
@@ -273,17 +289,17 @@ final class DashboardStore {
         if route.isInbox { inboxPath = [route] } else { path = [route] }
     }
 
-    func registerPush(token: String) async {
-        guard signedIn else { return }
+    func registerPush(token: String, enabled: Bool? = nil) async {
+        guard signedIn, !previewMode else { return }
         do {
             struct Registration: Encodable {
                 let installationId: String; let token: String; let topic: String; let environment: String
-                let name: String; let enabled: Bool; let permission: String
+                let name: String; let enabled: Bool?; let permission: String
             }
             let key = "installationId"
             let installation = UserDefaults.standard.string(forKey: key) ?? UUID().uuidString
             UserDefaults.standard.set(installation, forKey: key)
-            let body = Registration(installationId: installation, token: token, topic: Bundle.main.bundleIdentifier ?? "", environment: Bundle.main.object(forInfoDictionaryKey: "APNSEnvironment") as? String ?? "development", name: "iPhone", enabled: true, permission: "authorized")
+            let body = Registration(installationId: installation, token: token, topic: Bundle.main.bundleIdentifier ?? "", environment: Bundle.main.object(forInfoDictionaryKey: "APNSEnvironment") as? String ?? "development", name: "iPhone", enabled: enabled, permission: "authorized")
             struct Registered: Decodable, Sendable { let id: String; let revocationCredential: String }
             let result: Registered = try await request(path: "/api/v1/devices", method: "POST", body: JSONEncoder().encode(body))
             let binding = DeviceBinding(address: address, deviceId: result.id, credential: result.revocationCredential)
@@ -293,7 +309,9 @@ final class DashboardStore {
     }
 
     func signOut() {
-        let queuedUnbind = (try? DeviceRevocations.enqueueActive()) ?? false
+        var queuedUnbind = false
+        var unbindQueueFailed = false
+        do { queuedUnbind = try DeviceRevocations.enqueueActive() } catch { unbindQueueFailed = true }
         sessionGeneration = UUID()
         polling?.cancel(); refreshTask?.cancel(); freshnessTask?.cancel()
         polling = nil; refreshTask = nil; freshnessTask = nil
@@ -304,6 +322,7 @@ final class DashboardStore {
             error = "Signed out on this phone. Device alert unbinding will finish when the private service is reachable."
             Task { await DeviceRevocations.flush() }
         }
+        if unbindQueueFailed { error = "Signed out locally. Device alert unbinding could not be queued; reconnect to finish removing this phone's server binding." }
         deviceBinding = nil
     }
 
@@ -312,6 +331,14 @@ final class DashboardStore {
         Dictionary(uniqueKeysWithValues: bootstrap.deployments.flatMap { deployment in
             deployment.namespaces.map { (NamespaceRef(deploymentId: deployment.id, namespaceId: $0.id), $0.authorizationVersion) }
         })
+    }
+    private func validateAuthorization(_ bootstrap: Bootstrap) throws {
+        let namespaces = bootstrap.deployments.flatMap(\.namespaces)
+        guard Set(bootstrap.namespaces).count == bootstrap.namespaces.count,
+              namespaces.allSatisfy({ namespace in
+                  guard let checked = WireDate.parse(namespace.authorizationCheckedAt), let expiry = WireDate.parse(namespace.authorizationExpiresAt) else { return false }
+                  return checked <= Date().addingTimeInterval(30) && expiry > checked
+              }) else { throw DashboardError.authorizationUnavailable }
     }
     private func handle(_ error: Error) {
         consecutiveRefreshFailures = min(consecutiveRefreshFailures + 1, 4)
