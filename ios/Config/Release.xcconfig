@@ -1,0 +1,3 @@
+// The approved internal signing/export channel must be selected before distribution.
+APNS_ENVIRONMENT = production
+#include? "Local.xcconfig"

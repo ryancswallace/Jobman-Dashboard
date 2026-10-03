@@ -1,0 +1,1 @@
+../../../contracts/swift/DashboardAPI.generated.swift

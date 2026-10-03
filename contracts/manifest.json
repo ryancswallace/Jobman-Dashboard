@@ -1,0 +1,28 @@
+{
+  "apiVersion": "0.1.0-alpha.1",
+  "generator": "scripts/generate-contracts.py",
+  "openapiSha256": "cb1f2e062a827fdd920ec6bf23f8331c5d91ab8a06737cd69aa2937c694fdb1e",
+  "operations": [
+    "bootstrap",
+    "job",
+    "artifacts",
+    "logs",
+    "reports",
+    "requestReport",
+    "citation",
+    "workload",
+    "devices",
+    "updateDevice",
+    "inbox",
+    "updateInbox",
+    "jobs",
+    "overview",
+    "updatePreferences",
+    "rules",
+    "createRule",
+    "updateRule",
+    "targets",
+    "workloads"
+  ],
+  "schemaCount": 43
+}
