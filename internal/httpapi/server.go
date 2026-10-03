@@ -48,6 +48,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/overview", s.overview)
 	mux.HandleFunc("PUT /api/v1/preferences", s.updatePreferences)
 	mux.HandleFunc("GET /api/v1/deployments/{deployment}/namespaces/{namespace}/jobs/{job}/logs", s.logs)
+	mux.HandleFunc("GET /api/v1/deployments/{deployment}/namespaces/{namespace}/jobs/{job}/artifacts", s.artifacts)
 	mux.HandleFunc("GET /api/v1/deployments/{deployment}/namespaces/{namespace}/jobs/{job}", s.job)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, &api.Error{Code: "not_found_or_inaccessible", Message: "This API operation is not available."})

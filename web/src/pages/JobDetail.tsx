@@ -8,26 +8,18 @@ import {
 import { useSession } from "../lib/session";
 import { APIError, request, resourcePath } from "../lib/transport";
 import { useResource } from "../lib/useResource";
-import { decodeJobDetail, decodePage } from "../lib/api";
-import type { Artifact } from "../lib/models";
-import {
-  count,
-  sourceLabel,
-  timestamp,
-  title,
-  workloadRoute,
-} from "../lib/format";
+import { decodeJobDetail } from "../lib/api";
+import { ArtifactList } from "../components/ArtifactList";
+import { sourceLabel, timestamp, title, workloadRoute } from "../lib/format";
 import {
   ErrorNotice,
   Freshness,
   PageHeader,
   Spinner,
   Status,
-  Empty,
 } from "../components/States";
 import { LogViewer } from "../components/LogViewer";
 import { Reports } from "../components/Reports";
-const decodeArtifacts = (value: unknown) => decodePage<Artifact>(value);
 export function JobDetailPage() {
   const { deploymentId = "", namespaceId = "", jobId = "" } = useParams(),
     { bootstrap, identity } = useSession(),
@@ -43,12 +35,6 @@ export function JobDetailPage() {
       decodeJobDetail,
     ),
     job = result.data?.data;
-  const artifacts = useResource(
-    tab === "artifacts" ? `${path}/artifacts?limit=50` : null,
-    identity,
-    0,
-    decodeArtifacts,
-  );
   const [watchState, setWatchState] = useState(""),
     [watchError, setWatchError] = useState<APIError>();
   const watch = async () => {
@@ -341,65 +327,7 @@ export function JobDetailPage() {
               <Reports key={`${identity}:${path}`} job={ref} />
             )}
             {tab === "artifacts" && (
-              <section className="panel">
-                <div className="panel-heading">
-                  <div>
-                    <h2>Published artifacts</h2>
-                    <p>
-                      Metadata only. Downloads are not part of this release.
-                    </p>
-                  </div>
-                </div>
-                {artifacts.error && (
-                  <ErrorNotice
-                    error={artifacts.error}
-                    retry={artifacts.refresh}
-                  />
-                )}{" "}
-                {!artifacts.data && artifacts.loading ? (
-                  <Spinner label="Loading artifact metadata" />
-                ) : artifacts.data?.data.length ? (
-                  <div className="table-wrap">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Name</th>
-                          <th>Size</th>
-                          <th>Checksum</th>
-                          <th>Published</th>
-                          <th>Availability</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {artifacts.data.data.map((a) => (
-                          <tr key={a.id}>
-                            <td>{a.name}</td>
-                            <td>{count(a.sizeBytes)} bytes</td>
-                            <td className="mono">
-                              {a.checksum ?? "Unavailable"}
-                            </td>
-                            <td>
-                              {timestamp(
-                                a.publishedAt,
-                                bootstrap.preferences.timezone,
-                              )}
-                            </td>
-                            <td>
-                              <Status value={a.availability} />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  !artifacts.error && (
-                    <Empty title="No artifact metadata">
-                      No artifacts have been published for this job.
-                    </Empty>
-                  )
-                )}
-              </section>
+              <ArtifactList key={`${identity}:${path}`} path={path} />
             )}
           </>
         )

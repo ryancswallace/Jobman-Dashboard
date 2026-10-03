@@ -604,8 +604,17 @@
               "type": "integer",
               "default": 50,
               "minimum": 1,
-              "maximum": 200
+              "maximum": 100
             }
+          },
+          {
+            "in": "query",
+            "name": "runNumber",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            },
+            "description": "Select an actual run number; omit to list metadata across actual runs."
           }
         ],
         "responses": {
@@ -1402,14 +1411,20 @@
             "name": "nodeId",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "Immutable job UUID of the graph node, not its display label."
           },
           {
             "in": "query",
             "name": "direction",
             "schema": {
-              "type": "string"
-            }
+              "type": "string",
+              "enum": [
+                "incoming",
+                "outgoing"
+              ]
+            },
+            "description": "Filter relative to nodeId: incoming or outgoing; omit for both directions."
           }
         ],
         "responses": {
@@ -2321,15 +2336,35 @@
           },
           "availability": {
             "type": "string"
+          },
+          "runId": {
+            "type": "string"
+          },
+          "runNumber": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "executionId": {
+            "type": "string"
+          },
+          "targetGenerationId": {
+            "type": "string"
           }
         },
         "required": [
           "id",
           "name",
           "sizeBytes",
-          "availability"
+          "availability",
+          "runId",
+          "runNumber",
+          "executionId",
+          "targetGenerationId",
+          "checksum",
+          "publishedAt"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Published metadata; metadata_only does not establish byte availability. No storage path or download URL is returned."
       },
       "LogRange": {
         "type": "object",
@@ -2928,13 +2963,18 @@
           "fetchedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "total": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
           }
         },
         "required": [
           "items",
           "completeness",
           "sources",
-          "fetchedAt"
+          "fetchedAt",
+          "total"
         ],
         "additionalProperties": false
       },
@@ -3205,16 +3245,20 @@
         "type": "object",
         "properties": {
           "from": {
-            "type": "string"
+            "type": "string",
+            "description": "Display label of the upstream graph node; not its job identity."
           },
           "to": {
-            "type": "string"
+            "type": "string",
+            "description": "Display label of the downstream graph node; not its job identity."
           },
           "fromJobId": {
-            "type": "string"
+            "type": "string",
+            "description": "Immutable job UUID of the upstream graph node; used for nodeId filters and topology."
           },
           "toJobId": {
-            "type": "string"
+            "type": "string",
+            "description": "Immutable job UUID of the downstream graph node; used for nodeId filters and topology."
           },
           "predicate": {
             "type": "string"

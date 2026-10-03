@@ -1,7 +1,7 @@
 {
   "apiVersion": "0.1.0-alpha.1",
   "generator": "scripts/generate-contracts.py",
-  "openapiSha256": "1c76aefc7f864a5387b0bea06d5f2552e3af2510cb842ba6c212121c855c5bed",
+  "openapiSha256": "9e98503b75cd68fb4576a2a9f4a3fca9bc49bd40b952ecd3691939e7a9836316",
   "operations": [
     "bootstrap",
     "job",

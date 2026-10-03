@@ -156,8 +156,12 @@ func (o *OIDC) identity(token *oidc.IDToken, native bool) (Identity, error) {
 	if !uuid(directoryID) {
 		return Identity{}, ErrUnauthenticated
 	}
-	if native && read(o.options.ClientIDClaim) != o.options.NativeClientID {
-		return Identity{}, ErrUnauthenticated
+	if native {
+		// ID tokens name an interactive client as audience. Reject that audience
+		// even if an issuer mapper also (incorrectly) includes the API resource.
+		if read(o.options.ClientIDClaim) != o.options.NativeClientID || slices.Contains(token.Audience, o.options.NativeClientID) || slices.Contains(token.Audience, o.options.WebClientID) {
+			return Identity{}, ErrUnauthenticated
+		}
 	}
 	name := read("name")
 	if name == "" {

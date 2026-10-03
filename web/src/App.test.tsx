@@ -495,3 +495,62 @@ describe("group monitoring workflows", () => {
     ).toBeVisible();
   });
 });
+
+it("pages artifact metadata with exact run/size and restarts paging when selecting a run", async () => {
+  history.replaceState(
+    null,
+    "",
+    "/deployments/east/namespaces/ns/jobs/duplicate-id?tab=artifacts",
+  );
+  const previous = fetcher.getMockImplementation()!;
+  fetcher.mockImplementation(async (input: string, options?: RequestInit) => {
+    const url = new URL(input, "http://localhost");
+    if (!url.pathname.endsWith("/artifacts")) return previous(input, options);
+    const next = url.searchParams.has("cursor");
+    const run = url.searchParams.get("runNumber") ?? "3";
+    return Response.json({
+      ...page([
+        {
+          id: `execution/${next ? "second" : "first"}`,
+          name: next ? "second-result" : "first-result",
+          runId: "real-run",
+          runNumber: run,
+          executionId: "real-execution",
+          targetGenerationId: "generation",
+          sizeBytes: "9007199254740993",
+          checksum: "sha256:published-checksum",
+          publishedAt: "2026-10-03T12:00:00Z",
+          availability: "metadata_only",
+        },
+      ]),
+      total: "2",
+      ...(!next ? { nextCursor: "artifact-next" } : {}),
+    });
+  });
+  render(<App />);
+  expect(await screen.findByText("first-result")).toBeVisible();
+  expect(screen.getByText("9,007,199,254,740,993 bytes")).toBeVisible();
+  expect(
+    screen.getByText("Published metadata; bytes unverified"),
+  ).toBeVisible();
+  expect(
+    screen.queryByRole("link", { name: /download/i }),
+  ).not.toBeInTheDocument();
+  await userEvent.click(
+    screen.getByRole("button", { name: "Next artifact page →" }),
+  );
+  expect(await screen.findByText("second-result")).toBeVisible();
+  expect(location.search).toContain("artifactCursor=artifact-next");
+  await userEvent.type(
+    screen.getByRole("textbox", { name: "Artifact run number" }),
+    "2",
+  );
+  expect(await screen.findByText("first-result")).toBeVisible();
+  expect(location.search).toContain("artifactRun=2");
+  expect(location.search).not.toContain("artifactCursor");
+  expect(
+    fetcher.mock.calls.some(
+      ([path]) => path.includes("runNumber=2") && !path.includes("cursor="),
+    ),
+  ).toBe(true);
+});
