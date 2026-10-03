@@ -2,8 +2,10 @@ package monitoring
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -23,6 +25,7 @@ type testSource struct {
 	fail          bool
 	failDiscovery bool
 	calls         int
+	pageSize      int
 	hook          func()
 }
 
@@ -53,6 +56,9 @@ func (s *testSource) Jobs(_ context.Context, _ Actor, q SourceQuery) (JobPage, e
 		}
 	}
 	end := min(start+q.Limit, len(s.rows))
+	if s.pageSize > 0 {
+		end = min(end, start+s.pageSize)
+	}
 	items := slices.Clone(s.rows[start:end])
 	next := ""
 	if end < len(s.rows) {
@@ -82,7 +88,39 @@ func source(id string, count int, spacing time.Duration) *testSource {
 	for i := 0; i < count; i++ {
 		s.rows = append(s.rows, api.Job{Scope: api.Scope{DeploymentID: id, NamespaceID: "ns"}, ID: fmt.Sprintf("job-%03d", i), CreatedAt: clock.Add(-time.Duration(i) * spacing), Phase: "running", DesiredState: "cancel", Confidence: "stale", Revision: "9007199254740993", Labels: map[string]string{}})
 	}
+	slices.SortFunc(s.rows, compareJobs)
 	return s
+}
+
+func TestSameTimestampControlKeysetsRemainDescendingAcrossPageBoundaries(t *testing.T) {
+	a, b := source("a", 7, 0), source("b", 7, 0)
+	a.pageSize = 2
+	b.pageSize = 2
+	e := engine(t, a, b)
+	var got []string
+	cursor := ""
+	for range 10 {
+		page, err := e.Jobs(context.Background(), actor("one"), Query{Limit: 3}, cursor)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, job := range page.Items {
+			got = append(got, job.DeploymentID+"/"+job.ID)
+		}
+		cursor = page.NextCursor
+		if cursor == "" {
+			break
+		}
+	}
+	var expected []string
+	for _, id := range []string{"a", "b"} {
+		for i := 6; i >= 0; i-- {
+			expected = append(expected, fmt.Sprintf("%s/job-%03d", id, i))
+		}
+	}
+	if !slices.Equal(got, expected) {
+		t.Fatalf("equal-time keyset skipped or reordered jobs: got %v; want %v", got, expected)
+	}
 }
 func engine(t *testing.T, ss ...*testSource) *Engine {
 	t.Helper()
@@ -187,6 +225,54 @@ func TestCursorRetryAndBackNavigationReplaySamePage(t *testing.T) {
 	s.revoked = true
 	if _, err := e.Jobs(ctx, a, q, first.NextCursor); err == nil {
 		t.Fatal("cached page bypassed revocation")
+	}
+}
+
+func TestExcludedRefillRowsCannotSurvivePublicationOrRevokedReplay(t *testing.T) {
+	a, b := source("a", 10, time.Minute), source("b", 20, 2*time.Minute)
+	a.pageSize = 1
+	e := engine(t, a, b)
+	ctx := context.Background()
+	who := actor("one")
+	q := Query{Limit: 2}
+	first, err := e.Jobs(ctx, who, q, "")
+	if err != nil || first.NextCursor == "" {
+		t.Fatalf("first: %+v %v", first, err)
+	}
+	// A has a buffered row. It can contribute that row before its next read
+	// fails; an unscoped query must still discard its whole partial contribution.
+	a.fail = true
+	second, err := e.Jobs(ctx, who, q, first.NextCursor)
+	if err != nil || second.Completeness != "partial" || second.NextCursor == "" {
+		t.Fatalf("second: %+v %v", second, err)
+	}
+	for _, job := range second.Items {
+		if job.DeploymentID == "a" {
+			t.Fatal("failed refill left an emitted source row in the response")
+		}
+	}
+	// Also reject an older persisted cursor written before this fix, whose
+	// cached rows and excluded buffers disagree after that scope is revoked.
+	key := strings.Split(first.NextCursor, ".")[0]
+	data, version, err := e.cursors.Load(ctx, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var state browseState
+	if err := json.Unmarshal(data, &state); err != nil {
+		t.Fatal(err)
+	}
+	state.Response.Items = append(state.Response.Items, a.rows[1])
+	data, err = json.Marshal(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.cursors.Advance(ctx, key, version, data); err != nil {
+		t.Fatal(err)
+	}
+	a.revoked = true
+	if _, err := e.Jobs(ctx, who, q, first.NextCursor); err == nil {
+		t.Fatal("excluded cached source bypassed current authorization after revocation")
 	}
 }
 

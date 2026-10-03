@@ -214,8 +214,9 @@ func queryHash(q Query) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// Newest first, then stable source-qualified lexical identity. This ordering is
-// shared by upstream keysets and the cross-source merge, including equal times.
+// Newest first, then source-qualified scope ascending and job UUID descending.
+// Within a namespace this matches Control's (created_at DESC, id DESC) keyset,
+// including jobs created at one timestamp by a collection/graph transaction.
 func compareJobs(a, b api.Job) int {
 	if !a.CreatedAt.Equal(b.CreatedAt) {
 		if a.CreatedAt.After(b.CreatedAt) {
@@ -226,7 +227,7 @@ func compareJobs(a, b api.Job) int {
 	if c := scopeCompare(a.Scope, b.Scope); c != 0 {
 		return c
 	}
-	return strings.Compare(a.ID, b.ID)
+	return strings.Compare(b.ID, a.ID)
 }
 
 func (e *Engine) fill(ctx context.Context, a Actor, q Query, b *sourceBuffer) error {
@@ -334,6 +335,17 @@ func (e *Engine) Jobs(ctx context.Context, a Actor, q Query, cursor string) (api
 		// GET retries and back navigation replay exactly this page, but only
 		// after checking the current account, query and every source grant.
 		if state.Response != nil {
+			// Check actual cached rows independently of buffer eligibility. Older
+			// cursors may contain rows emitted before that source's refill failed.
+			authorities := make(map[api.Scope]string, len(state.Buffers))
+			for _, b := range state.Buffers {
+				authorities[b.Scope] = b.Authority
+			}
+			for _, job := range state.Response.Items {
+				if grants[job.Scope] == "" || authorities[job.Scope] != grants[job.Scope] {
+					return page, ErrCursor
+				}
+			}
 			return *state.Response, nil
 		}
 		state.Initial = false
@@ -397,6 +409,12 @@ func (e *Engine) Jobs(ctx context.Context, a Actor, q Query, cursor string) (api
 	}
 	for i := range state.Buffers {
 		b := &state.Buffers[i]
+		// A source can fail after contributing a short page during the merge.
+		// Exclusion removes its entire contribution, including already emitted
+		// rows, before either publication or durable replay caching.
+		if b.Excluded {
+			page.Items = slices.DeleteFunc(page.Items, func(j api.Job) bool { return j.Scope == b.Scope })
+		}
 		if finalDiscovery[b.Scope.DeploymentID].err != nil {
 			b.Excluded = true
 			b.Rows = nil
