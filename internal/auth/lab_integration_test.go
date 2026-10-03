@@ -31,6 +31,18 @@ import (
 // while keeping all credentials and tokens out of output and persisted files.
 // It does not establish AD FS, a physical iPhone or browser-app acceptance.
 func TestLabNativePKCEAndDashboardTokenValidation(t *testing.T) {
+	labNativeSignIn(t, "alice", "71000000-0000-4000-8000-000000000001")
+}
+
+type labNativeSession struct {
+	transport   *http.Transport
+	accessToken string
+	idToken     string
+	root        string
+}
+
+func labNativeSignIn(t *testing.T, user, directoryID string) labNativeSession {
+	t.Helper()
 	root := os.Getenv("JOBMAN_DASHBOARD_LAB_ROOT")
 	if root == "" {
 		t.Skip("set JOBMAN_DASHBOARD_LAB_ROOT to the authorized synthetic Lab")
@@ -63,7 +75,7 @@ func TestLabNativePKCEAndDashboardTokenValidation(t *testing.T) {
 			secrets[name] = strings.TrimSpace(value)
 		}
 	}
-	password, webSecret := secrets["JOBMAN_LAB_DASHBOARD_ALICE_PASSWORD"], secrets["JOBMAN_LAB_DASHBOARD_WEB_SECRET"]
+	password, webSecret := secrets["JOBMAN_LAB_DASHBOARD_"+strings.ToUpper(user)+"_PASSWORD"], secrets["JOBMAN_LAB_DASHBOARD_WEB_SECRET"]
 	if len(password) != 64 || len(webSecret) != 64 {
 		t.Fatal("Synthetic Dashboard credentials missing")
 	}
@@ -116,7 +128,7 @@ func TestLabNativePKCEAndDashboardTokenValidation(t *testing.T) {
 	if err != nil || u.Scheme != "https" || u.Host != "oidc.lab.test:8443" || u.User != nil || !strings.HasPrefix(u.Path, "/realms/jobman-lab/login-actions/") {
 		t.Fatal("Synthetic sign-in form action escaped pinned identity origin")
 	}
-	values := url.Values{"username": {"dashboard-alice"}, "password": {password}, "credentialId": {""}}
+	values := url.Values{"username": {"dashboard-" + user}, "password": {password}, "credentialId": {""}}
 	request, _ = http.NewRequestWithContext(ctx, "POST", u.String(), strings.NewReader(values.Encode()))
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	response, err = client.Do(request)
@@ -143,7 +155,7 @@ func TestLabNativePKCEAndDashboardTokenValidation(t *testing.T) {
 	native := httptest.NewRequest("GET", o.options.PublicOrigin+"/api/v1/bootstrap", nil).WithContext(ctx)
 	native.Header.Set("Authorization", "Bearer "+token.AccessToken)
 	actor, err := o.Authenticate(native)
-	if err != nil || actor.Issuer != issuer || actor.Subject == "" || actor.DirectoryID != "71000000-0000-4000-8000-000000000001" {
+	if err != nil || actor.Issuer != issuer || actor.Subject == "" || actor.DirectoryID != directoryID {
 		t.Fatal("Dashboard rejected signed Lab API identity")
 	}
 	id, ok := token.Extra("id_token").(string)
@@ -174,4 +186,5 @@ func TestLabNativePKCEAndDashboardTokenValidation(t *testing.T) {
 		t.Fatal("Authorization code replay accepted")
 	}
 	t.Log("PASS: verified TLS, native S256 code exchange, signed API/client/GUID identity, nonce, ID-token rejection and code replay denial; synthetic Keycloak only")
+	return labNativeSession{transport: transport, accessToken: token.AccessToken, idToken: id, root: root}
 }
