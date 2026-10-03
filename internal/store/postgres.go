@@ -12,6 +12,7 @@ import (
 	"io/fs"
 	"slices"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -45,6 +46,45 @@ func Open(ctx context.Context, url string) (*Store, error) {
 }
 func (s *Store) Close() { s.Pool.Close() }
 
+// CheckSchema lets a runtime identity verify the migration ledger without any
+// DDL authority. Newer or modified schemas require an explicit operator upgrade.
+func (s *Store) CheckSchema(ctx context.Context) error {
+	names, err := fs.Glob(migrations, "migrations/*.sql")
+	if err != nil {
+		return err
+	}
+	rows, err := s.Pool.Query(ctx, "SELECT name,sha256 FROM dashboard_schema_migrations")
+	if err != nil {
+		return fmt.Errorf("Dashboard schema is unavailable; run the explicit migration command")
+	}
+	defer rows.Close()
+	actual := map[string]string{}
+	for rows.Next() {
+		var name, sum string
+		if err := rows.Scan(&name, &sum); err != nil {
+			return err
+		}
+		actual[name] = sum
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if len(actual) != len(names) {
+		return fmt.Errorf("Dashboard schema version does not match this binary")
+	}
+	for _, name := range names {
+		data, err := migrations.ReadFile(name)
+		if err != nil {
+			return err
+		}
+		hash := sha256.Sum256(data)
+		if actual[name] != hex.EncodeToString(hash[:]) {
+			return fmt.Errorf("Dashboard schema integrity check failed")
+		}
+	}
+	return nil
+}
+
 // Migrate is invoked explicitly with the migration identity, never implicitly by
 // API/worker startup. Checksums prevent silently editing historical migrations.
 func (s *Store) Migrate(ctx context.Context) error {
@@ -64,6 +104,29 @@ func (s *Store) Migrate(ctx context.Context) error {
 		return err
 	}
 	slices.Sort(names)
+	rows, err := tx.Query(ctx, "SELECT name FROM dashboard_schema_migrations")
+	if err != nil {
+		return err
+	}
+	unknown := false
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			rows.Close()
+			return err
+		}
+		if !slices.Contains(names, name) {
+			unknown = true
+		}
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return err
+	}
+	if unknown {
+		return fmt.Errorf("database contains a newer or unknown Dashboard migration; use a compatible binary")
+	}
 	for _, name := range names {
 		sql, err := migrations.ReadFile(name)
 		if err != nil {
@@ -192,7 +255,7 @@ func (s *Store) Preferences(ctx context.Context, accountID string) (api.Preferen
 	return p, err
 }
 func (s *Store) UpdatePreferences(ctx context.Context, accountID, revision string, p api.Preferences) (api.Preferences, error) {
-	if _, err := time.LoadLocation(p.Timezone); err != nil || !slices.Contains([]string{"system", "light", "dark"}, p.Appearance) || !slices.Contains([]int{0, 5, 10, 30}, p.RefreshSeconds) {
+	if _, err := time.LoadLocation(p.Timezone); err != nil || p.Timezone == "" || p.Timezone == "Local" || len(p.Timezone) > 128 || !slices.Contains([]string{"system", "light", "dark"}, p.Appearance) || !slices.Contains([]int{0, 5, 10, 30}, p.RefreshSeconds) {
 		return api.Preferences{}, &api.Error{Code: "invalid_settings", Message: "Choose a valid timezone, appearance, and refresh interval."}
 	}
 	tx, err := s.Pool.Begin(ctx)

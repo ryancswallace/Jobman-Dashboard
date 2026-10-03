@@ -30,15 +30,21 @@ type Server struct {
 	Auth        Authenticator
 	Static      fs.FS
 	FixtureMode bool
+	AuthRoutes  interface{ RegisterRoutes(*http.ServeMux) }
+	Preferences PreferenceStore
 }
 type actorKey struct{}
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	if s.AuthRoutes != nil {
+		s.AuthRoutes.RegisterRoutes(mux)
+	}
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, map[string]string{"status": "alive"}) })
 	mux.HandleFunc("GET /api/v1/bootstrap", s.bootstrap)
 	mux.HandleFunc("GET /api/v1/jobs", s.jobs)
 	mux.HandleFunc("GET /api/v1/overview", s.overview)
+	mux.HandleFunc("PUT /api/v1/preferences", s.updatePreferences)
 	mux.HandleFunc("GET /api/v1/deployments/{deployment}/namespaces/{namespace}/jobs/{job}", s.job)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, &api.Error{Code: "not_found_or_inaccessible", Message: "This API operation is not available."})
@@ -150,6 +156,14 @@ func (s *Server) bootstrap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	b.FixtureMode = s.FixtureMode
+	b.CSRFToken = actor(r).CSRFToken
+	if s.Preferences != nil {
+		b.Preferences, err = s.Preferences.Preferences(r.Context(), actor(r).Account.ID)
+		if err != nil {
+			writeError(w, r, err)
+			return
+		}
+	}
 	writeJSON(w, 200, b)
 }
 func parseQuery(r *http.Request) (monitoring.Query, error) {

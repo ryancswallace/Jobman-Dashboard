@@ -14,6 +14,7 @@ type Actor struct {
 	Issuer      string
 	Subject     string
 	DirectoryID string
+	CSRFToken   string
 }
 
 type Discovery struct {
