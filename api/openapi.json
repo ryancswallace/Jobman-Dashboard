@@ -528,6 +528,14 @@
               "minimum": 1,
               "maximum": 262144
             }
+          },
+          {
+            "in": "query",
+            "name": "runNumber",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            }
           }
         ],
         "responses": {
@@ -1265,6 +1273,249 @@
           }
         }
       }
+    },
+    "/api/v1/deployments/{deploymentId}/namespaces/{namespaceId}/workloads/{kind}/{workloadId}/children": {
+      "get": {
+        "operationId": "workloadChildren",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deploymentId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "namespaceId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workloadId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "minimum": 1,
+              "maximum": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkloadChildrenPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/deployments/{deploymentId}/namespaces/{namespaceId}/workloads/graph/{workloadId}/dependencies": {
+      "get": {
+        "operationId": "graphEdges",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deploymentId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "namespaceId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workloadId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            }
+          },
+          {
+            "in": "query",
+            "name": "nodeId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphEdgePage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/deployments/{deploymentId}/namespaces/{namespaceId}/workloads/graph/{workloadId}/neighborhood": {
+      "get": {
+        "operationId": "graphNeighborhood",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deploymentId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "namespaceId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workloadId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "nodeId",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "maxNodes",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "in": "query",
+            "name": "maxEdges",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphNeighborhood"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1844,6 +2095,32 @@
           },
           "arrayId": {
             "type": "string"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "arrayMode": {
+            "type": "string"
+          },
+          "unsatisfiedPolicy": {
+            "type": "string"
+          },
+          "arrayPolicy": {
+            "type": "string"
           }
         },
         "required": [
@@ -1853,7 +2130,9 @@
           "kind",
           "createdAt",
           "totalChildren",
-          "counts"
+          "counts",
+          "revision",
+          "asOf"
         ],
         "additionalProperties": false
       },
@@ -1901,11 +2180,26 @@
             "items": {
               "$ref": "#/components/schemas/Dependency"
             }
+          },
+          "name": {
+            "type": "string"
+          },
+          "index": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "dependencyCounts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
           }
         },
         "required": [
           "id",
-          "job"
+          "job",
+          "index"
         ],
         "additionalProperties": false
       },
@@ -1944,6 +2238,10 @@
           "omittedEdges": {
             "type": "string",
             "pattern": "^[0-9]+$"
+          },
+          "total": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
           }
         },
         "required": [
@@ -1951,7 +2249,8 @@
           "children",
           "completeness",
           "sources",
-          "fetchedAt"
+          "fetchedAt",
+          "total"
         ],
         "additionalProperties": false
       },
@@ -2068,6 +2367,10 @@
           "capturedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "runNumber": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
           }
         },
         "required": [
@@ -2544,15 +2847,28 @@
           "fetchedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "total": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "totals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkloadTotal"
+            }
           }
         },
         "required": [
           "items",
           "completeness",
           "sources",
-          "fetchedAt"
+          "fetchedAt",
+          "total",
+          "totals"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "The total is the sum of available source totals; a partial response is explicitly a subtotal. Each source total retains its observation time."
       },
       "TargetPage": {
         "type": "object",
@@ -2818,6 +3134,218 @@
           }
         },
         "required": [],
+        "additionalProperties": false
+      },
+      "WorkloadTotal": {
+        "type": "object",
+        "properties": {
+          "deploymentId": {
+            "type": "string"
+          },
+          "namespaceId": {
+            "type": "string"
+          },
+          "total": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "deploymentId",
+          "namespaceId",
+          "total",
+          "asOf"
+        ],
+        "additionalProperties": false
+      },
+      "WorkloadChildrenPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkloadChild"
+            }
+          },
+          "total": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "nextCursor": {
+            "type": "string"
+          },
+          "completeness": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceStatus"
+            }
+          },
+          "fetchedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "completeness",
+          "sources",
+          "fetchedAt"
+        ],
+        "additionalProperties": false
+      },
+      "GraphEdge": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "fromJobId": {
+            "type": "string"
+          },
+          "toJobId": {
+            "type": "string"
+          },
+          "predicate": {
+            "type": "string"
+          },
+          "outcomes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "upstreamPhase": {
+            "type": "string"
+          },
+          "upstreamOutcome": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "fromJobId",
+          "toJobId",
+          "predicate",
+          "outcomes",
+          "upstreamPhase",
+          "state"
+        ],
+        "additionalProperties": false
+      },
+      "GraphEdgePage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GraphEdge"
+            }
+          },
+          "total": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "nextCursor": {
+            "type": "string"
+          },
+          "completeness": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceStatus"
+            }
+          },
+          "fetchedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "completeness",
+          "sources",
+          "fetchedAt"
+        ],
+        "additionalProperties": false
+      },
+      "GraphNeighborhood": {
+        "type": "object",
+        "properties": {
+          "centerId": {
+            "type": "string"
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkloadChild"
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GraphEdge"
+            }
+          },
+          "totalNodes": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "totalEdges": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "omittedNodes": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "omittedEdges": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "completeness": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceStatus"
+            }
+          },
+          "fetchedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "centerId",
+          "nodes",
+          "edges",
+          "totalNodes",
+          "totalEdges",
+          "omittedNodes",
+          "omittedEdges",
+          "completeness",
+          "sources",
+          "fetchedAt"
+        ],
         "additionalProperties": false
       }
     }

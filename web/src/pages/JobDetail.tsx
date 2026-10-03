@@ -10,7 +10,13 @@ import { APIError, request, resourcePath } from "../lib/transport";
 import { useResource } from "../lib/useResource";
 import { decodeJobDetail, decodePage } from "../lib/api";
 import type { Artifact } from "../lib/models";
-import { count, sourceLabel, timestamp, workloadRoute } from "../lib/format";
+import {
+  count,
+  sourceLabel,
+  timestamp,
+  title,
+  workloadRoute,
+} from "../lib/format";
 import {
   ErrorNotice,
   Freshness,
@@ -139,6 +145,12 @@ export function JobDetailPage() {
                 been reported.
               </p>
             )}
+            {job.imported && (
+              <p className="notice subtle">
+                Imported history. Original ownership and lifecycle facts are
+                shown only when reported by Control.
+              </p>
+            )}
             <nav className="tabs" aria-label="Job sections">
               {["details", "logs", "artifacts", "diagnosis"].map((t) => (
                 <button
@@ -183,23 +195,61 @@ export function JobDetailPage() {
                       <dd>{job.target?.backend ?? "Unavailable"}</dd>
                     </div>
                     <div>
+                      <dt>Target generation ID</dt>
+                      <dd>{job.target?.generationId ?? "Unavailable"}</dd>
+                    </div>
+                    <div>
+                      <dt>Graph disposition</dt>
+                      <dd>{title(job.disposition)}</dd>
+                    </div>
+                    <div>
                       <dt>Revision</dt>
                       <dd>{job.revision}</dd>
                     </div>
                     <div>
                       <dt>Run</dt>
                       <dd>
-                        {job.runId ?? "Unavailable"}
-                        {job.runNumber && ` (run ${job.runNumber})`}
+                        {job.currentRun?.id ?? "Unavailable"}
+                        {job.currentRun && ` (run ${job.currentRun.number})`}
                       </dd>
                     </div>
-                    {job.group && (
+                    <div>
+                      <dt>Execution ID</dt>
+                      <dd>{job.currentRun?.executionId ?? "Unavailable"}</dd>
+                    </div>
+                    {job.group?.collectionId && (
                       <div>
-                        <dt>Workload</dt>
+                        <dt>Collection</dt>
                         <dd>
-                          <Link to={workloadRoute({ ...job, ...job.group })}>
-                            {job.group.kind} / {job.group.id}
+                          <Link
+                            to={workloadRoute({
+                              ...job,
+                              kind: "collection",
+                              id: job.group.collectionId,
+                            })}
+                          >
+                            {job.group.collectionId}
                           </Link>
+                          {job.group.collectionIndex !== undefined &&
+                            ` · item ${job.group.collectionIndex}`}
+                        </dd>
+                      </div>
+                    )}
+                    {job.group?.graphId && (
+                      <div>
+                        <dt>Dependency graph</dt>
+                        <dd>
+                          <Link
+                            to={workloadRoute({
+                              ...job,
+                              kind: "graph",
+                              id: job.group.graphId,
+                            })}
+                          >
+                            {job.group.graphId}
+                          </Link>
+                          {job.group.graphIndex !== undefined &&
+                            ` · node ${job.group.graphIndex}`}
                         </dd>
                       </div>
                     )}
@@ -222,6 +272,11 @@ export function JobDetailPage() {
                       ["Completed", job.completedAt],
                       ["Record updated", job.updatedAt],
                       ["Confidence updated", job.confidenceUpdatedAt],
+                      ["Start recorded", job.lifecycle?.startedRecordedAt],
+                      [
+                        "Completion recorded",
+                        job.lifecycle?.completedRecordedAt,
+                      ],
                     ].map(([label, value]) => (
                       <div key={label}>
                         <dt>{label}</dt>
@@ -230,10 +285,20 @@ export function JobDetailPage() {
                         </dd>
                       </div>
                     ))}
+                    <div>
+                      <dt>Start provenance</dt>
+                      <dd>{title(job.lifecycle?.startedProvenance)}</dd>
+                    </div>
+                    <div>
+                      <dt>Completion provenance</dt>
+                      <dd>{title(job.lifecycle?.completedProvenance)}</dd>
+                    </div>
                   </dl>
                   <p className="panel-note">
                     Record updates are not execution heartbeats. Missing
-                    lifecycle observations stay unavailable.
+                    lifecycle observations stay unavailable. Recorded times
+                    indicate when Control stored an observation, separately from
+                    when execution started or completed.
                   </p>
                 </section>
                 <section className="panel wide">

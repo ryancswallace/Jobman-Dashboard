@@ -68,6 +68,11 @@ export function decodeJob(dto: JobDTO): Job {
     desiredState: dto.desiredState,
     observationConfidence: dto.confidence,
     revision: dto.revision,
+    imported: dto.imported,
+    disposition: dto.disposition,
+    lifecycle: dto.lifecycle,
+    currentRun: dto.currentRun,
+    group: dto.group,
     owner: dto.owner ? { ...dto.owner, verified: true } : undefined,
     createdAt: dto.createdAt,
     updatedAt: dto.updatedAt,
@@ -77,6 +82,7 @@ export function decodeJob(dto: JobDTO): Job {
     target: {
       name: dto.targetId,
       generation: dto.targetGeneration,
+      generationId: dto.targetGenerationId,
       backend: dto.backend,
     },
     scheduler: dto.scheduler

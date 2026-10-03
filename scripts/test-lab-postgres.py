@@ -12,15 +12,16 @@ from urllib.parse import quote
 
 root = Path(__file__).resolve().parents[1]
 lab = Path(os.environ.get("JOBMAN_LAB_ROOT", str(root.parent / "jobman-lab")))
-key = "JOBMAN_LAB_POSTGRES_PASSWORD"
+key = "JOBMAN_LAB_DASHBOARD_DDL_PASSWORD"
 password = None
-for line in (lab / ".lab/credentials/lab.env").read_text().splitlines():
+for line in (lab / ".lab/credentials/dashboard.env").read_text().splitlines():
     name, sep, value = line.partition("=")
     if sep and name == key:
         password = value.strip().strip("'\"")
 if not password:
     sys.exit("Synthetic Lab PostgreSQL key is unavailable.")
-url = f"postgres://jobman_control:{quote(password, safe='')}@10.77.0.20:5432/jobman_control?sslmode=disable"
+ca = quote(str(lab / ".lab/certs/lab-ca.crt"), safe="")
+url = f"postgres://jobman_dashboard_ddl:{quote(password, safe='')}@10.77.0.20:5432/jobman_dashboard?sslmode=verify-full&sslrootcert={ca}"
 env = os.environ.copy()
 env.pop("GOROOT", None)
 env.update(JOBMAN_DASHBOARD_TEST_DATABASE_URL=url, GOTOOLCHAIN="go1.26.6")

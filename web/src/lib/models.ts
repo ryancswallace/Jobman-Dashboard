@@ -79,7 +79,12 @@ export interface Job extends JobRef {
   completedAt?: string;
   confidenceUpdatedAt?: string;
   owner?: { id?: string; displayName?: string; verified?: boolean };
-  target?: { name: string; generation?: string; backend?: string };
+  target?: {
+    name: string;
+    generation?: string;
+    generationId?: string;
+    backend?: string;
+  };
   labels?: Record<string, string>;
   scheduler?: {
     nativeId?: string;
@@ -89,9 +94,21 @@ export interface Job extends JobRef {
     cluster?: string;
     backend?: string;
   };
-  group?: { kind: string; id: string; nodeId?: string; taskIndex?: string };
-  runId?: string;
-  runNumber?: string;
+  imported?: boolean;
+  disposition?: string;
+  lifecycle?: {
+    startedRecordedAt?: string;
+    startedProvenance?: string;
+    completedRecordedAt?: string;
+    completedProvenance?: string;
+  };
+  currentRun?: { id: string; number: string; executionId?: string };
+  group?: {
+    collectionId?: string;
+    collectionIndex?: number;
+    graphId?: string;
+    graphIndex?: number;
+  };
 }
 export interface Overview {
   active: string;
@@ -115,15 +132,31 @@ export interface Workload extends NamespaceRef {
   id: string;
   name?: string;
   kind: string;
+  revision: string;
   createdAt: string;
+  asOf: string;
+  updatedAt?: string;
+  phase?: string;
+  outcome?: string;
+  unsatisfiedPolicy?: string;
+  arrayMode?: string;
+  arrayPolicy?: string;
   totalChildren: string;
   counts: Record<string, string>;
   concurrency?: string;
   failurePolicy?: string;
   arrayId?: string;
 }
+export interface WorkloadCatalog {
+  items: Workload[];
+  total: string;
+  totals: (NamespaceRef & { total: string; asOf: string })[];
+}
 export interface GraphNode {
   id: string;
+  name?: string;
+  index?: string;
+  dependencyCounts?: Record<string, string>;
   job: Job;
   readiness?: string;
   disposition?: string;
@@ -137,8 +170,31 @@ export interface GraphNode {
 export interface WorkloadDetail {
   workload: Workload;
   children: GraphNode[];
-  omittedNodes?: string;
-  omittedEdges?: string;
+  total: string;
+}
+export interface GraphDependency {
+  from: string;
+  to: string;
+  fromJobId: string;
+  toJobId: string;
+  predicate: string;
+  outcomes: string[];
+  upstreamPhase: string;
+  upstreamOutcome?: string;
+  state: string;
+}
+export interface GraphDependencies {
+  items: GraphDependency[];
+  total: string;
+}
+export interface GraphNeighborhood {
+  centerId: string;
+  nodes: GraphNode[];
+  edges: GraphDependency[];
+  totalNodes: string;
+  totalEdges: string;
+  omittedNodes: string;
+  omittedEdges: string;
 }
 export interface Artifact {
   id: string;

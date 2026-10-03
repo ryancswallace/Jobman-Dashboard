@@ -35,6 +35,41 @@ describe("contract semantics", () => {
       decodeJob({ ...job, phase: "future_phase", outcome: "future_outcome" }),
     ).toMatchObject({ phase: "future_phase", outcome: "future_outcome" });
   });
+  it("preserves factual run and lifecycle metadata without inventing event timestamps", () => {
+    const facts = {
+      imported: true,
+      targetGenerationId: "generation-id",
+      disposition: "future_disposition",
+      lifecycle: {
+        startedProvenance: "agent_event",
+        startedRecordedAt: "2026-10-03T02:00:00Z",
+      },
+      currentRun: {
+        id: "run-id",
+        number: "9007199254740993",
+        executionId: "execution-id",
+      },
+      group: {
+        collectionId: "collection-id",
+        collectionIndex: 0,
+        graphId: "graph-id",
+        graphIndex: 0,
+      },
+      scheduler: {
+        reason: "Resources",
+        cluster: "lab",
+        observedAt: "2026-10-03T03:00:00Z",
+      },
+    };
+    const decoded = decodeJob({ ...job, ...facts });
+    const { targetGenerationId, ...preserved } = facts;
+    expect(decoded).toMatchObject({
+      ...preserved,
+      target: { generationId: targetGenerationId },
+    });
+    expect(decoded.startedAt).toBeUndefined();
+    expect(decoded.completedAt).toBeUndefined();
+  });
   it("qualifies duplicate IDs and conveys partial source state", () => {
     const result = decodeJobs({
       items: [job, { ...job, deploymentId: "b" }],

@@ -1,26 +1,15 @@
-import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useSession } from "../lib/session";
 import { apiQuery, resourcePath } from "../lib/transport";
 import { useResource } from "../lib/useResource";
-import {
-  decodePage,
-  decodeJob,
-  decodeMeta,
-  type JobDTO,
-  type SourceDTO,
-} from "../lib/api";
-import type {
-  GraphNode,
-  Workload,
-  WorkloadDetail,
-  Result,
-} from "../lib/models";
+import { decodeWorkloads, decodeWorkloadDetail } from "../lib/workloads";
+import { GraphInspector } from "../components/GraphInspector";
 import {
   count,
   jobRoute,
   scopeQuery,
   sourceLabel,
+  timestamp,
   title,
   workloadRoute,
 } from "../lib/format";
@@ -33,29 +22,6 @@ import {
   Spinner,
   Status,
 } from "../components/States";
-import { GraphView } from "../components/GraphView";
-const decodeWorkloads = (value: unknown) => decodePage<Workload>(value);
-function decodeWorkloadDetail(value: unknown): Result<WorkloadDetail> {
-  const dto = value as {
-    workload: Workload;
-    children: (Omit<GraphNode, "job"> & { job: JobDTO })[];
-    nextCursor?: string;
-    sources: SourceDTO[];
-    completeness: string;
-    fetchedAt: string;
-    omittedNodes?: string;
-    omittedEdges?: string;
-  };
-  return {
-    data: {
-      workload: dto.workload,
-      children: dto.children.map((c) => ({ ...c, job: decodeJob(c.job) })),
-      omittedNodes: dto.omittedNodes,
-      omittedEdges: dto.omittedEdges,
-    },
-    meta: decodeMeta(dto),
-  };
-}
 export function WorkloadsPage() {
   const { bootstrap, identity, scope } = useSession(),
     [search, setSearch] = useSearchParams(),
@@ -67,7 +33,7 @@ export function WorkloadsPage() {
       cursor: search.get("cursor") ?? undefined,
     }),
     identity,
-    bootstrap.preferences.refreshSeconds * 1000,
+    search.get("cursor") ? 0 : bootstrap.preferences.refreshSeconds * 1000,
     decodeWorkloads,
   );
   return (
@@ -76,7 +42,16 @@ export function WorkloadsPage() {
         title="Workloads"
         description="Explore collections, Slurm arrays, and source-owned dependency graphs."
         actions={
-          <button className="button secondary" onClick={result.refresh}>
+          <button
+            className="button secondary"
+            onClick={() => {
+              if (search.get("cursor")) {
+                const q = new URLSearchParams(search);
+                q.delete("cursor");
+                setSearch(q);
+              } else result.refresh();
+            }}
+          >
             ↻ Refresh
           </button>
         }
@@ -108,7 +83,11 @@ export function WorkloadsPage() {
           loading={result.loading}
           error={!!result.error}
         />
-        <span>Complete summaries · bounded child pages</span>
+        <span>
+          {result.data
+            ? `${count(result.data.data.total)} ${result.data.meta.completeness === "partial" ? "workloads in available sources (subtotal)" : "workloads"}`
+            : "Source summaries · bounded child pages"}
+        </span>
       </div>
       {result.error && (
         <ErrorNotice error={result.error} retry={result.refresh} />
@@ -116,7 +95,7 @@ export function WorkloadsPage() {
       <Completeness meta={result.data?.meta} />
       {!result.data && result.loading ? (
         <Spinner label="Loading workloads" />
-      ) : result.data?.data.length ? (
+      ) : result.data?.data.items.length ? (
         <section className="panel">
           <div className="table-wrap">
             <table>
@@ -130,7 +109,7 @@ export function WorkloadsPage() {
                 </tr>
               </thead>
               <tbody>
-                {result.data.data.map((w) => (
+                {result.data.data.items.map((w) => (
                   <tr key={`${w.deploymentId}:${w.namespaceId}:${w.id}`}>
                     <td>
                       <Link className="job-name" to={workloadRoute(w)}>
@@ -155,7 +134,9 @@ export function WorkloadsPage() {
                         ))}
                       </div>
                     </td>
-                    <td>{w.failurePolicy ?? "Unavailable"}</td>
+                    <td>
+                      {w.failurePolicy || w.unsatisfiedPolicy || "Unavailable"}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -199,7 +180,13 @@ export function WorkloadDetailPage() {
     } = useParams(),
     { identity, bootstrap } = useSession(),
     [search, setSearch] = useSearchParams(),
-    [selected, setSelected] = useState<string>();
+    selected = search.get("node") ?? undefined;
+  const setSelected = (node?: string) => {
+    const q = new URLSearchParams(search);
+    if (node) q.set("node", node);
+    else q.delete("node");
+    setSearch(q);
+  };
   const path = resourcePath(
     { deploymentId, namespaceId },
     `workloads/${encodeURIComponent(kind)}`,
@@ -208,7 +195,7 @@ export function WorkloadDetailPage() {
   const result = useResource(
       `${path}?${new URLSearchParams({ limit: "50", ...(search.get("cursor") ? { cursor: search.get("cursor")! } : {}) })}`,
       identity,
-      bootstrap.preferences.refreshSeconds * 1000,
+      search.get("cursor") ? 0 : bootstrap.preferences.refreshSeconds * 1000,
       decodeWorkloadDetail,
     ),
     detail = result.data?.data,
@@ -226,7 +213,16 @@ export function WorkloadDetailPage() {
         title={w?.name || id}
         description={`${title(kind)} · ${id}`}
         actions={
-          <button className="button secondary" onClick={result.refresh}>
+          <button
+            className="button secondary"
+            onClick={() => {
+              if (search.get("cursor")) {
+                const q = new URLSearchParams(search);
+                q.delete("cursor");
+                setSearch(q);
+              } else result.refresh();
+            }}
+          >
             ↻ Refresh
           </button>
         }
@@ -245,7 +241,10 @@ export function WorkloadDetailPage() {
               <div className="metric-card purple">
                 <span>Total child jobs</span>
                 <strong>{count(w.totalChildren)}</strong>
-                <small>Complete source summary</small>
+                <small>
+                  Source summary as of{" "}
+                  {timestamp(w.asOf, bootstrap.preferences.timezone)}
+                </small>
               </div>
               {Object.entries(w.counts).map(([key, value]) => (
                 <div className="metric-card" key={key}>
@@ -254,6 +253,10 @@ export function WorkloadDetailPage() {
                 </div>
               ))}
             </div>
+            <p className="panel-note">
+              Group counts follow Control's summary semantics: active excludes
+              accepted and terminal child jobs.
+            </p>
             <section className="panel">
               <dl className="facts compact">
                 <div>
@@ -264,6 +267,28 @@ export function WorkloadDetailPage() {
                   <dt>Failure policy</dt>
                   <dd>{w.failurePolicy ?? "Unavailable"}</dd>
                 </div>
+                {w.arrayPolicy && (
+                  <div>
+                    <dt>Array policy</dt>
+                    <dd>{w.arrayPolicy}</dd>
+                  </div>
+                )}
+                {w.arrayMode && (
+                  <div>
+                    <dt>Array mode</dt>
+                    <dd>{w.arrayMode}</dd>
+                  </div>
+                )}
+                {w.unsatisfiedPolicy && (
+                  <div>
+                    <dt>Unsatisfied dependency policy</dt>
+                    <dd>{w.unsatisfiedPolicy}</dd>
+                  </div>
+                )}
+                <div>
+                  <dt>Source revision</dt>
+                  <dd>{w.revision}</dd>
+                </div>
                 {kind === "array" && (
                   <div>
                     <dt>Scheduler array ID</dt>
@@ -273,12 +298,12 @@ export function WorkloadDetailPage() {
               </dl>
             </section>
             {kind === "graph" && (
-              <GraphView
-                nodes={detail.children}
+              <GraphInspector
+                path={path}
+                scope={{ deploymentId, namespaceId }}
                 onSelect={setSelected}
+                onClear={() => setSelected(undefined)}
                 selected={selected}
-                omittedNodes={detail.omittedNodes}
-                omittedEdges={detail.omittedEdges}
               />
             )}
             <section className="panel">
@@ -286,7 +311,7 @@ export function WorkloadDetailPage() {
                 <div>
                   <h2>
                     {kind === "graph"
-                      ? "Nodes and dependencies"
+                      ? "Graph nodes"
                       : kind === "array"
                         ? "Array tasks"
                         : "Child jobs"}
@@ -320,13 +345,15 @@ export function WorkloadDetailPage() {
                         <td>
                           {kind === "array" ? (
                             (node.taskIndex ?? "Unavailable")
-                          ) : (
+                          ) : kind === "graph" ? (
                             <button
                               className="text-button"
                               onClick={() => setSelected(node.id)}
                             >
-                              {node.id}
+                              {node.name ?? node.id}
                             </button>
+                          ) : (
+                            (node.name ?? `Child ${node.index ?? node.id}`)
                           )}
                         </td>
                         <td>
@@ -343,8 +370,8 @@ export function WorkloadDetailPage() {
                           )}
                         </td>
                         <td>
-                          {title(node.readiness)}
-                          {node.disposition && (
+                          {title(node.readiness ?? node.disposition)}
+                          {node.disposition && node.readiness && (
                             <span className="secondary-line">
                               {title(node.disposition)}
                             </span>
@@ -352,21 +379,25 @@ export function WorkloadDetailPage() {
                         </td>
                         {kind === "graph" && (
                           <td>
-                            {node.dependencies?.length ? (
-                              <ul className="dependency-list">
-                                {node.dependencies.map((d, i) => (
-                                  <li key={i}>
-                                    <span className="mono">
-                                      {d.upstreamNodeId}
-                                    </span>{" "}
-                                    · {d.predicate} ·{" "}
-                                    <strong>{d.status}</strong>
-                                  </li>
-                                ))}
-                              </ul>
+                            {node.dependencyCounts ? (
+                              <div className="count-chips">
+                                {Object.entries(node.dependencyCounts).map(
+                                  ([state, value]) => (
+                                    <span key={state} className="count-chip">
+                                      {title(state)} {count(value)}
+                                    </span>
+                                  ),
+                                )}
+                              </div>
                             ) : (
-                              "No prerequisites reported"
+                              "Dependency counts unavailable"
                             )}
+                            <button
+                              className="text-button"
+                              onClick={() => setSelected(node.id)}
+                            >
+                              Inspect dependencies
+                            </button>
                           </td>
                         )}
                       </tr>
@@ -377,7 +408,7 @@ export function WorkloadDetailPage() {
               <div className="pagination">
                 <span>
                   {detail.children.length} children loaded of{" "}
-                  {count(w.totalChildren)} total
+                  {count(detail.total)} at this child-page observation
                 </span>
                 <div>
                   {search.get("cursor") && (

@@ -88,3 +88,45 @@ it("flushes an incomplete UTF-8 suffix on a zero-byte final chunk", async () => 
   expect(screen.getByLabelText("stdout log output")).toHaveTextContent("�");
   expect(screen.getByText("Complete")).toBeVisible();
 });
+
+it("restarts an expired continuation from a fresh tail on explicit refresh", async () => {
+  fetcher
+    .mockResolvedValueOnce(
+      Response.json({
+        ...chunk,
+        endOffset: "1",
+        bytesBase64: "QQ==",
+        nextCursor: "old-cursor",
+        state: "open",
+      }),
+    )
+    .mockResolvedValueOnce(
+      Response.json(
+        { code: "cursor_expired", message: "Refresh logs." },
+        { status: 409 },
+      ),
+    )
+    .mockResolvedValueOnce(
+      Response.json({
+        ...chunk,
+        executionId: "new-execution",
+        startOffset: "20",
+        endOffset: "21",
+        bytesBase64: "Qg==",
+        state: "complete",
+      }),
+    );
+  await act(async () => {
+    render(<LogViewer job={job} />);
+  });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(5000);
+  });
+  expect(String(fetcher.mock.calls[1][0])).toContain("cursor=old-cursor");
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+  });
+  expect(String(fetcher.mock.calls[2][0])).not.toContain("cursor=");
+  expect(screen.getByLabelText("stdout log output")).toHaveTextContent("B");
+  expect(screen.getByLabelText("stdout log output")).not.toHaveTextContent("A");
+});

@@ -30,6 +30,19 @@ export function LogViewer({ job }: { job: JobRef }) {
     end = useRef<string | undefined>(undefined),
     execution = useRef<string | undefined>(undefined);
   const path = resourcePath(job, "jobs", job.jobId);
+  const refresh = () => {
+    if (
+      error &&
+      ["cursor_expired", "stream_changed", "log_gap"].includes(error.code)
+    ) {
+      cursor.current = undefined;
+      end.current = undefined;
+      execution.current = undefined;
+      decoder.current = new TextDecoder();
+      setBuffer({ text: "", evicted: false, gap: false });
+    }
+    setTick((value) => value + 1);
+  };
   useEffect(() => {
     setBuffer({ text: "", evicted: false, gap: false });
     cursor.current = undefined;
@@ -182,16 +195,11 @@ export function LogViewer({ job }: { job: JobRef }) {
         >
           {following ? "Pause following" : "Resume following"}
         </button>
-        <button
-          className="button secondary"
-          onClick={() => setTick((t) => t + 1)}
-        >
+        <button className="button secondary" onClick={refresh}>
           Refresh
         </button>
       </div>
-      {error && (
-        <ErrorNotice error={error} retry={() => setTick((t) => t + 1)} />
-      )}
+      {error && <ErrorNotice error={error} retry={refresh} />}
       {buffer.gap && (
         <p className="notice warning">
           The stream changed or a byte range is missing. Reopen Logs to request

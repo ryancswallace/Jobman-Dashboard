@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
-	"crypto/ed25519"
+	"crypto/hmac"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -21,7 +21,9 @@ import (
 	"github.com/ryancswallace/jobman-dashboard/internal/config"
 	"github.com/ryancswallace/jobman-dashboard/internal/control"
 	"github.com/ryancswallace/jobman-dashboard/internal/httpapi"
+	"github.com/ryancswallace/jobman-dashboard/internal/logs"
 	"github.com/ryancswallace/jobman-dashboard/internal/monitoring"
+	"github.com/ryancswallace/jobman-dashboard/internal/runtimeconfig"
 	"github.com/ryancswallace/jobman-dashboard/internal/store"
 )
 
@@ -31,6 +33,7 @@ type runtimeSecrets struct {
 	identityClient *http.Client
 	identity       auth.OIDCOptions
 	sources        []control.Config
+	brokers        map[string]logs.ClientConfig
 }
 
 func textSecret(path string) (string, error) {
@@ -44,36 +47,9 @@ func textSecret(path string) (string, error) {
 	}
 	return value, nil
 }
-func rootsFile(path string) (*x509.CertPool, error) {
-	data, err := config.ReadPublicFile(path, 1<<20)
-	if err != nil {
-		return nil, err
-	}
-	roots := x509.NewCertPool()
-	if !roots.AppendCertsFromPEM(data) {
-		return nil, errors.New("trust file contains no valid PEM certificates")
-	}
-	return roots, nil
-}
+func rootsFile(path string) (*x509.CertPool, error) { return runtimeconfig.Roots(path) }
 func certificateFiles(certPath, keyPath string) (tls.Certificate, error) {
-	cert, err := config.ReadPublicFile(certPath, 1<<20)
-	if err != nil {
-		return tls.Certificate{}, err
-	}
-	key, err := config.ReadSecret(keyPath, 65536)
-	if err != nil {
-		return tls.Certificate{}, err
-	}
-	pair, err := tls.X509KeyPair(cert, key)
-	if err != nil {
-		return tls.Certificate{}, errors.New("TLS certificate and private key do not form a valid pair")
-	}
-	leaf, err := x509.ParseCertificate(pair.Certificate[0])
-	if err != nil || time.Now().Before(leaf.NotBefore) || !time.Now().Add(time.Minute).Before(leaf.NotAfter) {
-		return tls.Certificate{}, errors.New("TLS leaf certificate is outside its validity period")
-	}
-	pair.Leaf = leaf
-	return pair, nil
+	return runtimeconfig.Certificate(certPath, keyPath)
 }
 func databaseSecret(path string) (string, error) {
 	value, err := textSecret(path)
@@ -119,35 +95,19 @@ func loadRuntime(c config.Config) (runtimeSecrets, error) {
 	}
 	result.identity = auth.OIDCOptions{Issuer: c.OIDC.Issuer, Audience: c.OIDC.APIAudience, WebClientID: c.OIDC.WebClientID, WebClientSecret: secret, NativeClientID: c.OIDC.NativeClientID, NativeRedirectURI: c.OIDC.NativeRedirectURI, DirectoryIDClaim: c.OIDC.DirectoryIDClaim, ClientIDClaim: c.OIDC.ClientIDClaim, PublicOrigin: c.PublicOrigin, Scopes: c.OIDC.Scopes, EncryptionKey: key, EncryptionKeyID: c.Encryption.KeyID, HTTPClient: result.identityClient}
 	for _, source := range c.Controls {
-		roots, err := rootsFile(source.TrustRootsFile)
+		loaded, err := runtimeconfig.Source(source)
 		if err != nil {
-			return result, fmt.Errorf("Control trust: %w", err)
+			return result, fmt.Errorf("Control trust/key material: %w", err)
 		}
-		certificate, err := certificateFiles(source.ClientCertificateFile, source.ClientKeyFile)
+		result.sources = append(result.sources, loaded)
+	}
+	result.brokers = make(map[string]logs.ClientConfig)
+	for _, broker := range c.LogBrokers {
+		loaded, err := runtimeconfig.Broker(broker)
 		if err != nil {
-			return result, fmt.Errorf("Control client certificate: %w", err)
+			return result, fmt.Errorf("broker trust/key material: %w", err)
 		}
-		encoded, err := config.ReadSecret(source.DelegationKeyFile, 65536)
-		if err != nil {
-			return result, fmt.Errorf("Control signing key: %w", err)
-		}
-		block, rest := pem.Decode(encoded)
-		if block == nil || block.Type != "PRIVATE KEY" || len(strings.TrimSpace(string(rest))) != 0 {
-			return result, errors.New("Control signing key requires one PKCS8 Ed25519 PEM block")
-		}
-		parsed, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-		if err != nil {
-			return result, errors.New("Control signing key is not PKCS8")
-		}
-		signingKey, ok := parsed.(ed25519.PrivateKey)
-		if !ok {
-			return result, errors.New("Control delegation requires an Ed25519 key")
-		}
-		signer, err := auth.NewDelegationSigner(signingKey, source.DelegationKeyID, source.ServiceID, source.Audience, certificate.Certificate[0], source.NamespaceIDs)
-		if err != nil {
-			return result, err
-		}
-		result.sources = append(result.sources, control.Config{DeploymentID: source.ID, Name: source.Name, Endpoint: source.Origin, InstanceID: source.ExpectedInstanceID, NamespaceIDs: source.NamespaceIDs, Roots: roots, Certificate: certificate, Signer: signer})
+		result.brokers[broker.ID] = loaded
 	}
 	if stat, err := os.Stat(c.WebRoot); err != nil || !stat.IsDir() {
 		return result, errors.New("webRoot must contain the compiled web application")
@@ -211,6 +171,7 @@ func runConfigured(path, mode, migrationURLFile string) error {
 		return err
 	}
 	sources := make([]monitoring.Source, 0, len(loaded.sources))
+	logSources := make(map[string]logs.ManifestSource)
 	for _, entry := range loaded.sources {
 		entry.VerifyIdentity = func(ctx context.Context, instance, epoch string) error {
 			return db.VerifySourceIdentity(ctx, entry.DeploymentID, instance, epoch, c.ConfigurationRevision)
@@ -221,10 +182,37 @@ func runConfigured(path, mode, migrationURLFile string) error {
 		}
 		defer client.Close()
 		sources = append(sources, client)
+		logSources[entry.DeploymentID] = client
 	}
 	engine, err := monitoring.New(sources, db)
 	if err != nil {
 		return err
+	}
+	var logService *logs.Broker
+	if len(loaded.brokers) > 0 {
+		brokers := make(map[string]*logs.Client)
+		for id, cfg := range loaded.brokers {
+			client, err := logs.NewClient(cfg)
+			if err != nil {
+				return err
+			}
+			defer client.Close()
+			brokers[id] = client
+		}
+		mappings := make([]logs.RemoteMapping, 0, len(c.LogMappings))
+		for _, m := range c.LogMappings {
+			mappings = append(mappings, logs.RemoteMapping{DeploymentID: m.DeploymentID, TargetGenerationID: m.TargetGenerationID, StoreName: m.StoreName, StoreVersion: m.StoreVersion, Client: brokers[m.BrokerID]})
+		}
+		chunks, err := logs.NewRemoteChunks(mappings)
+		if err != nil {
+			return err
+		}
+		mac := hmac.New(sha256.New, loaded.identity.EncryptionKey)
+		mac.Write([]byte("jobman-dashboard/log-cursor-key/v1"))
+		logService, err = logs.NewWithChunks(logSources, chunks, mac.Sum(nil))
+		if err != nil {
+			return err
+		}
 	}
 	maintenanceDone := make(chan struct{})
 	defer func() { stop(); <-maintenanceDone }()
@@ -249,7 +237,10 @@ func runConfigured(path, mode, migrationURLFile string) error {
 		}
 	}()
 	app := &httpapi.Server{Engine: engine, Auth: identity, AuthRoutes: identity, Preferences: db, Static: os.DirFS(c.WebRoot)}
-	server := &http.Server{Addr: c.Listen, Handler: app.Handler(), TLSConfig: &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{loaded.tls}}, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 20 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32 << 10}
+	if logService != nil {
+		app.Logs = logService
+	}
+	server := &http.Server{Addr: c.Listen, Handler: app.Handler(), TLSConfig: &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{loaded.tls}}, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 20 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 128 << 10}
 	done := make(chan error, 1)
 	go func() {
 		slog.Info("Dashboard HTTPS service starting", "listen", c.Listen)

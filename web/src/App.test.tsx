@@ -141,6 +141,75 @@ describe("web monitoring workflows", () => {
       fetcher.mock.calls.some(([path]) => path.includes("phase=running")),
     ).toBe(true);
   });
+  it("renders imported provenance, exact run identity and zero group indices separately from unavailable execution time", async () => {
+    history.replaceState(
+      null,
+      "",
+      "/deployments/east/namespaces/ns/jobs/duplicate-id",
+    );
+    const previous = fetcher.getMockImplementation()!;
+    fetcher.mockImplementation((input: string, options?: RequestInit) =>
+      input.endsWith("/jobs/duplicate-id")
+        ? Response.json({
+            job: {
+              ...job,
+              imported: true,
+              targetGenerationId: "generation-id",
+              disposition: "skipped",
+              currentRun: {
+                id: "run-id",
+                number: "9007199254740993",
+                executionId: "execution-id",
+              },
+              lifecycle: {
+                startedRecordedAt: "2026-10-03T15:00:00Z",
+                startedProvenance: "agent_event",
+              },
+              group: {
+                collectionId: "collection-id",
+                collectionIndex: 0,
+                graphId: "graph-id",
+                graphIndex: 0,
+              },
+              scheduler: { reason: "Resources", cluster: "lab-cluster" },
+            },
+          })
+        : previous(input, options),
+    );
+    render(<App />);
+    expect(await screen.findByText(/Imported history/)).toBeVisible();
+    expect(screen.getByText("Started").nextElementSibling).toHaveTextContent(
+      "Unavailable",
+    );
+    expect(
+      screen.getByText("Start recorded").nextElementSibling,
+    ).not.toHaveTextContent("Unavailable");
+    expect(
+      screen.getByText("Start provenance").nextElementSibling,
+    ).toHaveTextContent("Agent event");
+    expect(screen.getByText("Run").nextElementSibling).toHaveTextContent(
+      "9007199254740993",
+    );
+    expect(
+      screen.getByText("Execution ID").nextElementSibling,
+    ).toHaveTextContent("execution-id");
+    expect(screen.getByRole("link", { name: "collection-id" })).toHaveAttribute(
+      "href",
+      "/deployments/east/namespaces/ns/workloads/collection/collection-id",
+    );
+    expect(
+      screen.getByRole("link", { name: "collection-id" }).parentElement,
+    ).toHaveTextContent("item 0");
+    expect(
+      screen.getByRole("link", { name: "graph-id" }).parentElement,
+    ).toHaveTextContent("node 0");
+    expect(
+      screen.getByText("Graph disposition").nextElementSibling,
+    ).toHaveTextContent("Skipped");
+    expect(screen.getByText("Reason").nextElementSibling).toHaveTextContent(
+      "Resources",
+    );
+  });
   it("preserves a removed explicit namespace instead of broadening to other grants", async () => {
     history.replaceState(null, "", "/jobs?sources=east&namespace=removed");
     render(<App />);
@@ -237,4 +306,192 @@ it("offline sign-out clears sensitive content and does not silently restore the 
   ).toBeVisible();
   expect(screen.queryByText("Lab Alice")).not.toBeInTheDocument();
   expect(window.localStorage.getItem("jobman.signoutPending")).toBe("1");
+});
+
+describe("group monitoring workflows", () => {
+  const workload = {
+    deploymentId: "east",
+    namespaceId: "ns",
+    id: "graph-one",
+    kind: "graph",
+    name: "Synthetic pipeline",
+    revision: "12",
+    createdAt: "2026-10-03T10:00:00Z",
+    asOf: "2026-10-03T12:05:00Z",
+    totalChildren: "9007199254740993",
+    counts: { active: "2", waiting: "1" },
+    unsatisfiedPolicy: "skip",
+  };
+  it("shows source dependency counts, uses bounded neighborhoods and pages filtered source edges", async () => {
+    history.replaceState(
+      null,
+      "",
+      "/deployments/east/namespaces/ns/workloads/graph/graph-one",
+    );
+    vi.stubGlobal(
+      "Worker",
+      class {
+        onmessage?: (event: { data: unknown }) => void;
+        postMessage(data: { nodes: { id: string }[] }) {
+          this.onmessage?.({
+            data: {
+              positions: data.nodes.map((node, i) => ({
+                id: node.id,
+                x: i * 220,
+                y: 20,
+              })),
+              width: 700,
+              height: 180,
+            },
+          });
+        }
+        terminate() {}
+      },
+    );
+    const child = {
+      id: "node-two",
+      name: "Build",
+      index: "0",
+      job: { ...job, id: "node-two" },
+      disposition: "run",
+      dependencyCounts: {
+        total: "5",
+        satisfied: "1",
+        waiting: "4",
+        unsatisfied: "0",
+      },
+    };
+    const upstream = {
+      id: "node-one",
+      name: "Prepare",
+      index: "1",
+      job: { ...job, id: "node-one" },
+    };
+    const edge = {
+      from: "Prepare",
+      to: "Build",
+      fromJobId: "node-one",
+      toJobId: "node-two",
+      predicate: "afterok",
+      outcomes: [],
+      upstreamPhase: "running",
+      state: "waiting",
+    };
+    const previous = fetcher.getMockImplementation()!;
+    fetcher.mockImplementation(async (input: string, options?: RequestInit) => {
+      const url = new URL(input, "http://localhost");
+      if (url.pathname.endsWith("/graph/graph-one"))
+        return Response.json({
+          ...page([]),
+          workload,
+          children: [child],
+          total: "9007199254740993",
+        });
+      if (url.pathname.endsWith("/neighborhood"))
+        return Response.json({
+          ...page([]),
+          centerId: "node-two",
+          nodes: [child, upstream],
+          edges: [edge],
+          totalNodes: "6",
+          totalEdges: "5",
+          omittedNodes: "4",
+          omittedEdges: "4",
+        });
+      if (url.pathname.endsWith("/dependencies"))
+        return Response.json({
+          ...page([edge]),
+          total: "501",
+          nextCursor: url.searchParams.has("cursor")
+            ? undefined
+            : "edge-page-2",
+        });
+      return previous(input, options);
+    });
+    render(<App />);
+    expect(await screen.findByText("Total 5")).toBeVisible();
+    expect(screen.getByText("Waiting 4")).toBeVisible();
+    expect(
+      screen.queryByText("No prerequisites reported"),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByText("9,007,199,254,740,993").length).toBeGreaterThan(
+      0,
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Inspect dependencies" }),
+    );
+    expect(
+      await screen.findByRole("region", { name: "Neighborhood node list" }),
+    ).toBeVisible();
+    expect(
+      screen.getByText(/Not shown in this neighborhood: 4 nodes, 4 edges/),
+    ).toBeVisible();
+    const inspector = screen.getByRole("region", {
+      name: "Dependency inspection",
+    });
+    expect(
+      within(inspector).getByRole("link", { name: "Open upstream job" }),
+    ).toHaveAttribute("href", "/deployments/east/namespaces/ns/jobs/node-one");
+    expect(
+      fetcher.mock.calls.some(
+        ([path]) =>
+          path.includes("/neighborhood?") &&
+          path.includes("nodeId=node-two") &&
+          path.includes("maxNodes=50") &&
+          path.includes("maxEdges=100"),
+      ),
+    ).toBe(true);
+    await userEvent.click(
+      within(inspector).getByRole("button", { name: "Next dependency page →" }),
+    );
+    await waitFor(() =>
+      expect(
+        fetcher.mock.calls.some(
+          ([path]) =>
+            path.includes("cursor=edge-page-2") &&
+            path.includes("nodeId=node-two") &&
+            path.includes("direction=incoming"),
+        ),
+      ).toBe(true),
+    );
+    await userEvent.selectOptions(
+      screen.getByRole("combobox", { name: "Dependency direction" }),
+      "outgoing",
+    );
+    await waitFor(() =>
+      expect(
+        fetcher.mock.calls.some(
+          ([path]) =>
+            path.includes("direction=outgoing") && !path.includes("cursor="),
+        ),
+      ).toBe(true),
+    );
+  });
+  it("labels partial catalog counts as a subtotal and keeps duplicate IDs source-qualified", async () => {
+    history.replaceState(null, "", "/workloads?kind=graph");
+    const previous = fetcher.getMockImplementation()!;
+    fetcher.mockImplementation(async (input: string, options?: RequestInit) =>
+      input.startsWith("/api/v1/workloads/")
+        ? Response.json({
+            ...page([workload, { ...workload, deploymentId: "west" }]),
+            completeness: "partial",
+            total: "2",
+            totals: [],
+          })
+        : previous(input, options),
+    );
+    render(<App />);
+    const links = await screen.findAllByRole("link", {
+      name: "Synthetic pipeline",
+    });
+    expect(links.map((link) => link.getAttribute("href"))).toEqual(
+      expect.arrayContaining([
+        "/deployments/east/namespaces/ns/workloads/graph/graph-one",
+        "/deployments/west/namespaces/ns/workloads/graph/graph-one",
+      ]),
+    );
+    expect(
+      screen.getByText("2 workloads in available sources (subtotal)"),
+    ).toBeVisible();
+  });
 });

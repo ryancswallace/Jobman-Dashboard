@@ -48,6 +48,8 @@ jobs:
         run: |
           GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -o /tmp/dashboard-linux-amd64 ./cmd/jobman-dashboard
           GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -o /tmp/dashboard-linux-arm64 ./cmd/jobman-dashboard
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -o /tmp/log-broker-linux-amd64 ./cmd/jobman-log-broker
+          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -o /tmp/log-broker-linux-arm64 ./cmd/jobman-log-broker
 
   iphone:
     runs-on: macos-latest

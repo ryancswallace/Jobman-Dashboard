@@ -38,6 +38,7 @@ vet:
 build:
 	mkdir -p bin
 	go build -trimpath -o bin/jobman-dashboard ./cmd/jobman-dashboard
+	go build -trimpath -o bin/jobman-log-broker ./cmd/jobman-log-broker
 
 web:
 	cd web && npm ci && npm run build

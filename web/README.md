@@ -31,7 +31,7 @@ npm run build
 npm run format:check
 ```
 
-`npm test` exercises source-qualified duplicate IDs, unknown lifecycle values, cancellation intent, null counts, safe redirects, CSRF/session transport, stale-request cancellation, revoked-data clearing, bounded log buffers, stream gaps and terminal controls, plus rendered job and alert-editing workflows. Build output is in `dist/` and is not committed.
+`npm test` exercises source-qualified duplicate IDs, unknown lifecycle values, cancellation intent, null counts, safe redirects, CSRF/session transport, stale-request cancellation, revoked-data clearing, bounded log buffers, stream gaps and terminal controls, plus rendered job, group and alert-editing workflows. Group tests verify source-qualified duplicate wrapper IDs, partial subtotals, exact large decimal counts, zero indices, bounded neighborhood queries, omission labels, source dependency counts and filtered edge pagination. Build output is in `dist/` and is not committed.
 
 ## Client structure
 
@@ -41,7 +41,8 @@ npm run format:check
 - `src/lib/useResource.ts`: one active read per view, hidden-tab polling suspension, bounded retry delay, obsolete-response rejection and current-scope request cancellation.
 - `src/pages/`: Overview, Jobs/detail, workloads, Targets, Inbox, alert rules, Settings.
 - `src/components/LogViewer.tsx`: authorized bounded base64 reads, incremental UTF-8 decoding, plain-text rendering, offset/gap/execution checks, pause/resume and loaded-text search.
-- `src/components/GraphView.tsx`: at most 200 nodes / 500 edges, off-main-thread layout and an equivalent paginated node/dependency list.
+- `src/lib/workloads.ts`: generated workload/dependency/neighborhood DTO normalization; source counts and decimal values remain intact.
+- `src/components/GraphView.tsx` and `GraphInspector.tsx`: bounded selected-node neighborhoods, worker layout with obsolete-result rejection, complete incoming dependency counts, paginated incoming/outgoing edge inspection and equivalent accessible lists.
 - `api-contract-notes.md`: secondary endpoint field sets; `../api/openapi.json` is the authoritative contract and `make contracts-check` checks deterministic generation.
 
 All job and namespace access remains server-enforced. Scope selection cannot grant access. Broader Control roles never add execution controls to this application.
@@ -53,3 +54,5 @@ The browser stores no API data or credentials in Web Storage. A single benign si
 Implemented frontend workflows call the actual API, including secondary surfaces for logs, artifacts, reports/citations, groups, alerts, inbox, devices, and preferences. An unavailable endpoint displays a classified error. Their end-to-end completion requires corresponding production server implementations and the acceptance gates in `../docs/DESIGN.md`.
 
 Initial browser verification against the explicit two-source fixture backend covered overview counts, distinct links for duplicate job IDs, running-phase filtering, and job detail showing unavailable lifecycle facts separately from cancellation intent/confidence. Dark-theme rendering was inspected and repaired. This is development evidence, not release acceptance. Full browser matrix, keyboard/VoiceOver/WCAG review, large-graph and NFS integration, real sessions/revocation, and all secondary end-to-end workflows remain integration gates.
+
+The group slice also passed Chrome inspection against the built web assets served by the explicit loopback fixture API: two-source graph catalog, source-scoped summary, selected-node worker layout, bounded neighborhood lists, and source predicate states. Fixture HTTP tests cover catalog and child continuations, array task index zero, incoming edges and exact neighborhood omissions. Real delegated Control/LDAP and the full large-workload acceptance matrix remain outstanding.
