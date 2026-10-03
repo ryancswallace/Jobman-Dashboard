@@ -15,6 +15,7 @@ export function GraphView({
   omittedEdges?: string;
 }) {
   const [layout, setLayout] = useState<{
+    key: string;
     positions: { id: string; x: number; y: number }[];
     width: number;
     height: number;
@@ -26,13 +27,19 @@ export function GraphView({
     })),
   );
   useEffect(() => {
+    let live = true;
     const worker = new Worker(
       new URL("../lib/graph.worker.ts", import.meta.url),
       { type: "module" },
     );
-    worker.onmessage = (e) => setLayout(e.data);
+    worker.onmessage = (e) => {
+      if (live) setLayout({ ...e.data, key });
+    };
     worker.postMessage({ nodes: JSON.parse(key) });
-    return () => worker.terminate();
+    return () => {
+      live = false;
+      worker.terminate();
+    };
   }, [key]);
   const edges = nodes
     .flatMap((node) =>
@@ -60,7 +67,7 @@ export function GraphView({
         aria-label="Dependency graph diagram; equivalent node list follows"
         tabIndex={0}
       >
-        {layout ? (
+        {layout?.key === key ? (
           <svg
             width={layout.width}
             height={layout.height}
@@ -92,7 +99,8 @@ export function GraphView({
               ) : null;
             })}
             {layout.positions.map((position) => {
-              const node = nodes.find((n) => n.id === position.id)!;
+              const node = nodes.find((n) => n.id === position.id);
+              if (!node) return null;
               return (
                 <g
                   key={node.id}
