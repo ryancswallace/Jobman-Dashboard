@@ -14,27 +14,27 @@ The adopted [implementation prompt](IMPLEMENTATION_PROMPT.md), [requirements](RE
 | Jobman-Diagnose | `c5db4a8` | Clean at start. |
 | Jobman-Lab | `014d50e` | Clean at start; currently outside writable workspace. Read-only inspection permitted; request scoped runtime access for authorized changes. |
 
-Origins verified as the matching `ryancswallace/Jobman*` GitHub repositories. No task-attached worktrees or PRs existed at start. Control implementation PRs and Lab evidence are recorded below. Dashboard application changes are being prepared for their first implementation PR.
+Origins verified as the matching `ryancswallace/Jobman*` GitHub repositories. No task-attached worktrees or PRs existed at start. Control implementation PRs and Lab evidence are recorded below. Dashboard foundation is delivered as [PR1](https://github.com/ryancswallace/Jobman-Dashboard/pull/1); current integration continues on `feat/dashboard-authentication`, based on that PR.
 
-Host discovery: Go 1.27.1, Node 26.5.1, npm 11.17.0, Swift 6.3.3 command-line tools. Control pins Go 1.26.6; Dashboard will use that reproducible toolchain baseline. Ryan installed and licensed Xcode **27.0**. The native app now passes a complete unsigned iPhone simulator build; 23 core tests pass. Simulator UI workflow tests are next.
+Host discovery: Go 1.27.1, Node 26.5.1, npm 11.17.0, Swift 6.3.3 command-line tools. Control pins Go 1.26.6; Dashboard will use that reproducible toolchain baseline. Ryan installed and licensed Xcode **27.0**. The native app now passes a complete unsigned iPhone simulator build; 23 core tests pass. Two simulator UI workflow tests passed on iPhone 18 Pro / iOS 27; rendered screenshots were inspected and layout/list-loading defects fixed. Native core now has 26 passing tests after OAuth transport hardening.
 
 ## Work packages
 
 | Package | State | Current work / remaining acceptance |
 | --- | --- | --- |
-| WP01 | In progress | Go fixture service, authored OpenAPI, generated TS/Swift DTOs and clients, two-source fixtures, PostgreSQL migrations, React/SwiftUI projects and CI authored; first integrated CI pending. |
-| WP02 | In progress | Source-scoped Ed25519/mTLS-bound read signer and tests implemented; Control verifier/alias policy agreed. AD FS web/native server authentication and integration remain. |
+| WP01 | In progress | Go fixture service, authored OpenAPI, generated TS/Swift DTOs and clients, two-source fixtures, PostgreSQL migrations, React/SwiftUI projects and CI authored; backend/web and unsigned native CI passed at `de383e5` and native fixes `9c00f2f`. |
+| WP02 | In progress | OIDC web/native validation, PKCE browser flow, audited durable sessions, CSRF, verified account aliases, source-bound delegation and Control adapter implemented/tested. Real AD FS and integrated directory validation remain. |
 | WP03 | In progress | Control agent: contributing membership grants, exact capability union, current-principal discovery and migration compatibility. Directory reconciliation/revocation still required. |
-| WP04 | In progress | Control owner/lifecycle/filter/summary contracts tested and pushed; Dashboard aggregation/cursors tested against fixtures. Production source adapter/delegation integration remains. |
-| WP05 | In progress | Control bounded catalogs/children/dependencies/neighborhoods in progress; client views authored. |
+| WP04 | In progress | Control owner/lifecycle/filter/summary contracts tested and pushed; Dashboard aggregation/cursors tested against fixtures. Production HTTP adapter now tested with real loopback mTLS; actual Control directory/delegation integration remains. |
+| WP05 | In progress | Control bounded catalogs/children/dependencies/neighborhoods pushed and Lab-tested; Dashboard group adapter/routes still required. |
 | WP06 | Not implemented | Bounded manifests, authorized safe broker, cross-user local/NFS acceptance. |
-| WP07 | In progress | Core agent implementing schema2/shared collector with schema1 preservation; exact public DTO contract pending. |
-| WP08 | Not implemented | Public deterministic Diagnose library, durable report tasks and exact citation validation. |
+| WP07 | In progress | Core schema2/shared collector PR53 passes prior-head full CI and independent review; citation-ID hardening at `62ac89b` needs fresh CI. Published compatible module remains gated by required GitHub review. |
+| WP08 | In progress | Public deterministic Diagnose library and shared-report contracts implemented locally against explicit temporary integration workspace; released core dependency, durable Dashboard tasks and final cross-repo validation remain. |
 | WP09 | Not implemented | Transactional terminal events, serialized durable feed and replay-safe ingestion. |
-| WP10 | Not implemented | All rule scopes/outcomes, inbox/device/APNs/preferences persistence and workers. |
+| WP10 | In progress | Personal preferences wired to authenticated account/revision with database persistence. Rule/inbox/device/APNs/event workers remain. |
 | WP11 | In progress | Web agent: native web navigation, transport/state, accessible workflow screens. |
 | WP12 | In progress | Native agent: Swift core, SwiftUI iPhone project, OAuth/Keychain and source-qualified state. |
-| WP13 | In progress | Migration runner and runtime DB foundation, reproducible build/check commands and CI authored. Production configuration/packages/runbooks remain. |
+| WP13 | In progress | Migration runner and runtime DB foundation, reproducible build/check commands and CI authored. Strict production config, secret-file loading, direct HTTPS modes, explicit migration identity, runtime schema verification and authentication runbook now implemented; packaging/full operations remain. |
 | WP14 | Not implemented | Integrated T01–T12 evidence, independent security review, load/restore/pilot. |
 | WP15 | External inputs pending | Internal channel/signing/APNs/managed-device ownership unknown; implement reproducible development packaging first. |
 
@@ -73,12 +73,12 @@ T01–T12: **not yet passed for an integrated release**. Fixtures, Keycloak, moc
 
 | Slice | Tested evidence | Delivery |
 | --- | --- | --- |
-| Control authorization | `make quick-check`; real PostgreSQL isolated-schema integration including migration, union, overlapping grant removal, last-grant revocation and current user; local full checks through release/build, Docker smoke unavailable locally. | `7ab34c40a22ff5386414b32487d44be07b438ae3`; [PR16](https://github.com/ryancswallace/Jobman-Control/pull/16); [CI run](https://github.com/ryancswallace/Jobman-Control/actions/runs/37149374447). Independent review of this commit found no blocking defects; CI green. GitHub requires formal approval and current-base update; no merge. |
+| Control authorization | `make quick-check`; real PostgreSQL isolated-schema integration including migration, union, overlapping grant removal, last-grant revocation and current user; local full checks through release/build, Docker smoke unavailable locally. | Updated `b6ce8dd8b1e2e7bb8d92a3aaa59fc64b7d563bd5`; [PR16](https://github.com/ryancswallace/Jobman-Control/pull/16); [CI run](https://github.com/ryancswallace/Jobman-Control/actions/runs/37151811228). Independent review of this commit found no blocking defects; CI green. Main update and malformed-query hardening reviewed. GitHub requires formal approval; user asked to arrange eligible review. No merge. |
 | Control monitoring | Real Lab integration: summary/drill-down agreement, completion half-open boundary, original owner versus history importer, instance identity and actual agent lifecycle timestamps. Quick/full non-Docker checks pass, 65.0% coverage. | `7ac9353b28b3248cda1300e785e43d7ff7b0cf0c`; [stacked PR17](https://github.com/ryancswallace/Jobman-Control/pull/17). No merge. |
-| Dashboard backend | `go test -race ./...`; merge retains buffers, distinct duplicate IDs, source outage partials, cursor account/query/grant/epoch isolation, replay/back navigation, expiry, no execution API, strict queries and 300-poll quota regression. Local uncommitted implementation; CI revision pending. | Foundation branch; production authentication and source adapter not integrated. |
+| Dashboard backend | `go test -race ./...`; merge retains buffers, distinct duplicate IDs, source outage partials, cursor account/query/grant/epoch isolation, replay/back navigation, expiry, no execution API, strict queries and 300-poll quota regression. Foundation `de383e5` and native fixes `9c00f2f` pass CI; authentication integration has passing local focused/race tests and a passing full `make check`. | [PR1](https://github.com/ryancswallace/Jobman-Dashboard/pull/1), [latest foundation CI](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37154025641). Production auth/adapter now wired; live directory source validation pending. |
 | Dashboard database | `python3 scripts/test-lab-postgres.py` passes on PostgreSQL **17.6 (Debian 17.6-2.pgdg13+1)**: migration replay/integrity, optimistic cursor/preference updates, expiry/cleanup. Each test creates/removes only a random disposable schema. | Synthetic Lab pg01, no Control schema changes by Dashboard tests. |
 | Web | Production build and 35 focused tests pass; browser inspected two-source overview, job filters, duplicate-ID drill-down, source breadcrumbs, missing timestamps and dark appearance. | Root fixture API on loopback; remaining services show unavailable. |
-| Native | 23 core tests and full Xcode 27.0 unsigned simulator build pass. Bounded graph rendering, exact citations, device revocation, generated client integration and DEBUG fixture UI tests authored. | Simulator UI tests in progress; real AD FS/APNs and physical/managed-device acceptance pending. |
+| Native | 26 core tests, two iPhone 18 Pro / iOS 27 UI tests and full Xcode 27.0 unsigned simulator build pass. Bounded graph rendering, exact citations, device revocation, generated client integration and DEBUG fixture UI tests authored. | UI screenshots inspected; real AD FS/APNs and physical/managed-device acceptance pending. |
 | Contract generation | Deterministic generator check; eight generator tests; generated Swift standalone compile/smoke; generated TS client transport test. | `api/openapi.json` and checked-in `contracts/`. |
 
 Lab preflight: nine existing VMs were suspended; host has 48 GiB RAM and 287 GiB free disk. Only pg01 was resumed. Its suspended clock was September 17 with chrony unsynchronized; corrected to host UTC October 3 before continuing expiry checks. Ongoing time synchronization remains an installation check. No Lab destruction or production changes performed.
@@ -94,12 +94,22 @@ Lab preflight: nine existing VMs were suspended; host has 48 GiB RAM and 287 GiB
 
 ## Current ownership and next actions
 
-Root owns Dashboard backend, authored `api/`, root configuration, CI, documentation and integration. Web agent owns `web/`, generated `contracts/` and generator scripts plus the completed strict-query parser patch; native agent owns `ios/`; Control agent owns current stacked authorization/monitoring/groups branches. Web agent next independently reviews Control PR16. Agents do not commit shared Dashboard work independently.
+Root owns Dashboard backend, authored `api/`, root configuration, CI, documentation and integration. Web agent owns `web/`, generated `contracts/` and generator scripts plus the completed strict-query parser patch; native agent owns `ios/`; Control agent owns current stacked authorization/monitoring/groups branches. Control PR16 and core PR53 received independent engineering review. Native agent independently reviewed/fixed Control adapter and authentication issues, and owns current optional native factual detail/OAuth refinements. Agents do not commit shared Dashboard work independently.
 
-1. Push first Dashboard foundation PR and complete CI/simulator tests. Keep all acceptance gates open; address review findings before merge.
+1. Push authenticated Dashboard integration as a stacked PR after full tests; review foundation/client code and preserve repository approval gates before merging.
 2. Update/review Control PR16, retain required GitHub review approval; integrate PR17 monitoring and PR18 bounded groups, then delegation and directory enforcement.
 3. Complete Lab host/resource preflight and obtain scoped runtime write permission for its authorized configuration.
 4. Build evidence/report and durable event/alert paths in dependency order; publish compatible upstream modules before release builds.
 5. Run focused tests and independent reviews per slice, push reviewable PRs, then complete cross-repository acceptance and release preparation.
 
 Control bounded groups: `d2587d192699a59f4dd662194641f2cc59dea709`, [stacked PR18](https://github.com/ryancswallace/Jobman-Control/pull/18); real PostgreSQL group tests and non-Docker full checks pass. Core shared-evidence agent owns `diagnostic/` changes and must preserve all four pre-existing core user edits.
+
+## Authentication integration evidence (current work)
+
+- Actual local TLS RSA/JWKS tests: PKCE/state/nonce, web authorized-party claims, native API audience/client/directory claims, duplicate-cookie rejection, CSRF/Origin, sign-out and replay. No real AD FS claim-shape acceptance is implied.
+- Actual local mutual-TLS Control adapter tests: source pins, independent grants, preserved canonical owner IDs and verified directory aliases, stale/changed authorization, redirects, query fidelity and large revisions.
+- Synthetic Lab PostgreSQL: seven authentication/cursor/preference test cases pass, including alias conflicts, idle/session revocation, atomic content-free audit, 20-session account cap, cleanup, exact migration checks, and monotonic source epoch pinning.
+- Browser sessions intentionally do not retain refresh tokens; expiry is bounded by eight hours and shorter signed/token endpoint policy. Renewal uses AD FS SSO. Native refresh remains device-only. Design and `AUTHENTICATION.md` updated.
+- Core shared evidence: `62ac89b14547a5fc9c1b9e2852832d66498361c2`, [PR53](https://github.com/ryancswallace/Jobman/pull/53). Independent review found no remaining blocker including the citation-ID uniqueness follow-up. Prior head passed [full CI](https://github.com/ryancswallace/Jobman/actions/runs/37153268539); wait for new-head checks and required formal GitHub review before merge/release.
+
+Foundation web review found a graph-rendering race when a refreshed node set differs from the previous worker layout. Web agent will fix and test before PR1 can be merged. Scope/account component keys and authorization cache clearing were inspected without another blocking finding in those paths.

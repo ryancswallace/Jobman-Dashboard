@@ -58,3 +58,21 @@ private let jobJSON = #"{"deploymentId":"east","namespaceId":"team","id":"same-i
     #expect(WireDate.parse("2026-10-03T12:00:00Z") != nil)
     #expect(WireDate.parse("unknown") == nil)
 }
+
+@Test func lifecycleAndRunFactsRemainDistinctFromMetadataAndGroupPosition() throws {
+    var json = try JSONSerialization.jsonObject(with: Data(jobJSON.utf8)) as! [String: Any]
+    json["currentRun"] = ["id": "run1", "number": "9007199254740993", "executionId": "execution1"]
+    json["lifecycle"] = ["completedRecordedAt": "2026-10-03T12:00:04Z", "completedProvenance": "agent"]
+    json["group"] = ["collectionId": "collection1", "collectionIndex": 42, "graphId": "graph1", "graphIndex": 7]
+    json["targetGenerationId"] = "generation1"
+    json["scheduler"] = ["state": "FAILED", "reason": "Synthetic reason", "observedAt": "2026-10-03T12:00:02Z"]
+    let job = try JSONDecoder().decode(Job.self, from: JSONSerialization.data(withJSONObject: json))
+    #expect(job.currentRun?.number == "9007199254740993")
+    #expect(job.completedAt == nil)
+    #expect(job.lifecycle?.completedRecordedAt != job.updatedAt)
+    #expect(job.lifecycle?.completedProvenance == "agent")
+    #expect(job.group?.collectionIndex == 42)
+    #expect(job.group?.graphIndex == 7)
+    #expect(job.targetGenerationId == "generation1")
+    #expect(job.scheduler?.reason == "Synthetic reason")
+}

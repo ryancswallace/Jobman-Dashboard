@@ -18,13 +18,19 @@ public struct NativeOAuthConfiguration: Codable, Sendable {
     }
 
     public func validate() throws {
+        guard let issuerURL = URL(string: issuer), let issuerHost = issuerURL.host else { throw OAuthError.invalidConfiguration }
         for value in [issuer, authorizationEndpoint, tokenEndpoint] {
             guard let url = URL(string: value), url.scheme == "https", url.host != nil,
-                  url.user == nil, url.password == nil, url.fragment == nil else { throw OAuthError.invalidConfiguration }
+                  url.user == nil, url.password == nil, url.fragment == nil, url.query == nil,
+                  url.host?.lowercased() == issuerHost.lowercased(), (url.port ?? 443) == (issuerURL.port ?? 443)
+            else { throw OAuthError.invalidConfiguration }
         }
-        guard !clientId.isEmpty, !scopes.isEmpty,
-              let redirect = URL(string: redirectURI), redirect.scheme == "jobman-dashboard-auth",
-              redirect.host == "callback", redirect.path.isEmpty, redirect.query == nil, redirect.fragment == nil
+        guard !clientId.isEmpty, clientId.utf8.count <= 512,
+              !clientId.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
+              !scopes.isEmpty, scopes.count <= 64, Set(scopes).count == scopes.count,
+              scopes.contains("openid"), scopes.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 256 && $0.rangeOfCharacter(from: .whitespacesAndNewlines.union(.controlCharacters)) == nil }),
+              redirectURI == "jobman-dashboard-auth://callback",
+              resource == nil || (resource!.utf8.count <= 512 && !resource!.isEmpty && resource!.rangeOfCharacter(from: .controlCharacters) == nil)
         else { throw OAuthError.invalidConfiguration }
     }
 }
@@ -86,21 +92,35 @@ public struct OAuthAttempt: Sendable {
         guard states.count == 1, states[0].value == state else { throw OAuthError.invalidCallback }
         guard !items.contains(where: { $0.name == "error" }) else { throw OAuthError.rejected }
         let codes = items.filter { $0.name == "code" }
-        guard codes.count == 1, let code = codes[0].value, !code.isEmpty else { throw OAuthError.invalidCallback }
+        guard codes.count == 1, let code = codes[0].value, !code.isEmpty, code.utf8.count <= 4096,
+              code.rangeOfCharacter(from: .controlCharacters) == nil else { throw OAuthError.invalidCallback }
         return code
     }
 
     public func tokenRequest(code: String) throws -> URLRequest {
+        try Self.request(configuration: configuration, values: [
+            "grant_type": "authorization_code", "code": code, "client_id": configuration.clientId,
+            "redirect_uri": configuration.redirectURI, "code_verifier": verifier
+        ])
+    }
+
+    public static func refreshRequest(configuration: NativeOAuthConfiguration, refreshToken: String) throws -> URLRequest {
+        try request(configuration: configuration, values: [
+            "grant_type": "refresh_token", "refresh_token": refreshToken, "client_id": configuration.clientId
+        ])
+    }
+
+    private static func request(configuration: NativeOAuthConfiguration, values: [String: String]) throws -> URLRequest {
+        try configuration.validate()
         guard let url = URL(string: configuration.tokenEndpoint) else { throw OAuthError.invalidConfiguration }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
-        request.httpBody = Self.form([
-            "grant_type": "authorization_code", "code": code, "client_id": configuration.clientId,
-            "redirect_uri": configuration.redirectURI, "code_verifier": verifier
-        ])
+        var parameters = values
+        if let resource = configuration.resource { parameters["resource"] = resource }
+        request.httpBody = form(parameters)
         return request
     }
 
@@ -120,7 +140,9 @@ public struct OAuthTokens: Decodable, Sendable {
     public let expiresIn: Int
     enum CodingKeys: String, CodingKey { case accessToken = "access_token", refreshToken = "refresh_token", tokenType = "token_type", expiresIn = "expires_in" }
     public func validate() throws {
-        guard !accessToken.isEmpty, tokenType.lowercased() == "bearer", expiresIn > 0 else { throw OAuthError.invalidTokens }
+        guard !accessToken.isEmpty, accessToken.utf8.count <= 16384,
+              accessToken.rangeOfCharacter(from: .whitespacesAndNewlines.union(.controlCharacters)) == nil,
+              tokenType.lowercased() == "bearer", expiresIn > 0 else { throw OAuthError.invalidTokens }
     }
 }
 

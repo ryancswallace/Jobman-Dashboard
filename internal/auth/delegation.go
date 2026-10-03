@@ -108,7 +108,7 @@ func (s *DelegationSigner) Authorize(actor monitoring.Actor, operation, namespac
 }
 
 func uuid(value string) bool {
-	if len(value) != 36 {
+	if len(value) != 36 || value == "00000000-0000-0000-0000-000000000000" {
 		return false
 	}
 	for i, c := range value {

@@ -73,28 +73,53 @@ type Scheduler struct {
 	State      string     `json:"state,omitempty"`
 	JobID      string     `json:"jobId,omitempty"`
 	ObservedAt *time.Time `json:"observedAt,omitempty"`
+	Reason     string     `json:"reason,omitempty"`
+	Cluster    string     `json:"cluster,omitempty"`
+}
+
+type Lifecycle struct {
+	StartedRecordedAt   *time.Time `json:"startedRecordedAt,omitempty"`
+	StartedProvenance   string     `json:"startedProvenance,omitempty"`
+	CompletedRecordedAt *time.Time `json:"completedRecordedAt,omitempty"`
+	CompletedProvenance string     `json:"completedProvenance,omitempty"`
+}
+type RunReference struct {
+	ID          string `json:"id"`
+	Number      string `json:"number"`
+	ExecutionID string `json:"executionId,omitempty"`
+}
+type GroupReference struct {
+	CollectionID    string `json:"collectionId,omitempty"`
+	CollectionIndex *int   `json:"collectionIndex,omitempty"`
+	GraphID         string `json:"graphId,omitempty"`
+	GraphIndex      *int   `json:"graphIndex,omitempty"`
 }
 
 type Job struct {
 	Scope
-	ID               string            `json:"id"`
-	Name             string            `json:"name,omitempty"`
-	TargetID         string            `json:"targetId"`
-	TargetGeneration string            `json:"targetGeneration,omitempty"`
-	Backend          string            `json:"backend,omitempty"`
-	Revision         string            `json:"revision"`
-	Owner            *Owner            `json:"owner,omitempty"`
-	CreatedAt        time.Time         `json:"createdAt"`
-	UpdatedAt        time.Time         `json:"updatedAt"`
-	StartedAt        *time.Time        `json:"startedAt,omitempty"`
-	CompletedAt      *time.Time        `json:"completedAt,omitempty"`
-	DesiredState     string            `json:"desiredState"`
-	Phase            string            `json:"phase"`
-	Outcome          string            `json:"outcome,omitempty"`
-	Confidence       string            `json:"confidence"`
-	Labels           map[string]string `json:"labels"`
-	Scheduler        *Scheduler        `json:"scheduler,omitempty"`
-	Disposition      string            `json:"disposition,omitempty"`
+	ID                 string            `json:"id"`
+	Name               string            `json:"name,omitempty"`
+	TargetID           string            `json:"targetId"`
+	TargetGeneration   string            `json:"targetGeneration,omitempty"`
+	TargetGenerationID string            `json:"targetGenerationId,omitempty"`
+	Backend            string            `json:"backend,omitempty"`
+	Revision           string            `json:"revision"`
+	Owner              *Owner            `json:"owner,omitempty"`
+	CreatedAt          time.Time         `json:"createdAt"`
+	UpdatedAt          time.Time         `json:"updatedAt"`
+	StartedAt          *time.Time        `json:"startedAt,omitempty"`
+	CompletedAt        *time.Time        `json:"completedAt,omitempty"`
+	DesiredState       string            `json:"desiredState"`
+	Phase              string            `json:"phase"`
+	Outcome            string            `json:"outcome,omitempty"`
+	Confidence         string            `json:"confidence"`
+	Labels             map[string]string `json:"labels"`
+	Scheduler          *Scheduler        `json:"scheduler,omitempty"`
+	Disposition        string            `json:"disposition,omitempty"`
+	Imported           bool              `json:"imported"`
+	Lifecycle          *Lifecycle        `json:"lifecycle,omitempty"`
+	CurrentRun         *RunReference     `json:"currentRun,omitempty"`
+	Group              *GroupReference   `json:"group,omitempty"`
 }
 
 type SourceStatus struct {

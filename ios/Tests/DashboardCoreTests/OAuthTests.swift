@@ -21,7 +21,29 @@ private func config() -> NativeOAuthConfiguration {
     let request = try attempt.tokenRequest(code: "a+b&other=value")
     let body = String(data: request.httpBody!, encoding: .utf8)!
     #expect(body.contains("code=a%2Bb%26other%3Dvalue"))
+    #expect(body.contains("resource=https%3A%2F%2Fdashboard.example.test"))
     #expect(!body.contains("client_secret"))
+}
+
+@Test func discoveryCannotSendCodeOrRefreshCredentialOutsideIssuerOrigin() throws {
+    for endpoint in ["https://other.example.test/token", "http://adfs.example.test/token", "https://adfs.example.test:8443/token", "https://adfs.example.test/token?audience=other"] {
+        let bad = NativeOAuthConfiguration(issuer: config().issuer, authorizationEndpoint: config().authorizationEndpoint,
+            tokenEndpoint: endpoint, clientId: config().clientId, redirectURI: config().redirectURI, scopes: config().scopes, resource: config().resource)
+        #expect(throws: OAuthError.invalidConfiguration) { try OAuthAttempt(configuration: bad) }
+        #expect(throws: OAuthError.invalidConfiguration) { try OAuthAttempt.refreshRequest(configuration: bad, refreshToken: "synthetic-secret") }
+    }
+    let request = try OAuthAttempt.refreshRequest(configuration: config(), refreshToken: "synthetic+a&b")
+    let body = String(data: request.httpBody!, encoding: .utf8)!
+    #expect(request.url?.absoluteString == config().tokenEndpoint)
+    #expect(body.contains("resource=https%3A%2F%2Fdashboard.example.test"))
+    #expect(body.contains("refresh_token=synthetic%2Ba%26b"))
+    #expect(!body.contains("client_secret"))
+}
+
+@Test func malformedBearerCredentialCannotReachHTTPHeaders() throws {
+    let data = Data(#"{"access_token":"synthetic\r\nOther: value","token_type":"Bearer","expires_in":3600}"#.utf8)
+    let tokens = try JSONDecoder().decode(OAuthTokens.self, from: data)
+    #expect(throws: OAuthError.invalidTokens) { try tokens.validate() }
 }
 
 @Test func noIdTokenCanSubstituteForAPICredential() {

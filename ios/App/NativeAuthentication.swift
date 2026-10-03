@@ -72,11 +72,8 @@ final class NativeAuthentication: NSObject, ASWebAuthenticationPresentationConte
     private func refresh() async throws -> String {
         let attemptGeneration = generation
         guard let config = configuration, let key = credentialKey,
-              let refresh = try KeychainCredential.read(key: key), let url = URL(string: config.tokenEndpoint) else { throw DashboardError.authenticationRequired }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        request.httpBody = OAuthAttempt.form(["grant_type": "refresh_token", "refresh_token": refresh, "client_id": config.clientId])
+              let refresh = try KeychainCredential.read(key: key) else { throw DashboardError.authenticationRequired }
+        let request = try OAuthAttempt.refreshRequest(configuration: config, refreshToken: refresh)
         let tokens: OAuthTokens = try await json(request)
         guard attemptGeneration == generation, !Task.isCancelled else { throw CancellationError() }
         try accept(tokens)

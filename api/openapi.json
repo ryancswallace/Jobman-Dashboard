@@ -1529,6 +1529,12 @@
           "observedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "cluster": {
+            "type": "string"
           }
         },
         "required": [],
@@ -1605,6 +1611,21 @@
           },
           "disposition": {
             "type": "string"
+          },
+          "targetGenerationId": {
+            "type": "string"
+          },
+          "imported": {
+            "type": "boolean"
+          },
+          "lifecycle": {
+            "$ref": "#/components/schemas/Lifecycle"
+          },
+          "currentRun": {
+            "$ref": "#/components/schemas/RunReference"
+          },
+          "group": {
+            "$ref": "#/components/schemas/GroupReference"
           }
         },
         "required": [
@@ -2735,6 +2756,68 @@
           "sources",
           "fetchedAt"
         ],
+        "additionalProperties": false
+      },
+      "Lifecycle": {
+        "type": "object",
+        "properties": {
+          "startedRecordedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedProvenance": {
+            "type": "string"
+          },
+          "completedRecordedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedProvenance": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "RunReference": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "number": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "executionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "number"
+        ],
+        "additionalProperties": false
+      },
+      "GroupReference": {
+        "type": "object",
+        "properties": {
+          "collectionId": {
+            "type": "string"
+          },
+          "collectionIndex": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "graphId": {
+            "type": "string"
+          },
+          "graphIndex": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [],
         "additionalProperties": false
       }
     }

@@ -119,18 +119,40 @@ struct JobDetailView: View {
                     Text("A cancellation request is intent. Only the reported terminal outcome confirms cancellation.").font(.footnote).foregroundStyle(.secondary)
                     TimestampRow(label: "Created", value: job.createdAt)
                     TimestampRow(label: "Execution started", value: job.startedAt)
+                    TimestampRow(label: "Start recorded by Control", value: job.lifecycle?.startedRecordedAt)
+                    LabeledContent("Start evidence", value: job.lifecycle?.startedProvenance ?? "Unavailable")
                     TimestampRow(label: "Completed", value: job.completedAt)
+                    TimestampRow(label: "Completion recorded by Control", value: job.lifecycle?.completedRecordedAt)
+                    LabeledContent("Completion evidence", value: job.lifecycle?.completedProvenance ?? "Unavailable")
                     TimestampRow(label: "Metadata updated", value: job.updatedAt)
                     TimestampRow(label: "Last fetched", value: detail.fetchedAt)
                 }
                 Section("Placement and ownership") {
                     LabeledContent("Submitted by", value: job.owner?.displayName ?? job.owner?.id ?? "Unavailable")
                     LabeledContent("Target", value: job.targetId)
+                    LabeledContent("Target generation ID", value: job.targetGenerationId ?? "Unavailable")
                     LabeledContent("Backend", value: job.backend ?? "Unavailable")
                     LabeledContent("Revision", value: job.revision)
                     LabeledContent("Scheduler state", value: job.scheduler?.state ?? "Unavailable")
                     LabeledContent("Scheduler job ID", value: job.scheduler?.jobId ?? "Unavailable")
+                    LabeledContent("Scheduler reason", value: job.scheduler?.reason ?? "Unavailable")
+                    LabeledContent("Cluster", value: job.scheduler?.cluster ?? "Unavailable")
+                    TimestampRow(label: "Scheduler observation", value: job.scheduler?.observedAt)
+                    LabeledContent("Imported history", value: job.imported.map { $0 ? "Yes" : "No" } ?? "Unavailable")
                     ForEach(job.labels.keys.sorted(), id: \.self) { key in LabeledContent(key, value: job.labels[key] ?? "") }
+                }
+                Section("Run and workload references") {
+                    LabeledContent("Current run", value: job.currentRun?.number ?? "Unavailable")
+                    LabeledContent("Run ID", value: job.currentRun?.id ?? "Unavailable")
+                    LabeledContent("Execution ID", value: job.currentRun?.executionId ?? "Unavailable")
+                    if let id = job.group?.collectionId {
+                        NavigationLink("Collection \(id)") { WorkloadReferenceView(namespace: ref.namespace, kind: "collection", id: id) }
+                        if let index = job.group?.collectionIndex { LabeledContent("Collection index", value: String(index)) }
+                    }
+                    if let id = job.group?.graphId {
+                        NavigationLink("Graph \(id)") { WorkloadReferenceView(namespace: ref.namespace, kind: "graph", id: id) }
+                        if let index = job.group?.graphIndex { LabeledContent("Graph index", value: String(index)) }
+                    }
                 }
                 Section("Investigate") {
                     NavigationLink { LogView(ref: ref) } label: { Label("Logs", systemImage: "text.alignleft") }
@@ -209,7 +231,7 @@ struct WorkloadDetailView: View {
             if workload.kind == "graph" {
                 Section("Bounded graph diagram") {
                     Toggle("Show diagram", isOn: $showDiagram)
-                    if showDiagram { DependencyDiagram(children: children, totalNodes: workload.totalChildren) }
+                    if showDiagram { DependencyDiagram(children: children, totalNodes: summary.totalChildren) }
                     Text("The node list below provides the same navigation with VoiceOver. Readiness and dependency predicates are reported by Control.").font(.footnote)
                 }
             }
@@ -241,9 +263,38 @@ struct WorkloadDetailView: View {
         guard !loading else { return }; loading = true; defer { loading = false }
         do {
             let result: WorkloadDetail = try await store.request(path: workload.path, query: cursor.map { [.init(name: "cursor", value: $0)] } ?? [])
+            guard result.workload.path == workload.path, result.children.count <= 200,
+                  result.children.allSatisfy({ $0.job.deploymentId == workload.deploymentId && $0.job.namespaceId == workload.namespaceId })
+            else { throw DashboardError.invalidResponse }
             detail = result; self.cursor = result.nextCursor
             children = Array(result.children.prefix(200)); currentCursor = cursor
             error = nil
+        } catch is CancellationError {} catch { self.error = error.localizedDescription }
+    }
+}
+
+struct WorkloadReferenceView: View {
+    @Environment(DashboardStore.self) private var store
+    let namespace: NamespaceRef
+    let kind: String
+    let id: String
+    @State private var workload: Workload?
+    @State private var error: String?
+    private var path: String {
+        "/api/v1/deployments/\(APIPath.component(namespace.deploymentId))/namespaces/\(APIPath.component(namespace.namespaceId))/workloads/\(APIPath.component(kind))/\(APIPath.component(id))"
+    }
+    var body: some View {
+        Group {
+            if let workload { WorkloadDetailView(workload: workload) }
+            else if let error { List { ErrorMessage(error: error); Button("Retry") { Task { await load() } } } }
+            else { ProgressView("Loading authorized workload…") }
+        }.task { await load() }
+    }
+    private func load() async {
+        do {
+            let result: WorkloadDetail = try await store.request(path: path)
+            guard result.workload.path == path else { throw DashboardError.invalidResponse }
+            workload = result.workload; error = nil
         } catch is CancellationError {} catch { self.error = error.localizedDescription }
     }
 }

@@ -28,13 +28,22 @@ func main() {
 func run() error {
 	fs := flag.NewFlagSet("jobman-dashboard", flag.ContinueOnError)
 	fixture := fs.Bool("fixture", false, "serve synthetic development data, loopback only")
+	configPath := fs.String("config", "", "absolute production JSON configuration path")
+	mode := fs.String("mode", "serve", "serve, check-config, or migrate")
+	migrationURL := fs.String("migration-database-url-file", "", "private migration identity database URL file (migrate mode only)")
 	listen := fs.String("listen", "127.0.0.1:8088", "HTTP bind address")
 	web := fs.String("web", "web/dist", "compiled static web directory")
 	if err := fs.Parse(os.Args[1:]); err != nil {
 		return err
 	}
 	if !*fixture {
-		return fmt.Errorf("production configuration/authentication is not installed yet; only explicit --fixture development mode is available")
+		if *configPath == "" {
+			return fmt.Errorf("production requires --config; synthetic development requires explicit --fixture")
+		}
+		return runConfigured(*configPath, *mode, *migrationURL)
+	}
+	if *configPath != "" || *mode != "serve" || *migrationURL != "" {
+		return fmt.Errorf("fixture mode cannot be combined with production configuration or migrations")
 	}
 	host, _, err := net.SplitHostPort(*listen)
 	if err != nil {

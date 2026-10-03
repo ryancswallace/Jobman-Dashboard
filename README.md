@@ -13,7 +13,7 @@ make web
 make dev
 ```
 
-Open `http://127.0.0.1:8088`. This explicitly starts a **synthetic fixture environment**, restricted to a loopback IP. Fixture identities and data are not organization authentication. The server does not start in production mode until the real configuration/authentication integration is delivered. The current backend implements bootstrap, overview, jobs, and job detail; other implemented client screens report unavailable while their services are being integrated.
+Open `http://127.0.0.1:8088`. This explicitly starts a **synthetic fixture environment**, restricted to a loopback IP. Fixture identities and data are not organization authentication. Configured HTTPS mode now provides OIDC authentication, durable web sessions, current-authorized Control adapters and personal preferences; see [authentication and configuration](docs/AUTHENTICATION.md). Its actual AD FS and Control directory integration gates remain open. The current monitoring backend implements bootstrap, overview, jobs, and job detail; other implemented client screens report unavailable while their services are being integrated.
 
 For live web editing, run the fixture backend plus `npm run dev --prefix web`; the Vite configuration proxies same-origin API calls. Never expose the fixture server on a public or organization interface.
 

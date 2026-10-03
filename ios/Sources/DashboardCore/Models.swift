@@ -77,12 +77,24 @@ public struct Overview: Decodable, Sendable {
 }
 public struct Job: Codable, Sendable, Identifiable {
     public struct Owner: Codable, Sendable { public let id: String; public let displayName: String?; public let isCurrentUser: Bool }
-    public struct Scheduler: Codable, Sendable { public let state: String?; public let jobId: String? }
+    public struct Scheduler: Codable, Sendable {
+        public let state: String?; public let jobId: String?; public let reason: String?; public let cluster: String?; public let observedAt: String?
+    }
+    public struct Lifecycle: Codable, Sendable {
+        public let startedRecordedAt: String?; public let startedProvenance: String?
+        public let completedRecordedAt: String?; public let completedProvenance: String?
+    }
+    public struct RunReference: Codable, Sendable { public let id: String; public let number: String; public let executionId: String? }
+    public struct GroupReference: Codable, Sendable {
+        public let collectionId: String?; public let collectionIndex: Int?
+        public let graphId: String?; public let graphIndex: Int?
+    }
     public let deploymentId: String
     public let namespaceId: String
     public let id: String
     public let name: String?
     public let targetId: String
+    public let targetGenerationId: String?
     public let backend: String?
     public let revision: String
     public let owner: Owner?
@@ -97,6 +109,10 @@ public struct Job: Codable, Sendable, Identifiable {
     public let labels: [String: String]
     public let scheduler: Scheduler?
     public let disposition: String?
+    public let imported: Bool?
+    public let lifecycle: Lifecycle?
+    public let currentRun: RunReference?
+    public let group: GroupReference?
     public var ref: JobRef { .init(deploymentId: deploymentId, namespaceId: namespaceId, jobId: id) }
     public var title: String { name ?? id }
 }
