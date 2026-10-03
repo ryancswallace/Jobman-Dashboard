@@ -42,6 +42,72 @@ func TestExactImmutableFileRead(t *testing.T) {
 	}
 }
 
+func TestSearchOnlyDirectoryTraversal(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("requires an unprivileged process to exercise directory permission checks")
+	}
+	base, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent := filepath.Join(base, "search-only-parent")
+	root := filepath.Join(parent, "store")
+	chunks := filepath.Join(root, "chunks")
+	if err = os.MkdirAll(chunks, 0700); err != nil {
+		t.Fatal(err)
+	}
+	data := []byte("synthetic traversal-only access")
+	if err = os.WriteFile(filepath.Join(chunks, "one"), data, 0400); err != nil {
+		t.Fatal(err)
+	}
+	for _, link := range []struct{ name, target string }{
+		{filepath.Join(base, "linked-parent"), parent},
+		{filepath.Join(parent, "linked-store"), root},
+		{filepath.Join(root, "linked-chunks"), chunks},
+		{filepath.Join(chunks, "linked-file"), filepath.Join(chunks, "one")},
+	} {
+		if err = os.Symlink(link.target, link.name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Cleanup(func() {
+		for _, directory := range []string{parent, root, chunks} {
+			_ = os.Chmod(directory, 0700)
+		}
+	})
+	for _, directory := range []string{parent, root, chunks} {
+		if err = os.Chmod(directory, 0100); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = os.ReadDir(directory); !os.IsPermission(err) {
+			t.Fatalf("fixture permits directory listing: %v", err)
+		}
+	}
+	sum := sha256.Sum256(data)
+	r := FileRequest{Root: root, ObjectKey: "chunks/one", ByteLength: int64(len(data)), Checksum: "sha256:" + hex.EncodeToString(sum[:])}
+	if got := readFile(r); got.State != "ok" || !bytes.Equal(got.Bytes, data) {
+		t.Fatalf("authorized search-only traversal failed: state=%s byteCount=%d", got.State, len(got.Bytes))
+	}
+	for _, change := range []func(*FileRequest){
+		func(r *FileRequest) { r.Root = filepath.Join(base, "linked-parent", "store") },
+		func(r *FileRequest) { r.Root = filepath.Join(parent, "linked-store") },
+		func(r *FileRequest) { r.ObjectKey = "linked-chunks/one" },
+		func(r *FileRequest) { r.ObjectKey = "chunks/linked-file" },
+	} {
+		bad := r
+		change(&bad)
+		if got := readFile(bad); got.State != "mapping_inaccessible" || len(got.Bytes) != 0 {
+			t.Fatal("search-only traversal followed a symlink")
+		}
+	}
+	if err = os.Chmod(chunks, 0); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFile(r); got.State != "mapping_inaccessible" || len(got.Bytes) != 0 {
+		t.Fatal("directory search permission was bypassed")
+	}
+}
+
 func TestFileBoundaryRejectsTraversalAndCorruption(t *testing.T) {
 	r := fileFixture(t, []byte("synthetic"))
 	for _, key := range []string{"../chunks/one", "chunks/../../one", "/chunks/one", "chunks//one", "chunks/./one", "chunks/one/..", "chunks\\one", "https:object", "chunks/one\x00"} {
