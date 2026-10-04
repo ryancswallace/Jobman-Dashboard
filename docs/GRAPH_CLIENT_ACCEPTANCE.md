@@ -6,6 +6,56 @@ T10 additionally covers account/scope isolation, cancellation, keyboard navigati
 focus, display settings and assistive technology. Evidence at one layer does not
 complete the others.
 
+## Bounded production traversal history
+
+Child and dependency pagination retain one server-side browse record per
+traversal. Each record keeps at most 66 immutable selectors: the current page,
+the next page and 64 previous pages. Native dependency navigation retains the
+same 64-page Back window and discloses when earlier history has been discarded.
+Browser Back can revisit retained selectors; an evicted selector returns
+`409 cursor_expired`, requiring an explicit refresh from the first page.
+
+The opaque selector binds an unguessable record identifier and canonical page
+position to server-owned account, query, source instance, recovery epoch and
+authorization version. A caller cannot supply an arbitrary source cursor or
+extend the recorded window. Every page still verifies current source access
+before and after reading. Replaying a retained page reuses its exact captured
+successor; it does not discard later pages or extend expiry. Concurrent advances
+use the existing atomic store version check and accept only an identical
+successor after a conflicting write. Network reads never hold database locks.
+
+The original fixed 15-minute Dashboard expiry and all account/global row and byte
+quotas remain unchanged. A Control cursor may expire sooner under its own
+contract. Old `r.` selectors remain readable for their original lifetime and
+start a bounded traversal on continuation. New `g.` selectors require the new
+binary; rolling back to an older binary requires refreshing these pages. No
+database migration, cursor key rotation or source change is needed. Workload
+catalog, job, artifact, target and run pagination are outside this change.
+
+The live HTTP v2 attempt exposed the old capacity defect: 200 child pages and
+1,000 dependency pages required 1,198 per-page records, exceeding the production
+1,000-record account quota before the fixed expiry. The test stopped after a
+`429 rate_limited` dependency response, with both sign-ins successful and all 117
+input pins unchanged. Its failed log remains at
+`/private/tmp/jobman-dashboard-graph-http-v2-3d402kvj/acceptance.log`, SHA-256
+`f07245485384bc5ae0a0425a95b3fc6658dd092b525f92a57dd15c7e70b5f67f`.
+Pacing requests cannot repair this storage-capacity mismatch within the accepted
+traversal interval; the request limiter and the acceptance time budget stay intact.
+
+`TestGroupTraversalCeilingUsesTwoBoundedRows` exercises the actual engine across
+all 1,200 synthetic pages with a three-record fixture-store cap. It independently
+checks all node and edge identities, ordering, terminal continuation, record
+count and fixed expiry. Companion tests force simultaneous reads of one version,
+replay Back pages without changing stored history, reject evicted/forged/cross-account
+selectors and changed grants/epochs, preserve legacy cursors and prevent a
+post-read revocation from advancing history. The opt-in PostgreSQL tests
+`TestPostgresGroupTraversalCeiling` and `TestPostgresGroupTraversalCASAndExpiry`
+exercise the production store with unchanged quotas in the existing disposable
+schema harness. They test complete traversal, polling replacement, concurrent
+CAS, revocation and database-clock expiry. A local skipped database test is not
+PostgreSQL evidence, and these tests do not establish a successful live HTTP or
+rendered-client rerun.
+
 ## Existing source evidence
 
 Control's opt-in `TestGraphNavigationCeilingIntegration` builds a synthetic graph
