@@ -79,6 +79,14 @@ type labFaultHTTP struct {
 }
 
 func (c labFaultHTTP) read(ctx context.Context, label, path string, want int, code string, output any) error {
+	_, err := c.request(ctx, label, path, want, code, output, false)
+	return err
+}
+
+// Recovery may retry only a bounded, sanitized dependency-unavailable response.
+// Authentication rejection, changed cookies, malformed bodies and transport
+// failures remain failures; a running process is not proof of authorized reads.
+func (c labFaultHTTP) request(ctx context.Context, label, path string, want int, code string, output any, recovery bool) (int, error) {
 	start := time.Now()
 	header := http.Header{}
 	if c.token != "" {
@@ -87,10 +95,11 @@ func (c labFaultHTTP) read(ctx context.Context, label, path string, want int, co
 	response, err := labWebExchange(ctx, c.client, "GET", labWebOrigin+path, header, nil)
 	sample := labFaultSample{Label: label, Status: response.status, Milliseconds: float64(time.Since(start).Microseconds()) / 1000}
 	if response.status >= 400 {
-		var failure api.Error
-		dec := json.NewDecoder(bytes.NewReader(response.body))
-		dec.DisallowUnknownFields()
-		if dec.Decode(&failure) != nil || dec.Decode(new(any)) != io.EOF || !labFaultError(failure, response.status, code) {
+		failure, validJSON := labFaultDecodeError(response.body)
+		if recovery && slices.Contains([]string{"source_unavailable", "authorization_unavailable"}, failure.Code) {
+			code = failure.Code
+		}
+		if !validJSON || !labFaultError(failure, response.status, code) {
 			err = errors.New("fault response did not contain only the sanitized expected error")
 		} else {
 			sample.Code, sample.RequestID = failure.Code, failure.RequestID
@@ -104,19 +113,83 @@ func (c labFaultHTTP) read(ctx context.Context, label, path string, want int, co
 	}
 	c.mu.Unlock()
 	if err != nil {
-		return errors.New("fault HTTP transport, bounded body, or safe error contract failed")
+		return response.status, errors.New("fault HTTP transport, bounded body, or safe error contract failed")
 	}
-	if response.status != want || response.header.Get("Cache-Control") != "no-store" {
-		return fmt.Errorf("fault HTTP status/cache contract differs (HTTP%d)", response.status)
+	if (response.status != want && !(recovery && response.status == 503)) || response.header.Get("Cache-Control") != "no-store" {
+		return response.status, fmt.Errorf("fault HTTP status/cache contract differs (HTTP%d)", response.status)
 	}
 	if strings.HasPrefix(path, "/api/") && len(response.header.Values("Set-Cookie")) > 0 {
-		return errors.New("API fault cleared or replaced a valid session")
+		return response.status, errors.New("API fault cleared or replaced a valid session")
 	}
-	if output != nil && json.Unmarshal(response.body, output) != nil {
-		return errors.New("fault response DTO invalid")
+	if ctx.Err() != nil {
+		return response.status, errors.New("fault HTTP deadline elapsed")
 	}
-	return nil
+	if output != nil && response.status == want && json.Unmarshal(response.body, output) != nil {
+		return response.status, errors.New("fault response DTO invalid")
+	}
+	return response.status, nil
 }
+
+func (c labFaultHTTP) recoverLog(ctx context.Context, path string, output *api.LogRange) error {
+	bounded, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	return c.recoverLogWithin(bounded, path, output, time.Second)
+}
+
+func (c labFaultHTTP) recoverLogWithin(ctx context.Context, path string, output *api.LogRange, interval time.Duration) error {
+	for attempt := 0; attempt < 16; attempt++ {
+		var value api.LogRange
+		status, err := c.request(ctx, "restored-original-log", path, 200, "", &value, true)
+		if err != nil {
+			return err
+		}
+		if status == 200 {
+			*output = value
+			return nil
+		}
+		if attempt < 15 {
+			if labMixedWait(ctx, interval) != nil {
+				return errors.New("authorized broker log recovery deadline elapsed")
+			}
+		}
+	}
+	return errors.New("authorized broker log recovery attempt bound reached")
+}
+
+// Reject duplicate keys as well as unknown fields and trailing JSON. A decoder
+// into a struct alone could overwrite an earlier private message with a safe one.
+func labFaultDecodeError(raw []byte) (api.Error, bool) {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	first, err := dec.Token()
+	if err != nil || first != json.Delim('{') {
+		return api.Error{}, false
+	}
+	fields := map[string]string{}
+	for dec.More() {
+		token, err := dec.Token()
+		key, ok := token.(string)
+		if err != nil || !ok || !slices.Contains([]string{"code", "message", "requestId"}, key) {
+			return api.Error{}, false
+		}
+		if _, exists := fields[key]; exists {
+			return api.Error{}, false
+		}
+		var value string
+		if dec.Decode(&value) != nil {
+			return api.Error{}, false
+		}
+		fields[key] = value
+	}
+	end, err := dec.Token()
+	if err != nil || end != json.Delim('}') || len(fields) != 3 {
+		return api.Error{}, false
+	}
+	if _, err = dec.Token(); err != io.EOF {
+		return api.Error{}, false
+	}
+	return api.Error{Code: fields["code"], Message: fields["message"], RequestID: fields["requestId"]}, true
+}
+
 func labFaultError(e api.Error, status int, code string) bool {
 	id, err := hex.DecodeString(e.RequestID)
 	if status != 503 || e.Code != code || err != nil || len(id) != 16 || hex.EncodeToString(id) != e.RequestID {
@@ -639,7 +712,7 @@ func (s *labFaultState) broker() {
 		}
 		s.recover()
 		var reread api.LogRange
-		s.must(s.alice.read(s.ctx, "restored-original-log", s.jobPath+"/logs?stream=stderr", 200, "", &reread))
+		s.must(s.alice.recoverLog(s.ctx, s.jobPath+"/logs?stream=stderr", &reread))
 		var log labMixedLog
 		s.must(log.accept(reread, labSlurmFailureLog, s.run))
 		if reread.BytesBase64 != s.logs.BytesBase64 || reread.StartOffset != s.logs.StartOffset || reread.EndOffset != s.logs.EndOffset {
@@ -655,7 +728,7 @@ func (s *labFaultState) broker() {
 
 func (s *labFaultState) sourceScenario(ctx context.Context, action, selected string, output any) error {
 	root := s.sessions[0].root
-	for name, want := range map[string]string{"dashboard-multisource-notification-scenario.py": "a748492196e6d432d97f512f8d4c628730dbe812f058bcc07dba49978002a0bd", "dashboard-scale-source-common.py": "deb95b8dc32334cddcbcb2f7c1d24584d43de699212f26661c24499339b8cecb"} {
+	for name, want := range map[string]string{"dashboard-multisource-notification-scenario.py": "7357d47fb1186749c3c11d17f4bd4ccdc7360a45e5acad191eadf06b9744a253", "dashboard-scale-source-common.py": "deb95b8dc32334cddcbcb2f7c1d24584d43de699212f26661c24499339b8cecb"} {
 		raw, err := labScaleReadFile(filepath.Join(root, "scripts", name), 128<<10)
 		sum := sha256.Sum256(raw)
 		if err != nil || hex.EncodeToString(sum[:]) != want {
@@ -922,5 +995,111 @@ func TestLabFaultSameGrantsPermitsOnlyFreshnessChanges(t *testing.T) {
 	b.Deployments[0].Namespaces[0].Capabilities = append(b.Deployments[0].Namespaces[0].Capabilities, "jobs.submit")
 	if labFaultGrantsSame(a, b) {
 		t.Fatal("changed authority accepted as transport recovery")
+	}
+}
+
+func TestLabFaultBrokerRecoveryRequiresPositiveSameCredentialRead(t *testing.T) {
+	for _, code := range []string{"source_unavailable", "authorization_unavailable"} {
+		t.Run(code, func(t *testing.T) {
+			var mutex sync.Mutex
+			samples := []labFaultSample{}
+			calls := 0
+			want := api.LogRange{BytesBase64: "ZXhhY3QgYnl0ZXM=", StartOffset: "0", EndOffset: "11", ExecutionID: "accepted-execution"}
+			client := &http.Client{Transport: labMixedRoundTripper(func(r *http.Request) (*http.Response, error) {
+				calls++
+				if r.Header.Get("Authorization") != "Bearer unchanged-fixture-token" || r.URL.Path != "/api/v1/exact-job/logs" || r.URL.RawQuery != "stream=stderr" {
+					t.Fatal("recovery changed credentials or requested range")
+				}
+				status := 503
+				message := "The source is unavailable. Retry when private connectivity is restored."
+				if code == "authorization_unavailable" {
+					message = "Current source authorization could not be verified."
+				}
+				body, _ := json.Marshal(api.Error{Code: code, Message: message, RequestID: strings.Repeat("a", 32)})
+				if calls == 3 {
+					status = 200
+					body, _ = json.Marshal(want)
+				}
+				return &http.Response{StatusCode: status, Header: http.Header{"Cache-Control": {"no-store"}}, Body: io.NopCloser(bytes.NewReader(body))}, nil
+			})}
+			c := labFaultHTTP{client: client, token: "unchanged-fixture-token", mu: &mutex, samples: &samples}
+			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+			defer cancel()
+			var got api.LogRange
+			if err := c.recoverLogWithin(ctx, "/api/v1/exact-job/logs?stream=stderr", &got, time.Millisecond); err != nil || !reflect.DeepEqual(got, want) || calls != 3 {
+				t.Fatal("recovery did not require a positive unchanged range read")
+			}
+			if len(samples) != 3 || samples[0].Code != code || samples[1].Status != 503 || samples[2].Status != 200 {
+				t.Fatal("intermediate recovery evidence was discarded")
+			}
+		})
+	}
+}
+
+func TestLabFaultBrokerRecoveryRejectsInvalidErrorsAndKeepsOutputAtomic(t *testing.T) {
+	good := `{"code":"authorization_unavailable","message":"Current source authorization could not be verified.","requestId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
+	for _, test := range []struct {
+		name, body, cookie string
+		status             int
+	}{
+		{"authentication", good, "", 401},
+		{"unknown error", strings.Replace(good, "authorization_unavailable", "private_error", 1), "", 503},
+		{"sensitive fields", strings.TrimSuffix(good, "}") + `,"logs":["private-data"]}`, "", 503},
+		{"duplicate message", `{"message":"private-canary",` + strings.TrimPrefix(good, "{"), "", 503},
+		{"duplicate code", `{"code":"private-canary",` + strings.TrimPrefix(good, "{"), "", 503},
+		{"duplicate request ID", `{"requestId":"private-canary",` + strings.TrimPrefix(good, "{"), "", 503},
+		{"trailing JSON", good + `{}`, "", 503},
+		{"cookie changed", good, "session=changed", 503},
+		{"malformed success", "{", "", 200},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var mutex sync.Mutex
+			samples := []labFaultSample{}
+			calls := 0
+			client := &http.Client{Transport: labMixedRoundTripper(func(r *http.Request) (*http.Response, error) {
+				calls++
+				h := http.Header{"Cache-Control": {"no-store"}}
+				if test.cookie != "" {
+					h.Set("Set-Cookie", test.cookie)
+				}
+				return &http.Response{StatusCode: test.status, Header: h, Body: io.NopCloser(strings.NewReader(test.body))}, nil
+			})}
+			c := labFaultHTTP{client: client, mu: &mutex, samples: &samples}
+			before := api.LogRange{NextCursor: "original-private-cursor", ExecutionID: "original-execution"}
+			got := before
+			if c.recoverLogWithin(t.Context(), "/api/v1/exact-job/logs", &got, time.Millisecond) == nil || calls != 1 || !reflect.DeepEqual(got, before) {
+				t.Fatal("invalid response retried or changed original log state")
+			}
+		})
+	}
+}
+
+func TestLabFaultBrokerRecoveryDeadlineAndAttemptBounds(t *testing.T) {
+	for _, deadline := range []bool{false, true} {
+		t.Run(fmt.Sprint(deadline), func(t *testing.T) {
+			var mutex sync.Mutex
+			samples := []labFaultSample{}
+			calls := 0
+			client := &http.Client{Transport: labMixedRoundTripper(func(r *http.Request) (*http.Response, error) {
+				calls++
+				return &http.Response{StatusCode: 503, Header: http.Header{"Cache-Control": {"no-store"}}, Body: io.NopCloser(strings.NewReader(`{"code":"source_unavailable","message":"The source is unavailable. Retry when private connectivity is restored.","requestId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`))}, nil
+			})}
+			c := labFaultHTTP{client: client, mu: &mutex, samples: &samples}
+			limit, interval := time.Second, time.Millisecond
+			if deadline {
+				limit, interval = 20*time.Millisecond, time.Second
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), limit)
+			defer cancel()
+			before := api.LogRange{ExecutionID: "original-execution"}
+			got := before
+			start := time.Now()
+			if c.recoverLogWithin(ctx, "/api/v1/exact-job/logs", &got, interval) == nil || !reflect.DeepEqual(got, before) || time.Since(start) > time.Second {
+				t.Fatal("unavailable broker exceeded bound or changed original state")
+			}
+			if (!deadline && calls != 16) || (deadline && calls != 1) || len(samples) != calls {
+				t.Fatal("bounded recovery evidence or request count differs")
+			}
+		})
 	}
 }

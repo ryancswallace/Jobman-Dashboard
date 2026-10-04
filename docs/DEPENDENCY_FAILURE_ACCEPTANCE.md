@@ -1,12 +1,10 @@
 # Bounded dependency-failure acceptance
 
-Status: the first live directory interruption passed outage assertions but failed
-its initial recovery identity check. Cleanup restored the directory; independent
-verification and operation closure passed. The failed receipt is retained, and
-full directory acceptance remains open pending the reviewed recovery-check repair
-and a fresh exercise. Broker and database scenarios have not run. Root coordinates
-every Lab invocation after the exact driver,
-plan, and recovery actions have been reviewed. This supplements T02, T05, and T11
+Status: directory outage and same-session recovery acceptance passed on rc.3 in
+124.35 seconds after a reviewed recovery-verifier repair. The original failed
+attempt and subsequent passing result are retained separately. Broker and database
+acceptance remain open. Root coordinates every Lab invocation after the exact
+driver, plan, and recovery actions have been reviewed. This supplements T02, T05, and T11
 in [the design](DESIGN.md); it does not replace healthy scale acceptance.
 
 Run three separate scenarios and stop after any unexpected failure. Each scenario
@@ -94,8 +92,15 @@ pause is a real stalled dependency, not a sleep in the test client.
 At most four concurrent log requests may be in flight. Require a real sanitized
 HTTP 503 within 10 seconds, no leaked private paths/credentials/log bytes, and no
 successful cursor advance over the failure. Concurrent metadata/liveness reads
-remain responsive. After recovery, replay the unchanged requested range and verify
-exact bytes, checksums, source/run identity and contiguous offsets. A new broker
+remain responsive. Process restoration is followed by a positive authorized read:
+retry the unchanged requested range for at most 15 seconds and 16 attempts, keeping
+the same credential and recording every response. Only strictly sanitized
+`503 source_unavailable` or `503 authorization_unavailable` responses permit a
+retry. A broker restart intentionally imposes a delegation startup fence; process
+liveness alone does not prove that this fence has elapsed. Authentication failures,
+changed session cookies, malformed bodies and transport errors still fail the
+exercise immediately. Require HTTP 200 within the bound, then verify exact bytes,
+checksums, source/run identity and contiguous offsets. A new broker
 process is expected only in the stop/start interval; the pause interval preserves
 its process identity.
 
