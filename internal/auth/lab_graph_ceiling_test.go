@@ -13,6 +13,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strconv"
@@ -44,10 +45,23 @@ type labCeilingManifest struct {
 	} `json:"nodes"`
 }
 
+const labCeilingManifestLimit = 2 << 20
+
+// The graph handoff is a private receipt, not a configuration/trust-root file.
+// Reuse the receipt reader's owner/mode/link/identity checks with this explicit
+// graph bound; production configuration readers retain their 1 MiB maximum.
+func labCeilingLoad(path, expected string) (labCeilingManifest, error) {
+	raw, err := labRestorePrivate(path, labCeilingManifestLimit)
+	if err != nil {
+		return labCeilingManifest{}, errors.New("bounded private graph manifest unavailable or unsafe")
+	}
+	return labCeilingDecode(raw, expected)
+}
+
 func labCeilingDecode(raw []byte, expected string) (labCeilingManifest, error) {
 	var m labCeilingManifest
 	sum := sha256.Sum256(raw)
-	if len(raw) == 0 || len(raw) > 2<<20 || hex.EncodeToString(sum[:]) != expected {
+	if len(raw) == 0 || len(raw) > labCeilingManifestLimit || hex.EncodeToString(sum[:]) != expected {
 		return m, errors.New("reviewed graph manifest digest or size differs")
 	}
 	decoder := json.NewDecoder(bytes.NewReader(raw))
@@ -163,8 +177,7 @@ func TestLabDeployedGraphCeiling(t *testing.T) {
 	if os.Getenv("JOBMAN_DASHBOARD_LAB_GRAPH_CEILING") != "1" {
 		t.Skip("reviewed inert graph admission and explicit HTTP opt-in required")
 	}
-	raw := labExecutionFile(t, os.Getenv("JOBMAN_DASHBOARD_LAB_GRAPH_MANIFEST"), 2<<20)
-	m, err := labCeilingDecode(raw, os.Getenv("JOBMAN_DASHBOARD_LAB_GRAPH_MANIFEST_SHA256"))
+	m, err := labCeilingLoad(os.Getenv("JOBMAN_DASHBOARD_LAB_GRAPH_MANIFEST"), os.Getenv("JOBMAN_DASHBOARD_LAB_GRAPH_MANIFEST_SHA256"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -403,6 +416,94 @@ func labCeilingTestManifest() labCeilingManifest {
 	}
 	return m
 }
+
+func TestLabGraphCeilingFileLoader(t *testing.T) {
+	want := labCeilingTestManifest()
+	raw, err := json.MarshalIndent(want, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = append(raw, '\n')
+	if len(raw) != 849551 {
+		t.Fatal("Synthetic receipt no longer matches the actual handoff format/size")
+	}
+	newFile := func(t *testing.T, value []byte) string {
+		t.Helper()
+		root, err := filepath.EvalSymlinks(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(root, 0700); err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(root, "graph.json")
+		if err := os.WriteFile(path, value, 0600); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	digest := func(value []byte) string {
+		sum := sha256.Sum256(value)
+		return hex.EncodeToString(sum[:])
+	}
+	for _, size := range []int{len(raw), (1 << 20) + 1, labCeilingManifestLimit} {
+		t.Run(strconv.Itoa(size), func(t *testing.T) {
+			value := append(slices.Clone(raw), bytes.Repeat([]byte(" "), size-len(raw))...)
+			got, err := labCeilingLoad(newFile(t, value), digest(value))
+			if err != nil || !reflect.DeepEqual(got, want) {
+				t.Fatal("Valid complete bounded graph receipt rejected", err)
+			}
+		})
+	}
+	for name, value := range map[string][]byte{
+		"empty":     nil,
+		"oversize":  append(slices.Clone(raw), bytes.Repeat([]byte(" "), labCeilingManifestLimit+1-len(raw))...),
+		"malformed": []byte(`{"version":1}`),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := labCeilingLoad(newFile(t, value), digest(value)); err == nil {
+				t.Fatal("Invalid graph receipt accepted")
+			}
+		})
+	}
+	for _, name := range []string{"digest", "missing", "relative", "directory", "symlink", "parent symlink", "hardlink", "public file", "public parent"} {
+		t.Run(name, func(t *testing.T) {
+			path := newFile(t, raw)
+			expected := digest(raw)
+			var err error
+			switch name {
+			case "digest":
+				expected = digest([]byte("different bytes"))
+			case "missing":
+				path += ".missing"
+			case "relative":
+				path = "graph.json"
+			case "directory":
+				path = filepath.Dir(path)
+			case "symlink":
+				err = os.Symlink(path, path+".link")
+				path += ".link"
+			case "parent symlink":
+				link := filepath.Join(filepath.Dir(path), "parent")
+				err = os.Symlink(filepath.Dir(path), link)
+				path = filepath.Join(link, "graph.json")
+			case "hardlink":
+				err = os.Link(path, path+".link")
+			case "public file":
+				err = os.Chmod(path, 0644)
+			case "public parent":
+				err = os.Chmod(filepath.Dir(path), 0755)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := labCeilingLoad(path, expected); err == nil {
+				t.Fatal("Unsafe or changed graph receipt accepted")
+			}
+		})
+	}
+}
+
 func TestLabGraphCeilingManifestRejectsDrift(t *testing.T) {
 	check := func(m labCeilingManifest) error {
 		raw, err := json.Marshal(m)

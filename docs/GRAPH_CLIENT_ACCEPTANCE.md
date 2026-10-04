@@ -242,11 +242,26 @@ The corrected exact-source checks pass:
 
 ## Remaining integrated checks
 
-A future live profile must provide a separately reviewed immutable public receipt
+The live profile must provide a separately reviewed immutable receipt
 for its synthetic graph, exact source instance/recovery epoch, deployment and
 namespace, complete 10,000/100,000 counts, expected graph revision and known node
 IDs. Provisioning that profile is a separate scoped operation; these client tests
 perform no Lab mutations and do not repurpose existing execution fixtures.
+
+The HTTP harness reads the graph receipt with an explicit 2 MiB ceiling, a real
+absolute path, owner-only 0700 parent/0600 file, single regular-file link and
+descriptor/path identity checks. It verifies the reviewed digest before strict
+decoding. The first one-shot HTTP packet stopped before sign-in or any GET:
+`labExecutionFile` delegated to the production configuration loader, which rejects
+a requested bound above 1 MiB even when the actual receipt is smaller. The
+849,551-byte handoff was valid. That failed 0.00-second run and its 100 input pins
+remain at `/private/tmp/jobman-dashboard-graph-http-v1-_xssho66`; its consumed
+one-shot intent must not be reused. The graph-only loader now uses the existing
+private-receipt reader without changing production configuration limits. Offline
+file tests cover the exact handoff format/size, valid receipts above 1 MiB and at
+2 MiB, plus oversized, malformed, changed-digest, linked and nonprivate inputs.
+This correction establishes no live HTTP success; a new reviewed binary and
+one-shot packet are required, using the existing seeded graph without reseeding.
 
 Before and after real client navigation, the HTTP harness must verify the current
 source fingerprint and signed account, decode current namespace authorization and
