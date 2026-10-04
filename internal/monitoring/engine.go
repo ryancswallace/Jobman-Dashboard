@@ -572,7 +572,11 @@ func (e *Engine) Overview(ctx context.Context, a Actor, q Query, w api.Window) (
 	success := len(scopes) == 0
 	for _, s := range scopes {
 		r := results[s]
-		if next[s] == "" {
+		// An initially unavailable source contributed no authorized counts. A
+		// successful final discovery cannot retroactively admit it, nor is that
+		// recovery a change to an established grant. Keep this contribution
+		// unavailable until a new request can read under both authority checks.
+		if grants[s] == "" || next[s] == "" {
 			r.err = ErrAuthority
 		} else if next[s] != grants[s] {
 			return o, ErrForbidden
