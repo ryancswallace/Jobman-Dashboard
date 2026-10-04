@@ -36,6 +36,7 @@ type Server struct {
 	Reports     ReportService
 	Rules       RuleService
 	Devices     DeviceService
+	Inbox       InboxService
 }
 type actorKey struct{}
 
@@ -46,6 +47,7 @@ func (s *Server) Handler() http.Handler {
 	s.registerReportRoutes(mux)
 	s.registerRuleRoutes(mux)
 	s.registerDeviceRoutes(mux)
+	s.registerInboxRoutes(mux)
 	if s.AuthRoutes != nil {
 		s.AuthRoutes.RegisterRoutes(mux)
 	}

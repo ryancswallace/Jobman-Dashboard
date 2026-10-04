@@ -352,6 +352,205 @@ final class DashboardUITests: XCTestCase {
         element.coordinate(withNormalizedOffset: CGVector(dx: 0.90, dy: 0.5)).tap()
     }
 
+    func testDeviceAttachmentIsExplicitAndRemovalCannotAutoReattach() {
+        let app = deviceFixtureApp()
+        XCTAssertTrue(app.buttons["device-bind"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Attached to the signed-in account."].exists)
+        app.buttons["device-bind"].tap()
+        XCTAssertEqual(app.switches["Enable background alerts"].value as? String, "0")
+        app.buttons["Continue"].tap(); app.buttons["Confirm attachment"].tap()
+        XCTAssertTrue(app.staticTexts["Offline sign-out protection confirmed"].waitForExistence(timeout: 10))
+        capture("Explicit native device attachment", app: app)
+        let current = app.buttons["device-row-90000000-0000-4000-8000-000000000001"]
+        reveal(current, app: app); current.tap()
+        tapRuleSwitch(app.switches["Mute this device"], app: app)
+        app.buttons["Save"].tap()
+        XCTAssertTrue(current.waitForExistence(timeout: 10)); current.tap()
+        XCTAssertEqual(app.switches["Enable background alerts"].value as? String, "0")
+        XCTAssertEqual(app.switches["Mute this device"].value as? String, "1")
+        capture("Native delivery preferences", app: app)
+        app.buttons["device-remove"].tap(); app.buttons.matching(identifier: "device-confirm-remove").firstMatch.tap()
+        XCTAssertTrue(current.waitForNonExistence(timeout: 10))
+        let reload = app.buttons["devices-reload"]
+        for _ in 0..<4 { if reload.isHittable { break }; app.swipeDown() }
+        reload.tap()
+        XCTAssertTrue(app.buttons["device-bind"].waitForExistence(timeout: 10))
+        XCTAssertFalse(current.exists)
+        capture("Removed phone remains detached", app: app)
+    }
+
+    func testDeviceSwitchAndRemoteSettingsUseExplicitReview() {
+        let app = deviceFixtureApp(extra: ["--dashboard-device-other-account"])
+        XCTAssertTrue(app.buttons["device-switch"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["device-bind"].exists)
+        capture("Explicit account switch required", app: app)
+        app.buttons["device-switch"].tap(); app.buttons["Continue"].tap()
+        XCTAssertTrue(app.buttons["Confirm switch"].waitForExistence(timeout: 5)); app.buttons["Confirm switch"].tap()
+        XCTAssertTrue(app.staticTexts["Offline sign-out protection confirmed"].waitForExistence(timeout: 10))
+        let remote = app.buttons["device-row-90000000-0000-4000-8000-000000000002"]
+        reveal(remote, app: app); remote.tap()
+        XCTAssertEqual(app.switches["Enable background alerts"].value as? String, "0")
+        XCTAssertEqual(app.switches["Mute this device"].value as? String, "1")
+        app.buttons["device-remove"].tap(); app.buttons.matching(identifier: "device-confirm-remove").firstMatch.tap()
+        XCTAssertTrue(remote.waitForNonExistence(timeout: 10))
+    }
+
+    func testExistingDeviceRefreshPreservesMutedDisabledPreferencesAndUpgradeIsExplicit() {
+        let app = deviceFixtureApp(extra: ["--dashboard-device-existing"])
+        XCTAssertTrue(app.buttons["Complete secure setup"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Offline sign-out protection confirmed"].exists)
+        app.buttons["Complete secure setup"].tap()
+        XCTAssertTrue(app.staticTexts["Offline sign-out protection confirmed"].waitForExistence(timeout: 10))
+        app.buttons["devices-reload"].tap()
+        XCTAssertTrue(app.staticTexts["Offline sign-out protection confirmed"].waitForExistence(timeout: 10))
+        let current = app.buttons["device-row-90000000-0000-4000-8000-000000000001"]
+        reveal(current, app: app); current.tap()
+        XCTAssertEqual(app.switches["Enable background alerts"].value as? String, "0")
+        XCTAssertEqual(app.switches["Mute this device"].value as? String, "1")
+    }
+
+    func testBackgroundDuringReservationCannotAdmitLateBinding() {
+        let app = deviceFixtureApp(extra: ["--dashboard-device-delayed-reservation"])
+        XCTAssertTrue(app.buttons["device-bind"].waitForExistence(timeout: 10))
+        app.buttons["device-bind"].tap(); app.buttons["Continue"].tap(); app.buttons["Confirm attachment"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["device-saving"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["device-editor-close"].isEnabled)
+        XCUIDevice.shared.press(.home)
+        app.activate()
+        XCTAssertTrue(app.staticTexts["fixtureBanner"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["device-bind"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Attached to the signed-in account."].exists)
+        capture("Canceled reservation cannot attach", app: app)
+    }
+
+    func testOfflineSignOutPurgesAccountAndReportsQueuedDeviceRevocation() {
+        let app = deviceFixtureApp(extra: ["--dashboard-device-offline-revoke"])
+        XCTAssertTrue(app.buttons["device-bind"].waitForExistence(timeout: 10))
+        app.buttons["device-bind"].tap(); app.buttons["Continue"].tap(); app.buttons["Confirm attachment"].tap()
+        XCTAssertTrue(app.staticTexts["Offline sign-out protection confirmed"].waitForExistence(timeout: 10))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let signOut = app.buttons["Sign out"]
+        reveal(signOut, app: app); signOut.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.5)).tap()
+        XCTAssertTrue(app.staticTexts["Connect to your organization"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Synthetic researcher"].exists)
+        XCTAssertFalse(app.staticTexts["Attached to the signed-in account."].exists)
+        XCTAssertTrue(app.staticTexts["Signed out on this phone. Device alert unbinding will finish when the private service is reachable."].waitForExistence(timeout: 10))
+        capture("Offline sign-out retains only queued revocation", app: app)
+    }
+
+    func testUncertainAttachmentCannotBeBlindlyRetried() {
+        let app = deviceFixtureApp()
+        XCTAssertTrue(app.buttons["device-bind"].waitForExistence(timeout: 10)); app.buttons["device-bind"].tap()
+        let label = app.textFields["device-label"]
+        label.tap(); label.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 6) + "Uncertain attachment")
+        app.buttons["device-keyboard-done"].tap()
+        app.buttons["Continue"].tap(); app.buttons["Confirm attachment"].tap()
+        XCTAssertTrue(app.staticTexts["Close this form, reload devices, and review the current state before another change."].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["Continue"].isEnabled)
+        capture("Uncertain attachment requires explicit review", app: app)
+        app.buttons["device-editor-close"].tap()
+        app.buttons["devices-reload"].tap()
+        XCTAssertTrue(app.buttons["device-bind"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Attached to the signed-in account."].exists)
+    }
+
+    func testInboxHistoryPagingOriginalMatchesReadAndExplicitEmptySelection() {
+        let app = inboxFixtureApp()
+        let count = app.descendants(matching: .any)["inbox-unread-count"].firstMatch
+        XCTAssertTrue(count.waitForExistence(timeout: 10)); XCTAssertTrue(count.label.contains("24"))
+        XCTAssertTrue(app.staticTexts["inbox-partial"].exists)
+        capture("Native partial authorized inbox", app: app)
+        let next = app.buttons["Next inbox page"]
+        reveal(next, app: app); next.tap()
+        XCTAssertTrue(app.staticTexts["Synthetic update 21"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Synthetic update 1"].exists)
+        let previous = app.buttons["Previous inbox page"]
+        reveal(previous, app: app); previous.tap()
+        for _ in 0..<10 { if app.buttons["inbox-scope"].isHittable { break }; app.swipeDown() }
+        let row = app.buttons["inbox-row-92000000-0000-4000-8000-000000000001"]
+        reveal(row, app: app); row.tap()
+        let read = app.buttons["inbox-mark-read"]
+        reveal(read, app: app); XCTAssertEqual(read.label, "Mark read"); read.tap()
+        XCTAssertTrue(app.buttons["Mark unread"].waitForExistence(timeout: 10))
+        let match = app.buttons["Original synthetic rule"]
+        reveal(match, app: app); match.tap()
+        let revision = app.descendants(matching: .any)["inbox-rule-version-95000000-0000-4000-8000-000000000001"].firstMatch
+        reveal(revision, app: app); XCTAssertTrue(revision.label.contains("9007199254740993"))
+        capture("Native original inbox rule match and exact revision", app: app)
+        let delivery = app.staticTexts["inbox-delivery-disclosure"]
+        reveal(delivery, app: app)
+        capture("Native inbox delivery records", app: app)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        for _ in 0..<10 { if app.buttons["inbox-scope"].isHittable { break }; app.swipeDown() }
+        XCTAssertTrue(count.waitForExistence(timeout: 10)); XCTAssertTrue(count.label.contains("23"))
+        tapRuleSwitch(app.switches["inbox-unread-only"], app: app)
+        XCTAssertTrue(row.waitForNonExistence(timeout: 10))
+        app.buttons["inbox-scope"].tap(); app.buttons["No namespaces"].tap()
+        XCTAssertTrue(app.staticTexts["No updates in this selection."].waitForExistence(timeout: 10))
+        XCTAssertTrue(count.label.contains("0")); XCTAssertFalse(app.buttons["Next inbox page"].exists)
+        capture("Explicitly empty native inbox scope", app: app)
+        app.buttons["inbox-scope"].coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5)).tap(); app.buttons["All currently authorized namespaces"].tap()
+        XCTAssertTrue(count.waitForExistence(timeout: 10)); XCTAssertTrue(count.label.contains("23"))
+    }
+
+    func testInboxSourceFailureClearsCountAndRequiresExplicitRetry() {
+        let app = inboxFixtureApp(extra: ["--dashboard-inbox-unavailable-once"])
+        let unavailable = app.staticTexts["Current access cannot be verified. Try again when directory services recover."]
+        XCTAssertTrue(unavailable.waitForExistence(timeout: 10))
+        let count = app.descendants(matching: .any)["inbox-unread-count"].firstMatch
+        XCTAssertFalse(count.exists)
+        XCTAssertFalse(app.staticTexts["Synthetic update 1"].exists)
+        let automaticRetry = expectation(for: NSPredicate(format: "exists == true"), evaluatedWith: count)
+        automaticRetry.isInverted = true
+        wait(for: [automaticRetry], timeout: 2)
+        capture("Native inbox authorization outage without false zero", app: app)
+        app.buttons["inbox-refresh"].tap()
+        XCTAssertTrue(count.waitForExistence(timeout: 10)); XCTAssertTrue(count.label.contains("24"))
+        XCTAssertFalse(unavailable.exists)
+    }
+
+    func testInboxRevokedReadPurgesDetailAndOriginalMatches() {
+        let app = inboxFixtureApp(extra: ["--dashboard-inbox-revoke-on-read"])
+        let row = app.buttons["inbox-row-92000000-0000-4000-8000-000000000001"]
+        reveal(row, app: app); row.tap()
+        let read = app.buttons["inbox-mark-read"]
+        reveal(read, app: app); read.tap()
+        XCTAssertTrue(app.staticTexts["This item is unavailable or you no longer have access."].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Synthetic update 1"].exists)
+        XCTAssertFalse(app.buttons["Original synthetic rule"].exists)
+        XCTAssertFalse(app.buttons["Open current job"].exists)
+        capture("Native inbox revoked access removes cached detail", app: app)
+    }
+
+    func testOpaqueInboxNotificationRouteFetchesFreshDetailAfterForeground() {
+        let app = inboxFixtureApp(extra: ["--dashboard-inbox-open-id", "--dashboard-inbox-change-on-foreground"], openTab: false)
+        XCTAssertTrue(app.staticTexts["Synthetic update 1"].waitForExistence(timeout: 10))
+        let read = app.buttons["inbox-mark-read"]
+        reveal(read, app: app); XCTAssertTrue(read.exists)
+        XCUIDevice.shared.press(.home); app.activate()
+        XCTAssertTrue(app.staticTexts["Freshly authorized synthetic update"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Synthetic update 1"].exists)
+        capture("Native opaque inbox notification destination", app: app)
+    }
+
+    private func inboxFixtureApp(extra: [String] = [], openTab: Bool = true) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["--dashboard-ui-fixtures", "--dashboard-inbox-fixtures"] + extra
+        app.launch()
+        XCTAssertTrue(app.staticTexts["fixtureBanner"].waitForExistence(timeout: 10))
+        if openTab { app.tabBars.buttons["Inbox"].tap() }
+        return app
+    }
+
+    private func deviceFixtureApp(extra: [String] = []) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["--dashboard-ui-fixtures", "--dashboard-device-fixtures"] + extra
+        app.launch()
+        XCTAssertTrue(app.staticTexts["fixtureBanner"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["More"].tap(); app.buttons["Settings"].tap(); app.buttons["Manage notification devices"].tap()
+        return app
+    }
+
     private func ruleFixtureApp() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--dashboard-ui-fixtures", "--dashboard-rule-fixtures"]

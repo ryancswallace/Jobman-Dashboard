@@ -83,6 +83,6 @@ submit, cancel or modify a job.
 
 Rule versions, activation intervals and denial records have a separate lifecycle
 from the 30-day inbox. They must not be pruned while delayed evaluation, existing
-matches or source replay still depend on them. Retention and evaluation integration
-remain in progress at this checkpoint; these bounds are not a claim that inbox
-or push delivery is implemented.
+matches or source replay still depend on them. The [processing pipeline](NOTIFICATION_PIPELINE.md)
+implements durable evaluation and provider delivery; retention integration and
+deployed acceptance remain in progress at this checkpoint.

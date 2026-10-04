@@ -31,6 +31,9 @@ func (s *Store) PruneCapacityEvents(ctx context.Context, deployment string, expe
 		return 0, err
 	}
 	defer tx.Rollback(ctx)
+	if held, err := lockNotificationEventPruning(ctx, tx); err != nil || held {
+		return 0, err
+	}
 	var prior []byte
 	var namespaces []string
 	var retention int64
@@ -64,13 +67,7 @@ func (s *Store) PruneCapacityEvents(ctx context.Context, deployment string, expe
 	}
 	currentRetention, _ := strconv.ParseInt(checkpoint.RetentionSeconds, 10, 64)
 	retention = max(retention, currentRetention)
-	var removed int64
-	var recordedThrough *time.Time
-	err = tx.QueryRow(ctx, `WITH removed AS (
- DELETE FROM dashboard_source_events WHERE (deployment_id,control_instance_id,event_id) IN
- (SELECT deployment_id,control_instance_id,event_id FROM dashboard_source_events WHERE deployment_id=$1::uuid AND processed_at IS NOT NULL AND expires_at<=statement_timestamp() AND last_seen_at<=statement_timestamp()-$2*interval '1 second' ORDER BY last_seen_at LIMIT 500)
- RETURNING recorded_at)
- SELECT count(*),max(recorded_at) FROM removed`, deployment, retention+86400).Scan(&removed, &recordedThrough)
+	removed, recordedThrough, err := pruneSourceEventsTx(ctx, tx, deployment, retention)
 	if err != nil {
 		return 0, err
 	}

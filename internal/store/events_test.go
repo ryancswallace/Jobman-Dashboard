@@ -225,7 +225,7 @@ func TestEventFeedBoundsAndRetention(t *testing.T) {
 	if n, err := s.PruneSourceEvents(ctx, c.DeploymentID); err != nil || n != 0 {
 		t.Fatal("unexpired tombstone removed", err)
 	}
-	if _, err := s.Pool.Exec(ctx, `UPDATE dashboard_source_events SET expires_at=clock_timestamp()-interval '1 second',last_seen_at=clock_timestamp()-interval '32 days'`); err != nil {
+	if _, err := s.Pool.Exec(ctx, `UPDATE dashboard_source_events SET expires_at=clock_timestamp()-interval '1 second',last_seen_at=clock_timestamp()-interval '36 days'`); err != nil {
 		t.Fatal(err)
 	}
 	if n, err := s.PruneSourceEvents(ctx, c.DeploymentID); err != nil || n != 0 {
@@ -261,7 +261,7 @@ func TestEventRetentionIncreaseAndSourceOutageProtectTombstones(t *testing.T) {
 	if err := s.AppendFeed(ctx, feed, eventPage(c, "head-1", sourceEvent(c, 1))); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Pool.Exec(ctx, `UPDATE dashboard_source_events SET expires_at=clock_timestamp()-interval '1 second',last_seen_at=clock_timestamp()-interval '32 days',processed_at=clock_timestamp(); UPDATE dashboard_event_feeds SET last_success_at=clock_timestamp()-interval '2 minutes'`); err != nil {
+	if _, err := s.Pool.Exec(ctx, `UPDATE dashboard_source_events SET expires_at=clock_timestamp()-interval '1 second',last_seen_at=clock_timestamp()-interval '36 days',processed_at=clock_timestamp(); UPDATE dashboard_event_feeds SET last_success_at=clock_timestamp()-interval '2 minutes'`); err != nil {
 		t.Fatal(err)
 	}
 	if n, err := s.PruneSourceEvents(ctx, c.DeploymentID); err != nil || n != 0 {
@@ -289,7 +289,7 @@ func TestEventRetentionIncreaseAndSourceOutageProtectTombstones(t *testing.T) {
 	if n, err := s.PruneSourceEvents(ctx, c.DeploymentID); err != nil || n != 0 {
 		t.Fatal("retention decrease discarded high-water protection", err)
 	}
-	if _, err = s.Pool.Exec(ctx, `UPDATE dashboard_source_events SET last_seen_at=clock_timestamp()-interval '92 days'`); err != nil {
+	if _, err = s.Pool.Exec(ctx, `UPDATE dashboard_source_events SET last_seen_at=clock_timestamp()-interval '96 days'`); err != nil {
 		t.Fatal(err)
 	}
 	if n, err := s.PruneSourceEvents(ctx, c.DeploymentID); err != nil || n != 1 {

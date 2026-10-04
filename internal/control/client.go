@@ -192,6 +192,12 @@ type discovery struct {
 
 func (c *Client) Discover(ctx context.Context, actor monitoring.Actor) (monitoring.Discovery, error) {
 	d, err := c.discover(ctx, actor)
+	// A missing/forbidden discovery endpoint is not an authoritative namespace
+	// removal. Only a successfully verified /me response describes current grants.
+	// Preserve that distinction for rule revocation and recovery callers.
+	if errors.Is(err, monitoring.ErrNotFound) || errors.Is(err, monitoring.ErrForbidden) {
+		return monitoring.Discovery{}, monitoring.ErrAuthority
+	}
 	return d.Discovery, err
 }
 func (c *Client) discover(ctx context.Context, actor monitoring.Actor) (discovery, error) {

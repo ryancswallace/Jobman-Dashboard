@@ -24,7 +24,7 @@ func deviceHTTPSecret() string {
 	return base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{19}, 32))
 }
 func deviceHTTPBody(intent string) string {
-	body, _ := json.Marshal(map[string]any{"installationSecret": deviceHTTPSecret(), "label": "Synthetic phone", "topic": "test.jobman.dashboard", "environment": "sandbox", "token": "ab112233", "permission": "authorized", "enabled": true, "muted": false, intent: true})
+	body, _ := json.Marshal(map[string]any{"installationSecret": deviceHTTPSecret(), "revocationId": testInstallationID, "revocationCredential": deviceHTTPSecret(), "label": "Synthetic phone", "topic": "test.jobman.dashboard", "environment": "sandbox", "token": "ab112233", "permission": "authorized", "enabled": true, "muted": false, intent: true})
 	return string(body)
 }
 func deviceHTTPProof() string { return `{"installationSecret":"` + deviceHTTPSecret() + `"}` }
@@ -158,7 +158,7 @@ func TestDeviceHTTPRoutesUseCurrentActorAndPrivateBodies(t *testing.T) {
 	r.Header.Set("If-None-Match", "*")
 	w := httptest.NewRecorder()
 	deviceHTTPHandler(f).ServeHTTP(w, r)
-	if w.Code != 200 || f.revision != 0 || f.registration.InstallationID != testInstallationID {
+	if w.Code != 400 || f.calls != 0 {
 		t.Fatal("explicit first registration condition", w.Code)
 	}
 }
@@ -290,4 +290,19 @@ func TestDeviceHTTPBoundsAndRejectsBrokenProjection(t *testing.T) {
 	if w.Code != 503 {
 		t.Fatal("invalid inspection projection serialized")
 	}
+}
+
+func (f *deviceServiceFixture) ReserveRevocation(_ context.Context, a monitoring.Actor, id string, rev int64, in notifications.DeviceRevocationInput) (notifications.DeviceRevocationReceipt, error) {
+	f.record("reserve", a, id, rev)
+	f.secret = in.RevocationCredential
+	return notifications.DeviceRevocationReceipt{InstallationID: id, Revision: f.value.Revision, RevocationID: in.RevocationID, Intent: "bind"}, f.err
+}
+func (f *deviceServiceFixture) ActivateRevocation(_ context.Context, a monitoring.Actor, id string, rev int64, in notifications.DeviceRevocationInput) (notifications.DeviceRevocationReceipt, error) {
+	f.record("activate", a, id, rev)
+	return notifications.DeviceRevocationReceipt{InstallationID: id, Revision: f.value.Revision, RevocationID: in.RevocationID, Intent: "existing"}, f.err
+}
+func (f *deviceServiceFixture) RevokeDevice(_ context.Context, id, secret string) error {
+	f.record("revoke", monitoring.Actor{}, id, 0)
+	f.secret = secret
+	return f.err
 }

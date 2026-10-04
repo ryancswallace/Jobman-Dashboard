@@ -42,11 +42,11 @@ type deviceBinding struct {
 	invalidated        *time.Time
 }
 
-const deviceBindingColumns = `b.id::text,b.account_id::text,b.installation_id::text,i.revision,b.label,b.topic,b.environment,b.state,b.enabled,b.muted,b.permission,b.token_version,b.token_ciphertext,COALESCE(b.token_key_id,''),b.token_registered_at,b.token_invalidated_at,b.created_at,i.updated_at,b.last_seen_at`
+const deviceBindingColumns = `b.id::text,b.account_id::text,b.installation_id::text,i.revision,b.label,b.topic,b.environment,b.state,b.enabled,b.muted,b.permission,b.token_version,b.token_ciphertext,COALESCE(b.token_key_id,''),b.token_registered_at,b.token_invalidated_at,b.created_at,i.updated_at,b.last_seen_at,` + notificationDeviceReadySQL
 
 func scanDeviceBinding(row pgx.Row) (deviceBinding, error) {
 	var b deviceBinding
-	err := row.Scan(&b.id, &b.account, &b.view.InstallationID, &b.view.Revision, &b.view.Label, &b.view.Topic, &b.view.Environment, &b.view.State, &b.view.Enabled, &b.view.Muted, &b.view.Permission, &b.tokenVersion, &b.ciphertext, &b.keyID, &b.registered, &b.invalidated, &b.view.CreatedAt, &b.view.UpdatedAt, &b.view.LastSeenAt)
+	err := row.Scan(&b.id, &b.account, &b.view.InstallationID, &b.view.Revision, &b.view.Label, &b.view.Topic, &b.view.Environment, &b.view.State, &b.view.Enabled, &b.view.Muted, &b.view.Permission, &b.tokenVersion, &b.ciphertext, &b.keyID, &b.registered, &b.invalidated, &b.view.CreatedAt, &b.view.UpdatedAt, &b.view.LastSeenAt, &b.view.RevocationReady)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return b, notifications.ErrDeviceNotFound
 	}
@@ -210,8 +210,8 @@ func deviceMutationAdmission(ctx context.Context, tx pgx.Tx, id string, stopping
 
 // Bind is an explicit user operation. Normal startup/token registration must
 // call Refresh; it must never resurrect a remotely removed installation.
-// expectedRevision is 0 only for a never-seen installation; existing detached
-// installations require their current revision and the original Keychain proof.
+// The client must first acknowledge an authenticated revocation reservation.
+// Every bind uses its positive current installation revision and reserved target.
 func (d *NotificationDeviceStore) Bind(ctx context.Context, actor monitoring.Actor, expectedRevision int64, input notifications.DeviceRegistration) (notifications.DeviceView, error) {
 	return d.bind(ctx, actor, expectedRevision, input, false, false)
 }
@@ -236,54 +236,48 @@ func (d *NotificationDeviceStore) bind(ctx context.Context, actor monitoring.Act
 	}
 	defer tx.Rollback(ctx)
 	i, err := installation(ctx, tx, input.InstallationID, true)
-	if errors.Is(err, notifications.ErrDeviceNotFound) {
-		if expectedRevision != 0 || switching {
-			return empty, notifications.ErrDeviceNotFound
-		}
-		if err = deviceCreationAdmission(ctx, tx, actor.Account.ID); err != nil {
-			return empty, err
-		}
-		hash, _ := notifications.InstallationSecretHash(input.InstallationID, input.InstallationSecret)
-		_, err = tx.Exec(ctx, `INSERT INTO dashboard_notification_installations(id,creator_account_id,secret_hash) VALUES($1::uuid,$2::uuid,$3)`, input.InstallationID, actor.Account.ID, hash)
-		if err != nil {
-			return empty, deviceStorageError(err)
-		}
-		i = deviceInstallation{id: input.InstallationID, creator: actor.Account.ID, secret: hash, revision: 1}
-	} else if err != nil {
+	if err != nil {
 		return empty, err
-	} else {
-		if err = deviceProof(i, input.InstallationSecret); err != nil {
+	}
+	if err = deviceProof(i, input.InstallationSecret); err != nil {
+		return empty, err
+	}
+	if err = deviceRevision(i, expectedRevision); err != nil {
+		return empty, err
+	}
+	r, err := deviceRevocation(ctx, tx, input.RevocationID)
+	if err != nil {
+		return empty, err
+	}
+	intent := "bind"
+	if switching {
+		intent = "switch"
+	}
+	if !revocationMatches(r, i, actor, input.RevocationCredential) || r.state != "reserved" || r.intent != intent || r.origin != i.binding {
+		return empty, notifications.ErrDeviceConflict
+	}
+	if switching {
+		old, err := currentDevice(ctx, tx, i)
+		if err != nil {
 			return empty, err
 		}
-		if err = deviceRevision(i, expectedRevision); err != nil {
-			return empty, err
-		}
-		if switching {
-			if !confirmed || i.binding == "" {
-				return empty, notifications.ErrDeviceConflict
-			}
-			old, err := currentDevice(ctx, tx, i)
-			if err != nil {
-				return empty, err
-			}
-			if old.account == actor.Account.ID {
-				return empty, notifications.ErrDeviceConflict
-			}
-			if err = closeDeviceBinding(ctx, tx, i, "detached"); err != nil {
-				return empty, err
-			}
-		} else if i.binding != "" {
+		if !confirmed || old.account == actor.Account.ID {
 			return empty, notifications.ErrDeviceConflict
 		}
-		i.revision++
+		if err = closeDeviceBinding(ctx, tx, i, "detached"); err != nil {
+			return empty, err
+		}
+	} else if i.binding != "" {
+		return empty, notifications.ErrDeviceConflict
 	}
 	if err = deviceBindingAdmission(ctx, tx, actor.Account.ID, i.id); err != nil {
 		return empty, err
 	}
-	id, err := newID()
-	if err != nil {
+	if err = deviceMutationAdmission(ctx, tx, i.id, false); err != nil {
 		return empty, err
 	}
+	i.revision++
+	id := r.target
 	pins := notifications.DeviceTokenBinding{InstallationID: i.id, BindingID: id, AccountID: actor.Account.ID, Topic: input.Topic, Environment: input.Environment, TokenVersion: 1}
 	encrypted, err := d.cipher.Seal(pins, input.Token)
 	if err != nil {
@@ -294,6 +288,9 @@ func (d *NotificationDeviceStore) bind(ctx context.Context, actor monitoring.Act
 		return empty, deviceStorageError(err)
 	}
 	if _, err = tx.Exec(ctx, `UPDATE dashboard_notification_installations SET current_binding_id=$2::uuid,revision=$3,updated_at=clock_timestamp() WHERE id=$1::uuid`, i.id, id, i.revision); err != nil {
+		return empty, err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE dashboard_notification_device_revocations SET state='active',activated_at=clock_timestamp() WHERE id=$1::uuid`, r.id); err != nil {
 		return empty, err
 	}
 	i.binding = id
@@ -307,6 +304,10 @@ func (d *NotificationDeviceStore) bind(ctx context.Context, actor monitoring.Act
 	return b.view, tx.Commit(ctx)
 }
 func closeDeviceBinding(ctx context.Context, tx pgx.Tx, i deviceInstallation, state string) error {
+	if _, err := tx.Exec(ctx, `UPDATE dashboard_notification_device_revocations SET state='revoked',secret_hash=NULL,revoked_at=clock_timestamp() WHERE target_binding_id=$1::uuid AND state<>'revoked'`, i.binding); err != nil {
+		return err
+	}
+
 	if _, err := tx.Exec(ctx, `UPDATE dashboard_notification_device_bindings SET state=$2,enabled=false,token_ciphertext=NULL,token_key_id=NULL,token_digest=NULL,closed_at=clock_timestamp(),updated_at=clock_timestamp() WHERE id=$1::uuid AND state='bound'`, i.binding, state); err != nil {
 		return err
 	}
@@ -499,7 +500,7 @@ func (d *NotificationDeviceStore) List(ctx context.Context, actor monitoring.Act
 	return views, nil
 }
 func (d *NotificationDeviceStore) eligible(b deviceBinding) bool {
-	return b.view.State == "bound" && b.view.Enabled && !b.view.Muted && notifications.DevicePermissionAllowsDelivery(b.view.Permission) && b.ciphertext != nil && b.invalidated == nil && d.policy.Allows(b.view.Topic, b.view.Environment)
+	return b.view.RevocationReady && b.view.State == "bound" && b.view.Enabled && !b.view.Muted && notifications.DevicePermissionAllowsDelivery(b.view.Permission) && b.ciphertext != nil && b.invalidated == nil && d.policy.Allows(b.view.Topic, b.view.Environment)
 }
 func (d *NotificationDeviceStore) Candidates(ctx context.Context, actor monitoring.Actor) ([]notifications.DeviceCandidate, error) {
 	bindings, err := d.list(ctx, actor)
@@ -562,6 +563,19 @@ func (d *NotificationDeviceStore) Invalidate(ctx context.Context, candidate noti
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(72108003010)`); err != nil {
 		return false, err
 	}
+	changed, err := d.invalidateTx(ctx, tx, candidate, invalidAt)
+	if err != nil {
+		return false, err
+	}
+	return changed, tx.Commit(ctx)
+}
+
+// invalidateTx shares provider-result atomicity with the delivery journal. The
+// caller must already hold the global device advisory lock in this transaction.
+func (d *NotificationDeviceStore) invalidateTx(ctx context.Context, tx pgx.Tx, candidate notifications.DeviceCandidate, invalidAt *time.Time) (bool, error) {
+	if !eventUUID(candidate.InstallationID) || !eventUUID(candidate.BindingID) || !eventUUID(candidate.AccountID) || candidate.TokenVersion <= 0 || invalidAt != nil && (invalidAt.IsZero() || invalidAt.Year() < 1 || invalidAt.Year() > 9999) {
+		return false, notifications.ErrDeviceInvalid
+	}
 	i, err := installation(ctx, tx, candidate.InstallationID, true)
 	if errors.Is(err, notifications.ErrDeviceNotFound) {
 		return false, nil
@@ -591,5 +605,5 @@ func (d *NotificationDeviceStore) Invalidate(ctx context.Context, candidate noti
 	if err = auditDevice(ctx, tx, b.account, "notification_device.token_invalidated", i.id); err != nil {
 		return false, err
 	}
-	return true, tx.Commit(ctx)
+	return true, nil
 }

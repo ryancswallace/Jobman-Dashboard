@@ -2,6 +2,7 @@ package store
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -33,16 +34,42 @@ func deviceStore(t *testing.T, s *Store) *NotificationDeviceStore {
 	return d
 }
 func deviceRegistration(n int) notifications.DeviceRegistration {
-	return notifications.DeviceRegistration{InstallationID: fmt.Sprintf("80000000-0000-4000-8000-%012d", n), InstallationSecret: base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{byte(n)}, 32)), Label: "Synthetic phone", Topic: "test.jobman.dashboard", Environment: "sandbox", Token: fmt.Sprintf("ab%062x", n), Permission: "authorized", Enabled: true}
+	return notifications.DeviceRegistration{RevocationID: fmt.Sprintf("88000000-0000-4000-8000-%012d", n), RevocationCredential: base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{byte(n + 100)}, 32)), InstallationID: fmt.Sprintf("80000000-0000-4000-8000-%012d", n), InstallationSecret: base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{byte(n)}, 32)), Label: "Synthetic phone", Topic: "test.jobman.dashboard", Environment: "sandbox", Token: fmt.Sprintf("ab%062x", n), Permission: "authorized", Enabled: true}
 }
 func deviceBind(t *testing.T, d *NotificationDeviceStore, a monitoring.Actor, n int) (notifications.DeviceRegistration, notifications.DeviceView) {
 	t.Helper()
 	in := deviceRegistration(n)
-	v, err := d.Bind(t.Context(), a, 0, in)
+	receipt, err := d.ReserveRevocation(t.Context(), a, in.InstallationID, 0, revocationInput(in))
+	if err != nil {
+		t.Fatal("reserve", err)
+	}
+	v, err := d.Bind(t.Context(), a, receipt.Revision, in)
 	if err != nil {
 		t.Fatal("bind", err)
 	}
 	return in, v
+}
+func revocationInput(in notifications.DeviceRegistration) notifications.DeviceRevocationInput {
+	return notifications.DeviceRevocationInput{InstallationSecret: in.InstallationSecret, RevocationID: in.RevocationID, RevocationCredential: in.RevocationCredential}
+}
+
+// Existing lifecycle tests use this explicit two-phase operation. Dedicated
+// protocol tests below exercise stale CAS, reservation loss and cancellation.
+func attemptDeviceBind(ctx context.Context, d *NotificationDeviceStore, a monitoring.Actor, revision int64, in notifications.DeviceRegistration, switching bool) (notifications.DeviceView, error) {
+	in.RevocationID, _ = newID()
+	if revision == 0 {
+		if state, err := d.InspectInstallation(ctx, a, in.InstallationID, in.InstallationSecret); err == nil {
+			revision = state.Revision
+		}
+	}
+	receipt, err := d.ReserveRevocation(ctx, a, in.InstallationID, revision, revocationInput(in))
+	if err != nil {
+		return notifications.DeviceView{}, err
+	}
+	if switching {
+		return d.SwitchBinding(ctx, a, receipt.Revision, in, true)
+	}
+	return d.Bind(ctx, a, receipt.Revision, in)
 }
 func deviceCandidate(t *testing.T, d *NotificationDeviceStore, a monitoring.Actor) notifications.DeviceCandidate {
 	t.Helper()
@@ -73,7 +100,7 @@ func TestNotificationDevicesTokenLifecycleAndRemotePreferences(t *testing.T) {
 	in, v := deviceBind(t, d, alice, 1)
 	candidate := deviceCandidate(t, d, alice)
 	handoff, err := d.Handoff(ctx, alice, candidate)
-	if err != nil || handoff.Token != in.Token || v.Revision != 1 || v.TokenStatus != "current" {
+	if err != nil || handoff.Token != in.Token || v.Revision != 2 || v.TokenStatus != "current" {
 		t.Fatal("initial handoff", err)
 	}
 	var encrypted, hash []byte
@@ -159,8 +186,8 @@ func TestNotificationDevicesTokenLifecycleAndRemotePreferences(t *testing.T) {
 	if _, err = d.Refresh(ctx, alice, in.InstallationID, proof.Revision, notifications.DeviceRefresh{InstallationSecret: in.InstallationSecret, Token: in.Token, Permission: "authorized"}); !errors.Is(err, notifications.ErrDeviceNotFound) {
 		t.Fatal("normal startup resurrected remote removal", err)
 	}
-	rebound, err := d.Bind(ctx, alice, proof.Revision, in)
-	if err != nil || rebound.Revision != proof.Revision+1 {
+	rebound, err := attemptDeviceBind(ctx, d, alice, proof.Revision, in, false)
+	if err != nil || rebound.Revision != proof.Revision+2 {
 		t.Fatal("explicit reactivation with proof failed", err)
 	}
 	next := deviceCandidate(t, d, alice)
@@ -220,8 +247,8 @@ func TestNotificationDevicesOwnershipAliasAndExplicitSwitch(t *testing.T) {
 	}
 	// Old credentials may already be disabled; only the new verified actor and Keychain proof authorize the explicit switch.
 	deviceExec(t, s, `UPDATE dashboard_accounts SET disabled_at=clock_timestamp() WHERE id=$1::uuid`, alice.Account.ID)
-	switched, err := d.SwitchBinding(ctx, bob, v.Revision, in, true)
-	if err != nil || switched.Revision != 2 {
+	switched, err := attemptDeviceBind(ctx, d, bob, v.Revision, in, true)
+	if err != nil || switched.Revision != v.Revision+2 {
 		t.Fatal("explicit switch required expired old credentials", err)
 	}
 	if _, err = d.Handoff(ctx, alice, old); !errors.Is(err, monitoring.ErrForbidden) {
@@ -264,6 +291,12 @@ func TestNotificationDevicesAtomicConflictAndConcurrentCAS(t *testing.T) {
 	in, v := deviceBind(t, d, alice, 1)
 	other, _ := deviceBind(t, d, bob, 2)
 	old := deviceCandidate(t, d, alice)
+	receipt, err := d.ReserveRevocation(ctx, bob, in.InstallationID, v.Revision, notifications.DeviceRevocationInput{InstallationSecret: in.InstallationSecret, RevocationID: deviceRegistration(3).RevocationID, RevocationCredential: in.RevocationCredential})
+	if err != nil {
+		t.Fatal(err)
+	}
+	in.RevocationID = receipt.RevocationID
+	v.Revision = receipt.Revision
 	conflict := in
 	conflict.Token = other.Token
 	if _, err := d.SwitchBinding(ctx, bob, v.Revision, conflict, true); !errors.Is(err, notifications.ErrDeviceConflict) {
@@ -361,7 +394,7 @@ func TestNotificationDevicesAdmissionAndStops(t *testing.T) {
 		for n := 1; n <= notifications.MaximumInstallationCreatesPerMinute; n++ {
 			in, v = deviceBind(t, d, a, n)
 		}
-		if _, err := d.Bind(ctx, a, 0, deviceRegistration(6)); !errors.Is(err, notifications.ErrDeviceRateLimited) {
+		if _, err := attemptDeviceBind(ctx, d, a, 0, deviceRegistration(6), false); !errors.Is(err, notifications.ErrDeviceRateLimited) {
 			t.Fatal("new installation rate unbounded", err)
 		}
 		if err := d.Remove(ctx, a, in.InstallationID, v.Revision); err != nil {
@@ -369,16 +402,16 @@ func TestNotificationDevicesAdmissionAndStops(t *testing.T) {
 		}
 		deviceExec(t, s, `UPDATE dashboard_notification_installations SET created_at=clock_timestamp()-interval '2 minutes'`)
 		deviceExec(t, s, `INSERT INTO dashboard_notification_installations(id,creator_account_id,secret_hash,created_at) SELECT ('81000000-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid,$1::uuid,decode(repeat('ab',32),'hex'),clock_timestamp()-interval '2 minutes' FROM generate_series(1,$2::integer) n`, a.Account.ID, notifications.MaximumCreatedInstallations-5)
-		if _, err := d.Bind(ctx, a, 0, deviceRegistration(6)); !errors.Is(err, notifications.ErrDeviceCapacity) {
+		if _, err := attemptDeviceBind(ctx, d, a, 0, deviceRegistration(6), false); !errors.Is(err, notifications.ErrDeviceCapacity) {
 			t.Fatal("retained original creator quota not applied", err)
 		}
 		// A former installation creator's quota still counts after ownership transfer.
 		bob := reportActor(t, s, 202)
 		remaining := deviceRegistration(1)
-		if _, err := d.SwitchBinding(ctx, bob, 1, remaining, true); err != nil {
+		if _, err := attemptDeviceBind(ctx, d, bob, 2, remaining, true); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := d.Bind(ctx, a, 0, deviceRegistration(7)); !errors.Is(err, notifications.ErrDeviceCapacity) {
+		if _, err := attemptDeviceBind(ctx, d, a, 0, deviceRegistration(7), false); !errors.Is(err, notifications.ErrDeviceCapacity) {
 			t.Fatal("transfer freed original creator quota", err)
 		}
 	})
@@ -396,7 +429,7 @@ func TestNotificationDevicesAdmissionAndStops(t *testing.T) {
 			in, v = deviceBind(t, d, a, n)
 		}
 		deviceExec(t, s, `UPDATE dashboard_notification_installations SET created_at=clock_timestamp()-interval '2 minutes'`)
-		if _, err := d.Bind(ctx, a, 0, deviceRegistration(51)); !errors.Is(err, notifications.ErrDeviceCapacity) {
+		if _, err := attemptDeviceBind(ctx, d, a, 0, deviceRegistration(51), false); !errors.Is(err, notifications.ErrDeviceCapacity) {
 			t.Fatal("bound cap not applied", err)
 		}
 		list, err := d.List(ctx, a)
@@ -406,7 +439,7 @@ func TestNotificationDevicesAdmissionAndStops(t *testing.T) {
 		if err = d.Remove(ctx, a, in.InstallationID, v.Revision); err != nil {
 			t.Fatal("capacity blocked removal", err)
 		}
-		if _, err = d.Bind(ctx, a, 0, deviceRegistration(51)); err != nil {
+		if _, err = attemptDeviceBind(ctx, d, a, 0, deviceRegistration(51), false); err != nil {
 			t.Fatal("removal did not free bound slot", err)
 		}
 	})
@@ -423,7 +456,7 @@ func TestNotificationDevicesAdmissionAndStops(t *testing.T) {
 				next = a
 			}
 			var err error
-			v, err = d.SwitchBinding(ctx, next, v.Revision, in, true)
+			v, err = attemptDeviceBind(ctx, d, next, v.Revision, in, true)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -433,17 +466,21 @@ func TestNotificationDevicesAdmissionAndStops(t *testing.T) {
 		if owner.Account.ID == a.Account.ID {
 			next = b
 		}
-		if _, err := d.SwitchBinding(ctx, next, v.Revision, in, true); !errors.Is(err, notifications.ErrDeviceRateLimited) {
+		if _, err := attemptDeviceBind(ctx, d, next, v.Revision, in, true); !errors.Is(err, notifications.ErrDeviceRateLimited) {
 			t.Fatal("switch rate not applied", err)
 		}
-		if err := d.Detach(ctx, owner, in.InstallationID, v.Revision, in.InstallationSecret); err != nil {
+		stateBeforeStop, inspectErr := d.InspectInstallation(ctx, owner, in.InstallationID, in.InstallationSecret)
+		if inspectErr != nil {
+			t.Fatal(inspectErr)
+		}
+		if err := d.Detach(ctx, owner, in.InstallationID, stateBeforeStop.Revision, in.InstallationSecret); err != nil {
 			t.Fatal("rate blocked detach", err)
 		}
 		state, err := d.InspectInstallation(ctx, owner, in.InstallationID, in.InstallationSecret)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err = d.Bind(ctx, owner, state.Revision, in); !errors.Is(err, notifications.ErrDeviceRateLimited) {
+		if _, err = attemptDeviceBind(ctx, d, owner, state.Revision, in, false); !errors.Is(err, notifications.ErrDeviceRateLimited) {
 			t.Fatal("explicit rebind bypassed binding rate", err)
 		}
 	})
@@ -466,7 +503,7 @@ func TestNotificationDevicesAdmissionAndStops(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err = d.Bind(ctx, a, state.Revision, in); !errors.Is(err, notifications.ErrDeviceCapacity) {
+		if _, err = attemptDeviceBind(ctx, d, a, state.Revision, in, false); !errors.Is(err, notifications.ErrDeviceCapacity) {
 			t.Fatal("binding history was silently deleted or exceeded", err)
 		}
 		var count int
@@ -480,7 +517,7 @@ func TestNotificationDevicesAdmissionAndStops(t *testing.T) {
 		a, b := reportActor(t, s, 201), reportActor(t, s, 202)
 		ctx := t.Context()
 		deviceExec(t, s, `INSERT INTO dashboard_notification_installations(id,creator_account_id,secret_hash,created_at) SELECT ('83000000-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid,$1::uuid,decode(repeat('ab',32),'hex'),clock_timestamp()-interval '2 minutes' FROM generate_series(1,$2::integer) n`, a.Account.ID, notifications.MaximumInstallations)
-		if _, err := d.Bind(ctx, b, 0, deviceRegistration(1)); !errors.Is(err, notifications.ErrDeviceCapacity) {
+		if _, err := attemptDeviceBind(ctx, d, b, 0, deviceRegistration(1), false); !errors.Is(err, notifications.ErrDeviceCapacity) {
 			t.Fatal("global retained metadata cap not applied", err)
 		}
 	})
@@ -504,7 +541,7 @@ func TestNotificationDevicesMutationRateCannotDelayStops(t *testing.T) {
 	if err = s.Pool.QueryRow(ctx, `SELECT count(*) FROM dashboard_audit`).Scan(&auditAfter); err != nil || auditBefore != auditAfter {
 		t.Fatal("no-op settings added audit", err)
 	}
-	for range notifications.MaximumDeviceMutationsPerMinute {
+	for range notifications.MaximumDeviceMutationsPerMinute - 2 {
 		v, err = d.Refresh(ctx, a, in.InstallationID, v.Revision, notifications.DeviceRefresh{InstallationSecret: in.InstallationSecret, Token: in.Token, Permission: "authorized"})
 		if err != nil {
 			t.Fatal(err)
@@ -559,7 +596,7 @@ func TestNotificationDevicesMixedStopsCannotBypassMutationAdmission(t *testing.T
 			in := deviceRegistration(1)
 			in.Enabled = tc.before.Enabled
 			in.Muted = tc.before.Muted
-			v, err := d.Bind(ctx, a, 0, in)
+			v, err := attemptDeviceBind(ctx, d, a, 0, in, false)
 			if err != nil {
 				t.Fatal(err)
 			}

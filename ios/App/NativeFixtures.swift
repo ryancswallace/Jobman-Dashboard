@@ -14,7 +14,7 @@ enum NativeFixtures {
 
     static func data(path: String, query: [URLQueryItem] = []) throws -> Data { try JSONSerialization.data(withJSONObject: response(path: path, query: query)) }
     static func response(path: String, query: [URLQueryItem] = []) -> [String: Any] {
-        if NativeRuleFixtures.enabled, path == "/api/v1/bootstrap" { return NativeRuleFixtures.bootstrap() }
+        if NativeRuleFixtures.enabled || NativeInboxFixtures.enabled, path == "/api/v1/bootstrap" { return NativeRuleFixtures.bootstrap() }
         func value(_ name: String) -> String? { query.first { $0.name == name }?.value }
         let stream = value("stream") ?? "stdout"
         let now = Date()
@@ -100,10 +100,7 @@ enum NativeFixtures {
             return result
         }
         if path == "/api/v1/rules" { return ["items": []] }
-        let inbox: [String: Any] = ["id":"inbox-fixture","job":jobRef,"outcome":"failure","eventAt":date(now),"createdAt":date(now),"read":false,"matchedRules":["Synthetic failures"],"deliveryStatus":"fixture only"]
-        if path == "/api/v1/inbox" { return page([inbox]) }
-        if path.hasPrefix("/api/v1/inbox/") { return inbox }
-        if path == "/api/v1/devices" { return page([["id":"device-fixture","name":"Synthetic iPhone","enabled":false,"permission":"not_requested"]]) }
+        if path == "/api/v1/devices" { return ["items": []] }
         return ["code":"not_found_or_inaccessible","message":"No synthetic fixture is defined for this request."]
     }
 }
@@ -116,7 +113,7 @@ private final class FixtureProtocol: URLProtocol, @unchecked Sendable {
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
         do {
-            if let (status, data) = try NativeRuleFixtures.server.response(request) {
+            if let (status, data) = try NativeDeviceFixtures.server.response(request) ?? NativeInboxFixtures.server.response(request) ?? NativeRuleFixtures.server.response(request) {
                 let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
                 if payload?["fixtureDelay"] as? Bool == true {
                     let work = DispatchWorkItem { [weak self] in self?.respond(status: status, data: data) }

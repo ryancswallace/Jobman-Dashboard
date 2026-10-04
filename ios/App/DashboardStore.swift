@@ -34,7 +34,7 @@ final class DashboardStore {
     private(set) var contentGeneration = UUID()
     private var sessionGeneration = UUID()
     private var refreshGeneration = UUID()
-    private var deviceBinding: DeviceBinding?
+    let devices = NativeDeviceController()
     private var listGeneration = UUID()
     private(set) var evictedJobRows = 0
     private var consecutiveRefreshFailures = 0
@@ -80,7 +80,7 @@ final class DashboardStore {
             try activate(result)
             UserDefaults.standard.set(connection.baseURL.absoluteString, forKey: "dashboardAddress")
             refresh(); setActive(true)
-            if let token = PushRegistration.token { await registerPush(token: token) }
+            await refreshDeviceRegistration()
             if let pendingRoute { open(pendingRoute) }
         } catch {
             guard generation == sessionGeneration else { return }
@@ -113,7 +113,7 @@ final class DashboardStore {
     func refresh() {
         guard signedIn, refreshTask == nil else { return }
         lastDataRefresh = Date()
-        let refreshID = UUID()
+        let refreshID = UUID(), session = sessionGeneration
         refreshGeneration = refreshID
         refreshTask = Task { @MainActor in
             defer { if refreshGeneration == refreshID { refreshTask = nil } }
@@ -151,6 +151,7 @@ final class DashboardStore {
                 lastDataRefresh = Date()
             } catch is CancellationError { }
             catch {
+                guard session == sessionGeneration, refreshGeneration == refreshID else { return }
                 handle(error)
             }
         }
@@ -181,10 +182,10 @@ final class DashboardStore {
 
     func query() throws -> [URLQueryItem] { try scope.queryItems(authorized: bootstrap?.namespaces ?? []) }
 
-    /// Account-owned rules return their own current authorization projection.
+    /// Account-owned controls return their own current authorization projection.
     /// Stop/delete remain usable when namespace freshness is unavailable; all
     /// namespace data paths retain the separate SessionBoundary freshness gate.
-    func generatedRuleRequest<T: Sendable>(_ operation: @Sendable (DashboardClient) async throws -> T) async throws -> T {
+    func generatedAccountRequest<T: Sendable>(clearNamespaceContentOnFailure: Bool = true, _ operation: @Sendable (DashboardClient) async throws -> T) async throws -> T {
         guard active, signedIn, let client else { throw DashboardError.authenticationRequired }
         let generation = sessionGeneration, content = contentGeneration, account = bootstrap?.account.id
         do {
@@ -197,9 +198,16 @@ final class DashboardStore {
             return result
         } catch {
             if active, generation == sessionGeneration, content == contentGeneration, account == bootstrap?.account.id, let value = error as? DashboardError,
-               [.authenticationRequired, .forbidden, .authorizationUnavailable].contains(value) { handle(value) }
+               value == .authenticationRequired || (clearNamespaceContentOnFailure && [.forbidden, .authorizationUnavailable].contains(value)) { handle(value) }
             throw error
         }
+    }
+
+    func generatedRuleRequest<T: Sendable>(_ operation: @Sendable (DashboardClient) async throws -> T) async throws -> T { try await generatedAccountRequest(operation) }
+
+    var deviceContext: NativeDeviceContext? {
+        guard active, let account = bootstrap?.account.id, let origin = client?.origin else { return nil }
+        return NativeDeviceContext(accountID: account, session: sessionGeneration, origin: origin)
     }
 
     var hasFreshNamespaceOptions: Bool { !ruleNamespaceOptionsInvalidated && (boundary.authorizationValidUntil.map { $0 > Date() } ?? false) }
@@ -260,7 +268,14 @@ final class DashboardStore {
 
     func setActive(_ value: Bool) {
         active = value
-        if value { Task { await DeviceRevocations.flush() } }
+        if value {
+            Task { await DeviceRevocations.flush() }
+            Task {
+                await PushRegistration.refreshIfAllowed(preview: previewMode)
+                if active, signedIn { await refreshDeviceRegistration() }
+            }
+        }
+        else { devices.clear() }
         polling?.cancel(); polling = nil
         guard value, signedIn else { refreshTask?.cancel(); return }
         refresh()
@@ -279,6 +294,7 @@ final class DashboardStore {
     }
 
     private func refreshAccessOnly() async {
+        let session = sessionGeneration
         do {
             let boot = try await fetchBootstrap()
             guard boot.account.id == bootstrap?.account.id else { signOut(); return }
@@ -290,7 +306,8 @@ final class DashboardStore {
             ruleNamespaceOptionsInvalidated = false
             if removed || grantsChanged { try activate(boot); purgeContent(); path = []; inboxPath = [] }
             scheduleExpiry()
-        } catch { handle(error) }
+        } catch is CancellationError { }
+        catch { if session == sessionGeneration, active { handle(error) } }
     }
 
     private func scheduleExpiry() {
@@ -315,29 +332,17 @@ final class DashboardStore {
         if route.isInbox { inboxPath = [route] } else { path = [route] }
     }
 
-    func registerPush(token: String, enabled: Bool? = nil) async {
-        guard signedIn, !previewMode else { return }
-        do {
-            struct Registration: Encodable {
-                let installationId: String; let token: String; let topic: String; let environment: String
-                let name: String; let enabled: Bool?; let permission: String
-            }
-            let key = "installationId"
-            let installation = UserDefaults.standard.string(forKey: key) ?? UUID().uuidString
-            UserDefaults.standard.set(installation, forKey: key)
-            let body = Registration(installationId: installation, token: token, topic: Bundle.main.bundleIdentifier ?? "", environment: Bundle.main.object(forInfoDictionaryKey: "APNSEnvironment") as? String ?? "development", name: "iPhone", enabled: enabled, permission: "authorized")
-            struct Registered: Decodable, Sendable { let id: String; let revocationCredential: String }
-            let result: Registered = try await request(path: "/api/v1/devices", method: "POST", body: JSONEncoder().encode(body))
-            let binding = DeviceBinding(address: address, deviceId: result.id, credential: result.revocationCredential)
-            try DeviceRevocations.saveActive(binding)
-            deviceBinding = binding
-        } catch { self.error = error.localizedDescription }
-    }
+    func refreshDeviceRegistration() async { await devices.load(store: self, refreshToken: true) }
 
     func signOut() {
         var queuedUnbind = false
         var unbindQueueFailed = false
-        do { queuedUnbind = try DeviceRevocations.enqueueActive() } catch { unbindQueueFailed = true }
+        var unconfirmedBinding = devices.ownership?.refreshRevision != nil && !devices.offlineProtected
+        do {
+            queuedUnbind = try DeviceRevocations.enqueueActive()
+            let unresolved = try DeviceRevocations.read().hasUnconfirmedExisting
+            unconfirmedBinding = unconfirmedBinding || unresolved
+        } catch { unbindQueueFailed = true }
         sessionGeneration = UUID()
         polling?.cancel(); refreshTask?.cancel(); freshnessTask?.cancel()
         polling = nil; refreshTask = nil; freshnessTask = nil
@@ -348,11 +353,12 @@ final class DashboardStore {
             error = "Signed out on this phone. Device alert unbinding will finish when the private service is reachable."
             Task { await DeviceRevocations.flush() }
         }
+        if unconfirmedBinding { error = "Signed out locally. Server unbinding is unconfirmed for an older device binding; reconnect, sign in, and remove this installation. No login credential was retained." }
         if unbindQueueFailed { error = "Signed out locally. Device alert unbinding could not be queued; reconnect to finish removing this phone's server binding." }
-        deviceBinding = nil
+        devices.clear()
     }
 
-    private func purgeContent() { overview = nil; jobs = nil; jobRows = []; nextJobsCursor = nil; listGeneration = UUID(); evictedJobRows = 0; contentGeneration = UUID() }
+    private func purgeContent() { devices.clear(); overview = nil; jobs = nil; jobRows = []; nextJobsCursor = nil; listGeneration = UUID(); evictedJobRows = 0; contentGeneration = UUID() }
     private func authorizationVersions(_ bootstrap: Bootstrap) -> [NamespaceRef: String] {
         Dictionary(uniqueKeysWithValues: bootstrap.deployments.flatMap { deployment in
             deployment.namespaces.map { (NamespaceRef(deploymentId: deployment.id, namespaceId: $0.id), $0.authorizationVersion) }

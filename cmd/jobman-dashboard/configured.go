@@ -265,6 +265,10 @@ func runConfigured(path, mode, migrationURLFile string) error {
 	if err != nil {
 		return err
 	}
+	inboxService, err := notifications.NewInboxService(db, ruleSources, db)
+	if err != nil {
+		return err
+	}
 	var logService *logs.Broker
 	if len(loaded.brokers) > 0 {
 		brokers := make(map[string]*logs.Client)
@@ -310,7 +314,25 @@ func runConfigured(path, mode, migrationURLFile string) error {
 		go func() { defer close(workersDone); reportService.Run(ctx) }()
 		defer func() { stop(); <-workersDone }()
 	}
+	var notificationDevices *store.NotificationDeviceStore
+	if loaded.notifications != nil {
+		notificationDevices, err = store.NewNotificationDeviceStore(db, loaded.notifications.policy, loaded.notifications.cipher)
+		if err != nil {
+			return err
+		}
+	}
 	if c.Events.Enabled {
+		activationStore, err := store.NewNotificationActivationStore(db, c.OIDC.Issuer)
+		if err != nil {
+			return err
+		}
+		activationWorker, err := notifications.NewActivationWorker(activationStore, ruleService)
+		if err != nil {
+			return err
+		}
+		activationDone := make(chan struct{})
+		go func() { defer close(activationDone); activationWorker.Run(ctx) }()
+		defer func() { stop(); <-activationDone }()
 		ingestor, err := events.NewIngestor(eventSources, db)
 		if err != nil {
 			return err
@@ -318,6 +340,44 @@ func runConfigured(path, mode, migrationURLFile string) error {
 		ingestionDone := make(chan struct{})
 		go func() { defer close(ingestionDone); ingestor.Run(ctx) }()
 		defer func() { stop(); <-ingestionDone }()
+		var devicePolicy *notifications.DevicePolicy
+		if loaded.notifications != nil {
+			devicePolicy = loaded.notifications.policy
+		}
+		evaluationStore, err := store.NewNotificationEvaluationStore(db, c.OIDC.Issuer, devicePolicy)
+		if err != nil {
+			return err
+		}
+		evaluator, err := notifications.NewEvaluator(evaluationStore, db, ruleSources, eventSources, c.ConfigurationRevision)
+		if err != nil {
+			return err
+		}
+		evaluationDone := make(chan struct{})
+		go func() { defer close(evaluationDone); evaluator.Run(ctx) }()
+		defer func() { stop(); <-evaluationDone }()
+		if notificationDevices != nil && len(loaded.notifications.providers) > 0 {
+			pairs := make([]notifications.DeviceTopic, 0, len(loaded.notifications.providers))
+			providers := make(map[notifications.DeviceTopic]notifications.PushProvider, len(loaded.notifications.providers))
+			for pair, provider := range loaded.notifications.providers {
+				pairs = append(pairs, pair)
+				providers[pair] = provider
+			}
+			deliveryStore, err := store.NewNotificationDeliveryStore(evaluationStore, notificationDevices, pairs)
+			if err != nil {
+				return err
+			}
+			ids := make([]string, len(eventSources))
+			for i, source := range eventSources {
+				ids[i] = source.SourceID()
+			}
+			sender, err := notifications.NewSender(deliveryStore, evaluator, ids, providers)
+			if err != nil {
+				return err
+			}
+			deliveryDone := make(chan struct{})
+			go func() { defer close(deliveryDone); sender.Run(ctx) }()
+			defer func() { stop(); <-deliveryDone }()
+		}
 	}
 	maintenanceDone := make(chan struct{})
 	defer func() { stop(); <-maintenanceDone }()
@@ -337,6 +397,12 @@ func runConfigured(path, mode, migrationURLFile string) error {
 				if _, err := db.PruneCursors(maintenance); err != nil {
 					slog.Warn("browse retention pass failed")
 				}
+				if _, err := db.ExpireNotificationDeliveries(maintenance); err != nil {
+					slog.Warn("notification delivery expiry pass failed")
+				}
+				if _, err := db.PruneNotifications(maintenance); err != nil {
+					slog.Warn("notification retention pass failed")
+				}
 				if reportService != nil {
 					if err := reportService.Prune(maintenance); err != nil {
 						slog.Warn("diagnosis retention pass failed")
@@ -353,12 +419,9 @@ func runConfigured(path, mode, migrationURLFile string) error {
 	}()
 	app := &httpapi.Server{Engine: engine, Auth: identity, AuthRoutes: identity, Preferences: db, Static: loaded.static.FS()}
 	app.Rules = ruleService
-	if loaded.notifications != nil {
-		devices, err := store.NewNotificationDeviceStore(db, loaded.notifications.policy, loaded.notifications.cipher)
-		if err != nil {
-			return err
-		}
-		app.Devices = devices
+	app.Inbox = inboxService
+	if notificationDevices != nil {
+		app.Devices = notificationDevices
 	}
 	if logService != nil {
 		app.Logs = logService

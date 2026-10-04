@@ -22,7 +22,7 @@ func TestDeviceSecretsAndInputBounds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	good := DeviceRegistration{InstallationID: testDeviceInstallation, InstallationSecret: deviceTestSecret(), Label: "Synthetic phone", Topic: "test.jobman.dashboard", Environment: "sandbox", Token: "ab", Permission: "authorized", Enabled: true}
+	good := DeviceRegistration{RevocationID: "88000000-0000-4000-8000-000000000001", RevocationCredential: base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{42}, 32)), InstallationID: testDeviceInstallation, InstallationSecret: deviceTestSecret(), Label: "Synthetic phone", Topic: "test.jobman.dashboard", Environment: "sandbox", Token: "ab", Permission: "authorized", Enabled: true}
 	if err = good.Validate(p); err != nil {
 		t.Fatal(err)
 	}
@@ -143,5 +143,34 @@ func TestDeviceCipherAuthenticatedPinsAndRotation(t *testing.T) {
 	encoded, _ := json.Marshal(handoff)
 	if bytes.Contains(encoded, []byte(token)) {
 		t.Fatal("handoff token serialized")
+	}
+}
+
+func TestDeviceRevocationHashPurposeAndGenerationBinding(t *testing.T) {
+	id := "90000000-0000-4000-8000-000000000001"
+	installation := testDeviceInstallation
+	binding := deviceTestPins().BindingID
+	baseline, err := RevocationSecretHash(id, installation, binding, deviceTestSecret())
+	if err != nil || len(baseline) != 32 {
+		t.Fatal(err)
+	}
+	for _, parts := range [][3]string{{testDeviceInstallation, installation, binding}, {id, id, binding}, {id, installation, id}} {
+		other, err := RevocationSecretHash(parts[0], parts[1], parts[2], deviceTestSecret())
+		if err != nil || bytes.Equal(baseline, other) {
+			t.Fatal("authority crossed credential/install/generation", err)
+		}
+	}
+	proof, _ := InstallationSecretHash(id, deviceTestSecret())
+	if bytes.Equal(proof, baseline) {
+		t.Fatal("installation proof reused as revocation authority")
+	}
+	for _, secret := range []string{"", deviceTestSecret() + "=", strings.Repeat("x", 44), strings.Repeat("/", 43)} {
+		if ValidateDeviceRevocation(id, secret) == nil {
+			t.Fatal("noncanonical secret accepted")
+		}
+	}
+	encoded, _ := json.Marshal(DeviceRevocationInput{InstallationSecret: deviceTestSecret(), RevocationID: id, RevocationCredential: deviceTestSecret()})
+	if bytes.Contains(encoded, []byte(deviceTestSecret())) {
+		t.Fatal("request proofs serialized")
 	}
 }

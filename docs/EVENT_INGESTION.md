@@ -42,12 +42,14 @@ Each payload is at most 4 KiB; operational sizing must include indexes and
 database overhead. Capacity pauses ingestion instead of silently dropping work.
 Unprocessed events are preserved until evaluation records a disposition.
 Processed event identities persist for the largest observed source replay
-retention plus one day, extended on replay. Retention increases protect all
+retention plus five days, with a minimum of 35 days, extended on replay. Retention increases protect all
 existing identities without a table-wide rewrite. Cleanup requires a recently
 successful active source, so an outage cannot discard identities before a
 changed source replay window is learned. Indexed fixed-time seeks delete at most
 500 eligible rows per pass while keeping the source's admission counter exact.
-Source events and future 30-day user inbox expiry are separate lifecycles.
+Pending fanout, account evaluation or provider delivery prevents event removal.
+Global delivery holds preserve deduplication history. Source events and 30-day
+user inbox expiry are separate lifecycles; see [retention](NOTIFICATION_RETENTION.md).
 
 Tests exercise real PostgreSQL transactions: concurrent leases, abandoned
 leases, injected failure between event insertion and checkpoint publication,

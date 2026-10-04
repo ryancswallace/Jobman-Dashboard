@@ -19,6 +19,7 @@ public enum DashboardError: Error, Equatable, Sendable, LocalizedError {
     case revisionConflict
     case rateLimited
     case ruleCapacity
+    case deviceCapacity
     case unsupportedOutcome
     case invalidResponse
     case responseTooLarge
@@ -44,6 +45,7 @@ public enum DashboardError: Error, Equatable, Sendable, LocalizedError {
         case .snapshotChanged: "The source snapshot changed. Request a new report."
         case .revisionConflict: "This request conflicts with the current revision or an earlier request. Refresh and try again."
         case .rateLimited: "Too many requests. Wait briefly before retrying."
+        case .deviceCapacity: "Device or retained installation capacity has been reached. Stopping or removing devices remains available; contact your operator."
         case .ruleCapacity: "The alert rule or history capacity has been reached. Stop or remove unused rules, or contact your operator."
         case .unsupportedOutcome: "An outcome in this rule is not supported by the service. Review the selected outcomes."
         case .invalidResponse: "The service returned an unexpected response."
@@ -72,6 +74,7 @@ public enum DashboardError: Error, Equatable, Sendable, LocalizedError {
         case "revision_conflict": .revisionConflict
         case "rate_limited": .rateLimited
         case "rule_capacity": .ruleCapacity
+        case "device_capacity": .deviceCapacity
         case "unsupported_outcome": .unsupportedOutcome
         default:
             switch status {
@@ -100,6 +103,7 @@ public struct DashboardConnection: Equatable, Sendable {
 /// Ephemeral URLSession + no redirects prevents cookies, persistent API caches and bearer forwarding.
 public final class DashboardTransport: Sendable {
     private let connection: DashboardConnection
+    public var origin: URL { connection.baseURL }
     private let session: URLSession
     public static let maximumResponseBytes = 4 * 1024 * 1024
 
@@ -137,9 +141,11 @@ public final class DashboardTransport: Sendable {
     }
 
     public func data(path: String, query: [URLQueryItem] = [], token: String?, method: String = "GET",
-                     body: Data? = nil, revision: String? = nil, idempotencyKey: UUID? = nil) async throws -> Data {
+                     body: Data? = nil, revision: String? = nil, ifNoneMatch: String? = nil, idempotencyKey: UUID? = nil) async throws -> Data {
+        guard ifNoneMatch == nil || (ifNoneMatch == "*" && revision == nil) else { throw DashboardError.invalidResponse }
         let apiPath = path.hasPrefix("/api/v1/")
         let unbindPath = path == "/auth/native/device-revocations" && method == "POST" && token == nil
+        if unbindPath, !query.isEmpty || revision != nil || ifNoneMatch != nil || idempotencyKey != nil { throw DashboardError.invalidAddress }
         guard (apiPath || unbindPath), !path.contains(".."), !path.contains("?"), !path.contains("#"),
               var parts = URLComponents(url: connection.baseURL, resolvingAgainstBaseURL: false) else { throw DashboardError.invalidAddress }
         parts.percentEncodedPath = path
@@ -153,6 +159,7 @@ public final class DashboardTransport: Sendable {
         if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         if let revision { request.setValue(revision, forHTTPHeaderField: "If-Match") }
+        if let ifNoneMatch { request.setValue(ifNoneMatch, forHTTPHeaderField: "If-None-Match") }
         if let idempotencyKey { request.setValue(idempotencyKey.uuidString, forHTTPHeaderField: "Idempotency-Key") }
         do {
             let (bytes, response) = try await session.bytes(for: request)

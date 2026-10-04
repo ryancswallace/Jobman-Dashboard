@@ -26,6 +26,9 @@ const (
 	MaximumInstallationCreatesPerMinute = 5
 	MaximumBindingChangesPerMinute      = 10
 	MaximumDeviceMutationsPerMinute     = 30
+	MaximumInstallationRevocations      = 500
+	MaximumPendingDeviceRevocations     = 5
+	MaximumBindingRevocations           = 5
 )
 
 var (
@@ -64,6 +67,8 @@ func (p *DevicePolicy) Allows(topic, environment string) bool {
 type DeviceRegistration struct {
 	InstallationID            string
 	InstallationSecret        string `json:"-"`
+	RevocationID              string
+	RevocationCredential      string `json:"-"`
 	Label, Topic, Environment string
 	Token                     string `json:"-"`
 	Permission                string
@@ -102,8 +107,10 @@ func (r DeviceRegistration) Validate(policy *DevicePolicy) error {
 	if !uuid(r.InstallationID) || !deviceLabel(r.Label) || !policy.Allows(r.Topic, r.Environment) || !push.ValidDeviceToken(r.Token) || !DevicePermission(r.Permission) {
 		return ErrDeviceInvalid
 	}
-	_, err := InstallationSecretHash(r.InstallationID, r.InstallationSecret)
-	return err
+	if err := (DeviceRevocationInput{r.InstallationSecret, r.RevocationID, r.RevocationCredential}).Validate(r.InstallationID); err != nil {
+		return err
+	}
+	return nil
 }
 func (r DeviceRefresh) Validate(id string) error {
 	if !push.ValidDeviceToken(r.Token) || !DevicePermission(r.Permission) {
@@ -135,19 +142,20 @@ func InstallationSecretHash(id, secret string) ([]byte, error) {
 // DeviceView is safe for the authenticated owner. Binding IDs, token versions,
 // token ciphertext/hashes and installation proofs are deliberately absent.
 type DeviceView struct {
-	InstallationID string    `json:"installationId"`
-	Revision       int64     `json:"revision,string"`
-	Label          string    `json:"label"`
-	Topic          string    `json:"topic"`
-	Environment    string    `json:"environment"`
-	State          string    `json:"state"`
-	Enabled        bool      `json:"enabled"`
-	Muted          bool      `json:"muted"`
-	Permission     string    `json:"permission"`
-	TokenStatus    string    `json:"tokenStatus"`
-	CreatedAt      time.Time `json:"createdAt"`
-	UpdatedAt      time.Time `json:"updatedAt"`
-	LastSeenAt     time.Time `json:"lastSeenAt"`
+	InstallationID  string    `json:"installationId"`
+	Revision        int64     `json:"revision,string"`
+	Label           string    `json:"label"`
+	Topic           string    `json:"topic"`
+	Environment     string    `json:"environment"`
+	State           string    `json:"state"`
+	Enabled         bool      `json:"enabled"`
+	Muted           bool      `json:"muted"`
+	Permission      string    `json:"permission"`
+	TokenStatus     string    `json:"tokenStatus"`
+	RevocationReady bool      `json:"revocationReady"`
+	CreatedAt       time.Time `json:"createdAt"`
+	UpdatedAt       time.Time `json:"updatedAt"`
+	LastSeenAt      time.Time `json:"lastSeenAt"`
 }
 type InstallationState struct {
 	InstallationID        string `json:"installationId"`
@@ -260,4 +268,46 @@ func DeviceTokenDigest(topic, environment, token string) []byte {
 	raw, _ := json.Marshal([]string{"jobman-dashboard/apns-token-index/v1", topic, environment, token})
 	sum := sha256.Sum256(raw)
 	return sum[:]
+}
+
+// DeviceRevocationInput is never serialized: both proofs are request-only.
+type DeviceRevocationInput struct {
+	InstallationSecret   string `json:"-"`
+	RevocationID         string
+	RevocationCredential string `json:"-"`
+}
+
+func (r DeviceRevocationInput) Validate(installationID string) error {
+	if _, err := InstallationSecretHash(installationID, r.InstallationSecret); err != nil {
+		return err
+	}
+	return ValidateDeviceRevocation(r.RevocationID, r.RevocationCredential)
+}
+func ValidateDeviceRevocation(id, secret string) error {
+	_, err := InstallationSecretHash(id, secret)
+	return err
+}
+
+// RevocationSecretHash purpose-binds the random client secret to a single
+// opaque credential ID and its immutable private binding generation.
+func RevocationSecretHash(id, installationID, bindingID, secret string) ([]byte, error) {
+	if ValidateDeviceRevocation(id, secret) != nil || !uuid(installationID) || !uuid(bindingID) {
+		return nil, ErrDeviceInvalid
+	}
+	decoded, _ := base64.RawURLEncoding.DecodeString(secret)
+	h := sha256.New()
+	h.Write([]byte("jobman-dashboard/device-revocation/v1\x00"))
+	for _, part := range []string{id, installationID, bindingID} {
+		h.Write([]byte(part))
+		h.Write([]byte{0})
+	}
+	h.Write(decoded)
+	return h.Sum(nil), nil
+}
+
+type DeviceRevocationReceipt struct {
+	InstallationID string `json:"installationId"`
+	Revision       int64  `json:"revision,string"`
+	RevocationID   string `json:"revocationId"`
+	Intent         string `json:"intent"`
 }

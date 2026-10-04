@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class DeviceContractTests(unittest.TestCase):
     def test_responses_never_expose_device_authority_or_credentials(self):
         schemas = json.loads((ROOT / "api/openapi.json").read_text())["components"]["schemas"]
-        for name in ("Device", "DevicePage", "InstallationState"):
+        for name in ("Device", "DevicePage", "InstallationState", "DeviceRevocationReceipt"):
             for private in ("accountId", "bindingId", "tokenVersion", "token", "tokenCiphertext", "installationSecret"):
                 self.assertNotIn(private, schemas[name]["properties"])
         self.assertEqual(schemas["Device"]["properties"]["revision"]["type"], "string")
@@ -24,7 +24,11 @@ class DeviceContractTests(unittest.TestCase):
         base = "/api/v1/devices/{installationId}"
         bind = doc["paths"][base + "/bind"]["post"]
         headers = {p["name"]: p for p in bind["parameters"] if p["in"] == "header"}
-        self.assertIn("If-None-Match", headers)
+        self.assertNotIn("If-None-Match", headers)
+        self.assertTrue(headers["If-Match"]["required"])
+        reserve = doc["paths"][base + "/revocation-reservations"]["post"]
+        self.assertIn("If-None-Match", {p["name"] for p in reserve["parameters"]})
+        self.assertEqual(doc["paths"]["/auth/native/device-revocations"]["post"]["security"], [])
         self.assertIn("If-Match", headers)
         for path, method in ((base, "delete"), (base + "/switch", "post"), (base + "/token", "put"), (base + "/settings", "put"), (base + "/detach", "post")):
             headers = {p["name"]: p for p in doc["paths"][path][method]["parameters"] if p["in"] == "header"}
@@ -37,7 +41,7 @@ class DeviceContractTests(unittest.TestCase):
                 self.assertFalse(any(p["in"] == "query" for p in op["parameters"]))
         ts = (ROOT / "contracts/typescript/dashboard.generated.ts").read_text()
         swift = (ROOT / "contracts/swift/DashboardAPI.generated.swift").read_text()
-        for method in ("devices", "inspectInstallation", "bindDevice", "switchDeviceBinding", "refreshDeviceToken", "updateDeviceSettings", "removeDevice", "detachInstallation"):
+        for method in ("devices", "inspectInstallation", "bindDevice", "switchDeviceBinding", "refreshDeviceToken", "updateDeviceSettings", "removeDevice", "detachInstallation", "reserveDeviceRevocation", "activateDeviceRevocation", "revokeNativeDevice"):
             self.assertIn(f"  {method}(", ts)
             self.assertIn(f"public func {method}(", swift)
         self.assertNotIn("  updateDevice(", ts)

@@ -285,8 +285,9 @@ func (s *Store) ReleaseFeed(ctx context.Context, feed events.Feed, code string) 
 }
 
 // PruneSourceEvents preserves identity tombstones for the full configured
-// replay window plus a day, extended on replay. Cleanup and admission serialize
-// on the same feed row so the explicit per-source storage budget stays exact.
+// replay window plus five days (at least 35 days), extended on replay. Cleanup
+// serializes with pending-work transitions and source admission so the explicit
+// per-source storage budget stays exact.
 func (s *Store) PruneSourceEvents(ctx context.Context, deployment string) (int64, error) {
 	if !eventUUID(deployment) {
 		return 0, events.ErrInvalid
@@ -296,18 +297,16 @@ func (s *Store) PruneSourceEvents(ctx context.Context, deployment string) (int64
 		return 0, err
 	}
 	defer tx.Rollback(ctx)
+	if held, err := lockNotificationEventPruning(ctx, tx); err != nil || held {
+		return 0, err
+	}
 	var retention int64
 	if err = tx.QueryRow(ctx, `SELECT retention_seconds FROM dashboard_event_feeds WHERE deployment_id=$1::uuid AND status='active' AND last_success_at>clock_timestamp()-interval '60 seconds' FOR UPDATE`, deployment).Scan(&retention); errors.Is(err, pgx.ErrNoRows) {
 		return 0, nil
 	} else if err != nil {
 		return 0, err
 	}
-	var removed int64
-	var recordedThrough *time.Time
-	err = tx.QueryRow(ctx, `WITH removed AS (
- DELETE FROM dashboard_source_events WHERE (deployment_id,control_instance_id,event_id) IN (SELECT deployment_id,control_instance_id,event_id FROM dashboard_source_events WHERE deployment_id=$1::uuid AND processed_at IS NOT NULL AND expires_at<=statement_timestamp() AND last_seen_at<=statement_timestamp()-$2*interval '1 second' ORDER BY last_seen_at LIMIT 500)
- RETURNING recorded_at)
- SELECT count(*),max(recorded_at) FROM removed`, deployment, retention+86400).Scan(&removed, &recordedThrough)
+	removed, recordedThrough, err := pruneSourceEventsTx(ctx, tx, deployment, retention)
 	if err != nil {
 		return 0, err
 	}
@@ -315,4 +314,28 @@ func (s *Store) PruneSourceEvents(ctx context.Context, deployment string) (int64
 		return 0, err
 	}
 	return removed, tx.Commit(ctx)
+}
+
+// Both normal and explicit capacity-recovery pruning share the same authority,
+// pending-work and replay-window gates. No network runs under these locks.
+func lockNotificationEventPruning(ctx context.Context, tx pgx.Tx) (bool, error) {
+	var held bool
+	if err := tx.QueryRow(ctx, `SELECT held FROM dashboard_notification_delivery_control WHERE singleton FOR SHARE`).Scan(&held); err != nil || held {
+		return held, err
+	}
+	_, err := tx.Exec(ctx, `SELECT pending_evaluations FROM dashboard_notification_work_quota WHERE singleton FOR UPDATE`)
+	return false, err
+}
+func pruneSourceEventsTx(ctx context.Context, tx pgx.Tx, deployment string, retention int64) (int64, *time.Time, error) {
+	var removed int64
+	var recordedThrough *time.Time
+	err := tx.QueryRow(ctx, `WITH removed AS (
+ DELETE FROM dashboard_source_events WHERE (deployment_id,control_instance_id,event_id) IN (SELECT e.deployment_id,e.control_instance_id,e.event_id FROM dashboard_source_events e WHERE e.deployment_id=$1::uuid AND e.processed_at IS NOT NULL AND e.expires_at<=statement_timestamp() AND e.last_seen_at<=statement_timestamp()-$2*interval '1 second'
+ AND NOT EXISTS(SELECT 1 FROM dashboard_notification_fanout f WHERE (f.deployment_id,f.control_instance_id,f.event_id)=(e.deployment_id,e.control_instance_id,e.event_id) AND NOT f.done)
+ AND NOT EXISTS(SELECT 1 FROM dashboard_notification_evaluations n WHERE (n.deployment_id,n.control_instance_id,n.event_id)=(e.deployment_id,e.control_instance_id,e.event_id) AND n.state='pending')
+ AND NOT EXISTS(SELECT 1 FROM dashboard_notification_inbox i JOIN dashboard_notification_deliveries d ON d.inbox_id=i.id AND d.state='pending' WHERE (i.deployment_id,i.control_instance_id,i.event_id)=(e.deployment_id,e.control_instance_id,e.event_id))
+ ORDER BY e.last_seen_at,e.event_id LIMIT 500)
+ RETURNING recorded_at)
+ SELECT count(*),max(recorded_at) FROM removed`, deployment, max(int64(35*86400), retention+5*86400)).Scan(&removed, &recordedThrough)
+	return removed, recordedThrough, err
 }

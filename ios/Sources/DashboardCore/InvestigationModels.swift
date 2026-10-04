@@ -71,11 +71,3 @@ public struct LogChunk: Decodable, Sendable {
     public let startOffset: String; public let endOffset: String; public let nextCursor: String?
     public let state: String; public let truncated: Bool?; public let capturedAt: String?
 }
-public struct InboxItem: Decodable, Sendable, Identifiable {
-    public let id: String; public let job: JobRef; public let outcome: String; public let eventAt: String; public let createdAt: String
-    public let read: Bool; public let matchedRules: [String]; public let deliveryStatus: String?
-}
-public struct Device: Decodable, Sendable, Identifiable {
-    public let id: String; public let name: String; public let platform: String?; public let enabled: Bool
-    public let permission: String?; public let lastSeenAt: String?
-}

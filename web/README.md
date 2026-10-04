@@ -67,3 +67,5 @@ revision-conflict review, explicit revalidation, stopping during source outages,
 uncertain create responses, account-change cancellation, deletion and bounded
 pagination. These rendered component tests do not establish durable inbox/APNs
 delivery or browser authentication acceptance.
+
+Inbox list/detail uses generated DTOs and validates exact counts, source-qualified references, original match revisions and delivery summaries. It preserves filters on continuation, clears failed authority, cancels obsolete account/scope mutations and renders missing current jobs without cached names. Component tests cover those behaviors; actual browser/session and physical push acceptance remain separate.

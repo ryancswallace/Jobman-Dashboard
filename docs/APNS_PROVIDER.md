@@ -41,8 +41,9 @@ Apple primary references checked while implementing the provider:
 Local tests use a TLS/HTTP2 server and verify signatures, headers, the complete
 payload, environment separation, response classification, timestamp fencing and
 retry bounds. Real provider credentials, phone delivery and company-managed-device
-acceptance remain external gates. Runtime provider/worker integration is still
-being completed; these transport tests do not establish end-to-end push delivery.
+acceptance remain external gates. The [durable delivery worker](NOTIFICATION_PIPELINE.md)
+is wired into the configured runtime; local transport and storage tests do not
+establish end-to-end delivery to a real phone.
 
 ## Operator configuration
 

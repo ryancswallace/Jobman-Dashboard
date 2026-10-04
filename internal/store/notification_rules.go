@@ -16,7 +16,8 @@ import (
 )
 
 const (
-	// History is never silently pruned: delayed evaluation may still need it.
+	// Retention retires only expired, unreferenced snapshots; delayed evaluation
+	// and current intervals preserve their original authority history.
 	// Normal mutations stop at 1,000 retained snapshots. Up to 100 live rules
 	// may then each disable and delete using the 200-record safety reserve.
 	// Stops bypass the rate limit, but cannot reopen an interval or rule slot
@@ -252,6 +253,15 @@ func persistNotificationRule(ctx context.Context, tx pgx.Tx, previous *notificat
 			return notifications.ErrTransition
 		}
 	}
+	// Every retained snapshot keeps indexed references to all of its intervals.
+	// The retention worker cannot retire an interval payload behind any snapshot.
+	historyIDs := make([]string, len(next.Activation))
+	for i, a := range next.Activation {
+		historyIDs[i] = a.ID
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO dashboard_notification_version_activations(rule_id,revision,activation_id) SELECT $1::uuid,$2,unnest($3::uuid[])`, next.ID, next.Revision, historyIDs); err != nil {
+		return err
+	}
 	// Keep only current source-qualified selections in the candidate index.
 	// This work is bounded by the validated320 scopes and remains in the same
 	// transaction as the revision/snapshot/activation publication.
@@ -273,6 +283,9 @@ func persistNotificationRule(ctx context.Context, tx pgx.Tx, previous *notificat
 		if err != nil {
 			return err
 		}
+	}
+	if err = syncNotificationActivationWork(ctx, tx, next); err != nil {
+		return err
 	}
 	_, err = tx.Exec(ctx, `INSERT INTO dashboard_audit(account_id,action,resource_kind,resource_id) VALUES($1::uuid,$2,'notification_rule',$3)`, next.AccountID, action, next.ID)
 	return err
@@ -483,10 +496,9 @@ func (s *Store) NotificationActivationRevocations(ctx context.Context, actor mon
 		ids[i] = activation.ID
 	}
 	rows, err := tx.Query(ctx, `SELECT a.id::text FROM dashboard_notification_activations a
- JOIN dashboard_notification_rule_versions v ON v.rule_id=a.rule_id AND v.revision=a.created_revision
  LEFT JOIN dashboard_notification_activation_revocations r ON r.activation_id=a.id
  LEFT JOIN dashboard_notification_scope_revocations n ON n.deployment_id=a.deployment_id AND n.namespace_id=a.namespace_id
- WHERE a.id=ANY($1::uuid[]) AND (r.activation_id IS NOT NULL OR v.recorded_at<=n.revoked_through) ORDER BY a.id`, ids)
+ WHERE a.id=ANY($1::uuid[]) AND (r.activation_id IS NOT NULL OR a.origin_recorded_at<=n.revoked_through) ORDER BY a.id`, ids)
 	if err != nil {
 		return nil, err
 	}

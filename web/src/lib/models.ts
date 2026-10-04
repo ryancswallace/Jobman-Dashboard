@@ -210,16 +210,6 @@ export interface LogChunk {
   truncated?: boolean;
   capturedAt?: string;
 }
-export interface InboxItem {
-  id: string;
-  job: JobRef;
-  outcome: string;
-  eventAt: string;
-  createdAt: string;
-  read: boolean;
-  matchedRules: string[];
-  deliveryStatus?: string;
-}
 export interface Device {
   id: string;
   name: string;

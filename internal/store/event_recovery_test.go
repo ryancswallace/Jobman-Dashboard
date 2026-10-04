@@ -263,7 +263,7 @@ func TestEventRecoveryCapacityCleanupIsBoundedAndPreservesPending(t *testing.T) 
 		}
 	}
 	state := planPausedRecovery(t, s, feed, c, "capacity", events.RecoveryUncertainty{})
-	if _, err := s.Pool.Exec(ctx, `UPDATE dashboard_source_events SET expires_at=clock_timestamp()-interval '1 second',last_seen_at=clock_timestamp()-interval '32 days'`); err != nil {
+	if _, err := s.Pool.Exec(ctx, `UPDATE dashboard_source_events SET expires_at=clock_timestamp()-interval '1 second',last_seen_at=clock_timestamp()-interval '36 days'`); err != nil {
 		t.Fatal(err)
 	}
 	if n, err := s.PruneCapacityEvents(ctx, c.DeploymentID, state.Plan.FeedGeneration, 1, c); err != nil || n != 0 {
@@ -282,7 +282,7 @@ func TestEventRecoveryCapacityCleanupIsBoundedAndPreservesPending(t *testing.T) 
 	if n, err := s.PruneCapacityEvents(ctx, c.DeploymentID, state.Plan.FeedGeneration, 1, extended); err != nil || n != 0 {
 		t.Fatal("current longer source retention not honored", n, err)
 	}
-	if _, err := s.Pool.Exec(ctx, `UPDATE dashboard_source_events SET last_seen_at=clock_timestamp()-interval '62 days'`); err != nil {
+	if _, err := s.Pool.Exec(ctx, `UPDATE dashboard_source_events SET last_seen_at=clock_timestamp()-interval '66 days'`); err != nil {
 		t.Fatal(err)
 	}
 	if n, err := s.PruneCapacityEvents(ctx, c.DeploymentID, state.Plan.FeedGeneration, 1, c); err != nil || n != 500 {
@@ -394,7 +394,7 @@ func TestEventRecoveryCapacityCompoundCauseRequiresNewPinnedPlan(t *testing.T) {
 			if oldPlan.Plan.Mode != events.RecoveryContinue {
 				t.Fatal("unchanged capacity must continue original cursor")
 			}
-			if _, err = s.Pool.Exec(ctx, `UPDATE dashboard_source_events SET processed_at=clock_timestamp(),expires_at=clock_timestamp()-interval '1 second',last_seen_at=clock_timestamp()-interval '32 days'`); err != nil {
+			if _, err = s.Pool.Exec(ctx, `UPDATE dashboard_source_events SET processed_at=clock_timestamp(),expires_at=clock_timestamp()-interval '1 second',last_seen_at=clock_timestamp()-interval '36 days'`); err != nil {
 				t.Fatal(err)
 			}
 			target := c
@@ -447,7 +447,7 @@ func TestEventRecoveryPrunedWatermarkAndRestoreUncertainty(t *testing.T) {
 	if err := s.AppendFeed(ctx, feed, eventPage(c, "old", original)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Pool.Exec(ctx, `UPDATE dashboard_source_events SET processed_at=clock_timestamp(),expires_at=clock_timestamp()-interval '1 second',last_seen_at=clock_timestamp()-interval '32 days'`); err != nil {
+	if _, err := s.Pool.Exec(ctx, `UPDATE dashboard_source_events SET processed_at=clock_timestamp(),expires_at=clock_timestamp()-interval '1 second',last_seen_at=clock_timestamp()-interval '36 days'`); err != nil {
 		t.Fatal(err)
 	}
 	if n, err := s.PruneSourceEvents(ctx, c.DeploymentID); err != nil || n != 1 {

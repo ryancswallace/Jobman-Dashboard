@@ -1,0 +1,60 @@
+.notification-devices .panel-heading {
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.device-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 28rem), 1fr));
+  gap: 1rem;
+  padding: 1.25rem;
+}
+.device-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1.1rem;
+  min-width: 0;
+}
+.device-card-heading {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.device-card h3 {
+  margin: 0 0 0.35rem;
+  overflow-wrap: anywhere;
+}
+.device-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  margin: 1rem 0;
+}
+.device-facts dt {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.device-facts dd {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+}
+.device-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+.device-editor,
+.device-removal {
+  margin-top: 1rem;
+  border-top: 1px solid var(--line);
+  padding-top: 1rem;
+}
+.device-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.device-checkbox input {
+  width: auto;
+}

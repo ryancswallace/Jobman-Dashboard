@@ -16,6 +16,9 @@ import (
 // DeviceService is intentionally separate from worker-only token handoff and
 // provider invalidation. No public route can obtain a token or private fence.
 type DeviceService interface {
+	ReserveRevocation(context.Context, monitoring.Actor, string, int64, notifications.DeviceRevocationInput) (notifications.DeviceRevocationReceipt, error)
+	ActivateRevocation(context.Context, monitoring.Actor, string, int64, notifications.DeviceRevocationInput) (notifications.DeviceRevocationReceipt, error)
+	RevokeDevice(context.Context, string, string) error
 	List(context.Context, monitoring.Actor) ([]notifications.DeviceView, error)
 	InspectInstallation(context.Context, monitoring.Actor, string, string) (notifications.InstallationState, error)
 	Bind(context.Context, monitoring.Actor, int64, notifications.DeviceRegistration) (notifications.DeviceView, error)
@@ -28,6 +31,9 @@ type DeviceService interface {
 
 func (s *Server) registerDeviceRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/devices", s.devices)
+	mux.HandleFunc("POST /api/v1/devices/{installation}/revocation-reservations", s.reserveDeviceRevocation)
+	mux.HandleFunc("POST /api/v1/devices/{installation}/revocation-credentials", s.activateDeviceRevocation)
+	mux.Handle("POST /auth/native/device-revocations", newDeviceRevocationHandler(s))
 	mux.HandleFunc("POST /api/v1/devices/{installation}/inspect", s.inspectDevice)
 	mux.HandleFunc("POST /api/v1/devices/{installation}/bind", s.bindDevice)
 	mux.HandleFunc("POST /api/v1/devices/{installation}/switch", s.switchDevice)
@@ -52,7 +58,7 @@ func writeDeviceError(w http.ResponseWriter, r *http.Request, err error) {
 	writeError(w, r, err)
 }
 
-// A first explicit bind uses If-None-Match:*. Every subsequent mutation uses
+// A first reservation uses If-None-Match:*. Every subsequent mutation uses
 // one positive If-Match decimal string. Proofs/tokens never enter URL parameters.
 func deviceSelection(r *http.Request, conditional string) (string, int64, error) {
 	id := r.PathValue("installation")
@@ -69,7 +75,7 @@ func deviceSelection(r *http.Request, conditional string) (string, int64, error)
 		}
 		return id, 0, nil
 	}
-	if conditional == "bind" && len(none) == 1 && none[0] == "*" && len(match) == 0 {
+	if conditional == "reserve" && len(none) == 1 && none[0] == "*" && len(match) == 0 {
 		return id, 0, nil
 	}
 	if len(match) != 1 || len(none) != 0 {
@@ -105,7 +111,7 @@ func decodeDeviceFields(w http.ResponseWriter, r *http.Request, limit int64, fie
 func decodeDeviceRegistration(w http.ResponseWriter, r *http.Request, id, intent string) (notifications.DeviceRegistration, error) {
 	result := notifications.DeviceRegistration{InstallationID: id}
 	var confirmed bool
-	err := decodeDeviceFields(w, r, 16<<10, map[string]any{"installationSecret": &result.InstallationSecret, "label": &result.Label, "topic": &result.Topic, "environment": &result.Environment, "token": &result.Token, "permission": &result.Permission, "enabled": &result.Enabled, "muted": &result.Muted, intent: &confirmed})
+	err := decodeDeviceFields(w, r, 16<<10, map[string]any{"installationSecret": &result.InstallationSecret, "revocationId": &result.RevocationID, "revocationCredential": &result.RevocationCredential, "label": &result.Label, "topic": &result.Topic, "environment": &result.Environment, "token": &result.Token, "permission": &result.Permission, "enabled": &result.Enabled, "muted": &result.Muted, intent: &confirmed})
 	if err != nil || !confirmed {
 		return result, notifications.ErrDeviceInvalid
 	}
@@ -195,7 +201,7 @@ func (s *Server) inspectDevice(w http.ResponseWriter, r *http.Request) {
 func (s *Server) bindDevice(w http.ResponseWriter, r *http.Request)   { s.deviceBinding(w, r, false) }
 func (s *Server) switchDevice(w http.ResponseWriter, r *http.Request) { s.deviceBinding(w, r, true) }
 func (s *Server) deviceBinding(w http.ResponseWriter, r *http.Request, switching bool) {
-	condition, intent := "bind", "confirmBind"
+	condition, intent := "mutation", "confirmBind"
 	if switching {
 		condition, intent = "mutation", "confirmSwitch"
 	}

@@ -26,6 +26,9 @@ func main() {
 	}
 }
 func run() error {
+	if len(os.Args) > 1 && os.Args[1] == "status" {
+		return runStatusOperator(os.Args[2:], os.Stdout)
+	}
 	if len(os.Args) > 1 && os.Args[1] == "events" {
 		return runEventOperator(os.Args[2:], os.Stdout)
 	}
