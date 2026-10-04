@@ -38,6 +38,7 @@ var labInstallFiles = []string{
 }
 
 type labInstallPlan struct {
+	Scope                string            `json:"scope,omitempty"`
 	Format               int               `json:"format"`
 	Synthetic            bool              `json:"synthetic"`
 	OperationID          string            `json:"operationId"`
@@ -64,6 +65,17 @@ type labInstallDriver struct {
 	plan                                                          labInstallPlan
 }
 
+func labInstallScope(scope string) (origin, client, listen string, err error) {
+	switch scope {
+	case "", "v1":
+		return labInstallOrigin, labInstallClient, "10.77.0.10:48443", nil
+	case "v2":
+		return "https://dashboard.lab.test:49443", "jobman-dashboard-install-web-v2", "10.77.0.10:49443", nil
+	default:
+		return "", "", "", errors.New("installation scope invalid")
+	}
+}
+
 func labInstallDigest(raw []byte) string {
 	sum := sha256.Sum256(raw)
 	return hex.EncodeToString(sum[:])
@@ -85,7 +97,8 @@ func labInstallLoad(root, implementationRoot, staging, planSHA, implementationSH
 		return result, errors.New("installation plan unavailable or changed")
 	}
 	p := result.plan
-	if p.Format != 1 || !p.Synthetic || !uuid(p.OperationID) || p.PostFixRevision != labInstallFix || p.Configs.API.PublicOrigin != labInstallOrigin || p.Configs.API.Listen != "10.77.0.10:48443" || p.Configs.API.OIDC.WebClientID != labInstallClient || len(p.Candidates) != 2 || p.Candidates["baseline"].Revision == p.Candidates["upgrade"].Revision || len(p.Candidates["baseline"].Revision) != 40 || len(p.Candidates["upgrade"].Revision) != 40 || len(p.ImplementationSHA256) != len(labInstallFiles) {
+	origin, client, listen, scopeErr := labInstallScope(p.Scope)
+	if scopeErr != nil || p.Format != 1 || !p.Synthetic || !uuid(p.OperationID) || p.PostFixRevision != labInstallFix || p.Configs.API.PublicOrigin != origin || p.Configs.API.Listen != listen || p.Configs.API.OIDC.WebClientID != client || len(p.Candidates) != 2 || p.Candidates["baseline"].Revision == p.Candidates["upgrade"].Revision || len(p.Candidates["baseline"].Revision) != 40 || len(p.Candidates["upgrade"].Revision) != 40 || len(p.ImplementationSHA256) != len(labInstallFiles) {
 		return result, errors.New("installation plan scope invalid")
 	}
 	for _, name := range labInstallFiles {
@@ -144,6 +157,9 @@ func (d labInstallDriver) run(ctx context.Context, phase, selected string) error
 	if _, err := labInstallLoad(d.root, d.implementationRoot, d.staging, d.planSHA, d.implementationSHA); err != nil {
 		return err
 	}
+	if d.plan.Scope == "v2" && d.adapterPath != "" {
+		return errors.New("v2 installation cannot adopt v1 continuation")
+	}
 	entry := filepath.Join(d.implementationRoot, "scripts/install-dashboard-fresh.py")
 	if _, err := d.withAdapter(d.adapterPath, d.adapterSHA); err != nil {
 		return err
@@ -154,6 +170,14 @@ func (d labInstallDriver) run(ctx context.Context, phase, selected string) error
 	args := []string{entry, phase, "--lab-root", d.root, "--staging", d.staging, "--expected-plan-sha256", d.planSHA, "--expected-implementation-sha256", d.implementationSHA}
 	if d.adapterPath != "" {
 		args = append(args, "--implementation-root", d.implementationRoot, "--expected-adapter-sha256", d.adapterSHA)
+	}
+	if d.plan.Scope == "v2" {
+		previous := filepath.Join(d.staging, "previous-attempt.json")
+		raw, err := labRestorePrivate(previous, 8<<20)
+		if err != nil {
+			return errors.New("prior aborted installation evidence unavailable")
+		}
+		args = append(args, "--scope", "v2", "--previous-attempt", previous, "--expected-previous-attempt-sha256", labInstallDigest(raw))
 	}
 	if phase == "verify" {
 		if selected != "baseline" && selected != "upgrade" && selected != "rollback" {
@@ -193,9 +217,17 @@ func (d labInstallDriver) run(ctx context.Context, phase, selected string) error
 	return nil
 }
 
-func labInstallExchange(ctx context.Context, client *http.Client, method, target string, headers http.Header, body []byte) (labWebResponse, error) {
+func labInstallExchange(ctx context.Context, client *http.Client, method, target string, headers http.Header, body []byte, scope ...string) (labWebResponse, error) {
+	selected := ""
+	if len(scope) > 1 {
+		return labWebResponse{}, errors.New("installation scope invalid")
+	}
+	if len(scope) == 1 {
+		selected = scope[0]
+	}
+	origin, _, _, scopeErr := labInstallScope(selected)
 	u, err := url.Parse(target)
-	if err != nil || len(target) > 16<<10 || u.Scheme != "https" || (u.Host != "dashboard.lab.test:48443" && u.Host != "oidc.lab.test:8443") || u.User != nil || u.Fragment != "" || len(body) > 4096 {
+	if scopeErr != nil || err != nil || len(target) > 16<<10 || u.Scheme != "https" || ("https://"+u.Host != origin && u.Host != "oidc.lab.test:8443") || u.User != nil || u.Fragment != "" || len(body) > 4096 {
 		return labWebResponse{}, errors.New("installation request outside fixed bounds")
 	}
 	request, err := http.NewRequestWithContext(ctx, method, target, bytes.NewReader(body))
@@ -218,14 +250,18 @@ func labInstallExchange(ctx context.Context, client *http.Client, method, target
 	return labWebResponse{response.StatusCode, response.Header.Clone(), raw}, nil
 }
 
-func labInstallHTTP(t *testing.T, native labNativeSession, cookies bool) *http.Client {
+func labInstallHTTP(t *testing.T, native labNativeSession, cookies bool, scope string) *http.Client {
 	t.Helper()
+	origin, _, listen, err := labInstallScope(scope)
+	if err != nil {
+		t.Fatal("installation scope invalid")
+	}
 	transport := native.transport.Clone()
 	transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
 		target := ""
 		switch address {
-		case "dashboard.lab.test:48443":
-			target = "10.77.0.10:48443"
+		case strings.TrimPrefix(origin, "https://"):
+			target = listen
 		case "oidc.lab.test:8443":
 			target = "10.77.0.21:8443"
 		default:
@@ -241,7 +277,18 @@ func labInstallHTTP(t *testing.T, native labNativeSession, cookies bool) *http.C
 	return client
 }
 
-func labInstallAuthorization(header http.Header, state string) (string, error) {
+func labInstallAuthorization(header http.Header, state string, scope ...string) (string, error) {
+	selected := ""
+	if len(scope) > 1 {
+		return "", errors.New("installation scope invalid")
+	}
+	if len(scope) == 1 {
+		selected = scope[0]
+	}
+	origin, client, _, scopeErr := labInstallScope(selected)
+	if scopeErr != nil {
+		return "", scopeErr
+	}
 	u, err := labWebRedirect(header, labWebIssuerOrigin, "/realms/jobman-lab/protocol/openid-connect/auth")
 	if err != nil {
 		return "", err
@@ -255,14 +302,18 @@ func labInstallAuthorization(header http.Header, state string) (string, error) {
 			return "", errors.New("installation authorize duplicate query")
 		}
 	}
-	if q.Get("client_id") != labInstallClient || q.Get("redirect_uri") != labInstallOrigin+"/auth/callback" || q.Get("response_type") != "code" || q.Get("code_challenge_method") != "S256" || len(q.Get("code_challenge")) != 43 || len(q.Get("nonce")) != 43 || q.Get("state") != state || q.Get("resource") != "jobman-dashboard-api" || q.Get("scope") != "openid profile" {
+	if q.Get("client_id") != client || q.Get("redirect_uri") != origin+"/auth/callback" || q.Get("response_type") != "code" || q.Get("code_challenge_method") != "S256" || len(q.Get("code_challenge")) != 43 || len(q.Get("nonce")) != 43 || q.Get("state") != state || q.Get("resource") != "jobman-dashboard-api" || q.Get("scope") != "openid profile" {
 		return "", errors.New("installation authorize contract invalid")
 	}
 	return u.String(), nil
 }
 
-func labInstallSignIn(ctx context.Context, client *http.Client, password string) (string, error) {
-	login, err := labInstallExchange(ctx, client, "GET", labInstallOrigin+"/auth/login?returnTo=%2Fsettings", nil, nil)
+func labInstallSignIn(ctx context.Context, client *http.Client, password, scope string) (string, error) {
+	origin, _, _, err := labInstallScope(scope)
+	if err != nil {
+		return "", err
+	}
+	login, err := labInstallExchange(ctx, client, "GET", origin+"/auth/login?returnTo=%2Fsettings", nil, nil, scope)
 	if err != nil || login.status != 302 {
 		return "", errors.New("installation login unavailable")
 	}
@@ -270,11 +321,11 @@ func labInstallSignIn(ctx context.Context, client *http.Client, password string)
 	if err != nil || cookie.MaxAge != 300 {
 		return "", errors.New("installation login cookie invalid")
 	}
-	authorize, err := labInstallAuthorization(login.header, cookie.Value)
+	authorize, err := labInstallAuthorization(login.header, cookie.Value, scope)
 	if err != nil {
 		return "", err
 	}
-	form, err := labInstallExchange(ctx, client, "GET", authorize, nil, nil)
+	form, err := labInstallExchange(ctx, client, "GET", authorize, nil, nil, scope)
 	if err != nil || form.status != 200 {
 		return "", errors.New("installation sign-in form unavailable")
 	}
@@ -283,11 +334,11 @@ func labInstallSignIn(ctx context.Context, client *http.Client, password string)
 		return "", err
 	}
 	body := url.Values{"username": {"dashboard-alice"}, "password": {password}, "credentialId": {""}}
-	posted, err := labInstallExchange(ctx, client, "POST", action, http.Header{"Content-Type": {"application/x-www-form-urlencoded"}}, []byte(body.Encode()))
+	posted, err := labInstallExchange(ctx, client, "POST", action, http.Header{"Content-Type": {"application/x-www-form-urlencoded"}}, []byte(body.Encode()), scope)
 	if err != nil || posted.status != 302 {
 		return "", errors.New("installation identity exchange unavailable")
 	}
-	callback, err := labWebRedirect(posted.header, labInstallOrigin, "/auth/callback")
+	callback, err := labWebRedirect(posted.header, origin, "/auth/callback")
 	if err != nil {
 		return "", err
 	}
@@ -295,7 +346,7 @@ func labInstallSignIn(ctx context.Context, client *http.Client, password string)
 	if err != nil || len(q["state"]) != 1 || q.Get("state") != cookie.Value || len(q["code"]) != 1 || q.Get("code") == "" || q.Get("error") != "" {
 		return "", errors.New("installation callback binding invalid")
 	}
-	response, err := labInstallExchange(ctx, client, "GET", callback.String(), nil, nil)
+	response, err := labInstallExchange(ctx, client, "GET", callback.String(), nil, nil, scope)
 	if err != nil || response.status != 303 || response.header.Get("Location") != "/settings" {
 		return "", errors.New("installation callback unavailable")
 	}
@@ -303,7 +354,7 @@ func labInstallSignIn(ctx context.Context, client *http.Client, password string)
 	if err != nil {
 		return "", err
 	}
-	response, err = labInstallExchange(ctx, client, "GET", labInstallOrigin+"/api/v1/bootstrap", nil, nil)
+	response, err = labInstallExchange(ctx, client, "GET", origin+"/api/v1/bootstrap", nil, nil, scope)
 	if err != nil {
 		return "", err
 	}
@@ -329,6 +380,10 @@ func TestLabFreshInstallationAndSupportedRollback(t *testing.T) {
 	driver, err = driver.withAdapter(os.Getenv("JOBMAN_DASHBOARD_LAB_INSTALL_ADAPTER"), os.Getenv("JOBMAN_DASHBOARD_LAB_INSTALL_ADAPTER_SHA256"))
 	if err != nil {
 		t.Fatal("Reviewed installation continuation is unavailable")
+	}
+	origin, _, _, err := labInstallScope(driver.plan.Scope)
+	if err != nil {
+		t.Fatal("installation scope invalid")
 	}
 	var baseline struct {
 		Completed   bool
@@ -357,7 +412,7 @@ func TestLabFreshInstallationAndSupportedRollback(t *testing.T) {
 		cleanup, stop := context.WithTimeout(context.Background(), 3*time.Minute)
 		defer stop()
 		if csrf != "" {
-			response, err := labInstallExchange(cleanup, web, "POST", labInstallOrigin+"/auth/logout", http.Header{"Origin": {labInstallOrigin}, "X-CSRF-Token": {csrf}}, nil)
+			response, err := labInstallExchange(cleanup, web, "POST", origin+"/auth/logout", http.Header{"Origin": {origin}, "X-CSRF-Token": {csrf}}, nil, driver.plan.Scope)
 			if err != nil || response.status != 204 {
 				t.Error("Fresh browser cleanup unconfirmed; disposable installation state retained")
 			}
@@ -376,8 +431,8 @@ func TestLabFreshInstallationAndSupportedRollback(t *testing.T) {
 	})
 	alice := labNativeSignIn(t, "alice", "71000000-0000-4000-8000-000000000001")
 	bob := labNativeSignIn(t, "bob", "71000000-0000-4000-8000-000000000002")
-	client := labInstallHTTP(t, alice, false)
-	web = labInstallHTTP(t, alice, true)
+	client := labInstallHTTP(t, alice, false, driver.plan.Scope)
+	web = labInstallHTTP(t, alice, true, driver.plan.Scope)
 	request := func(method, path, token, key string, input, target any, want int) []byte {
 		t.Helper()
 		var body []byte
@@ -397,7 +452,7 @@ func TestLabFreshInstallationAndSupportedRollback(t *testing.T) {
 		if key != "" {
 			headers.Set("Idempotency-Key", key)
 		}
-		response, err := labInstallExchange(ctx, client, method, labInstallOrigin+path, headers, body)
+		response, err := labInstallExchange(ctx, client, method, origin+path, headers, body, driver.plan.Scope)
 		if err != nil || response.status != want {
 			t.Fatalf("Isolated installation %s returned unexpected status (wanted%d); response contents withheld", method, want)
 		}
@@ -424,7 +479,7 @@ func TestLabFreshInstallationAndSupportedRollback(t *testing.T) {
 			t.Fatal("Fresh database copied historic rules/inbox or authorization was unavailable")
 		}
 	}
-	page, err := labInstallExchange(ctx, client, "GET", labInstallOrigin+"/", nil, nil)
+	page, err := labInstallExchange(ctx, client, "GET", origin+"/", nil, nil, driver.plan.Scope)
 	if err != nil || page.status != 200 || !bytes.Contains(page.body, []byte("<html")) {
 		t.Fatal("Fresh packaged web assets unavailable")
 	}
@@ -432,7 +487,7 @@ func TestLabFreshInstallationAndSupportedRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal("Synthetic BFF credentials unavailable")
 	}
-	csrf, err = labInstallSignIn(ctx, web, password)
+	csrf, err = labInstallSignIn(ctx, web, password, driver.plan.Scope)
 	if err != nil {
 		t.Fatal("New confidential client BFF failed; protocol details withheld")
 	}
@@ -442,11 +497,11 @@ func TestLabFreshInstallationAndSupportedRollback(t *testing.T) {
 	}
 	// The new origin is a separate port. This test uses its own empty cookie jar;
 	// it never loads a person's browser cookies shared by host across ports.
-	denied, err := labInstallExchange(ctx, web, "PUT", labInstallOrigin+"/api/v1/preferences", http.Header{"Origin": {labInstallOrigin}, "Content-Type": {"application/json"}, "If-Match": {before.Preferences.Revision}}, body)
+	denied, err := labInstallExchange(ctx, web, "PUT", origin+"/api/v1/preferences", http.Header{"Origin": {origin}, "Content-Type": {"application/json"}, "If-Match": {before.Preferences.Revision}}, body, driver.plan.Scope)
 	if err != nil || denied.status != 401 {
 		t.Fatal("Fresh browser write accepted absent CSRF")
 	}
-	changed, err := labInstallExchange(ctx, web, "PUT", labInstallOrigin+"/api/v1/preferences", http.Header{"Origin": {labInstallOrigin}, "X-CSRF-Token": {csrf}, "Content-Type": {"application/json"}, "If-Match": {before.Preferences.Revision}}, body)
+	changed, err := labInstallExchange(ctx, web, "PUT", origin+"/api/v1/preferences", http.Header{"Origin": {origin}, "X-CSRF-Token": {csrf}, "Content-Type": {"application/json"}, "If-Match": {before.Preferences.Revision}}, body, driver.plan.Scope)
 	var preference api.Preferences
 	if err != nil || changed.status != 200 || json.Unmarshal(changed.body, &preference) != nil || preference.Revision == before.Preferences.Revision || preference.Timezone != "America/New_York" {
 		t.Fatalf("Fresh preference persistence failed (HTTP%d; transportFailure=%t); response contents withheld", changed.status, err != nil)
@@ -512,7 +567,7 @@ func TestLabFreshInstallationAndSupportedRollback(t *testing.T) {
 		if boot.Account != before.Account || boot.Preferences != preference || boot.Completeness != "complete" {
 			t.Fatal("Account or preferences changed across package transition")
 		}
-		response, err := labInstallExchange(ctx, web, "GET", labInstallOrigin+"/api/v1/bootstrap", nil, nil)
+		response, err := labInstallExchange(ctx, web, "GET", origin+"/api/v1/bootstrap", nil, nil, driver.plan.Scope)
 		browser, e := labWebBootstrap(response)
 		if err != nil || e != nil || browser.Account != before.Account || browser.Preferences != preference || browser.CSRFToken != csrf {
 			t.Fatal("Fresh session key or browser state changed across compatible transition")
@@ -680,6 +735,44 @@ func TestLabInstallationImplementationPins(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The new attempt must carry its private abort proof and finite scope to
+	// the archived host driver; it cannot infer resource names from the path.
+	previousRaw := []byte("{}\n")
+	if err := os.WriteFile(filepath.Join(staging, "previous-attempt.json"), previousRaw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	v2 := p
+	v2.Scope = "v2"
+	v2.Configs.API.PublicOrigin, v2.Configs.API.Listen, v2.Configs.API.OIDC.WebClientID = "https://dashboard.lab.test:49443", "10.77.0.10:49443", "jobman-dashboard-install-web-v2"
+	v2.ImplementationSHA256 = map[string]string{}
+	for k, v := range p.ImplementationSHA256 {
+		v2.ImplementationSHA256[k] = v
+	}
+	entry := filepath.Join(scripts, "install-dashboard-fresh.py")
+	originalEntry, err := os.ReadFile(entry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v2Entry := []byte("import json,sys\nassert sys.argv[sys.argv.index('--scope')+1] == 'v2'\nassert sys.argv[sys.argv.index('--previous-attempt')+1] == " + strconv.Quote(filepath.Join(staging, "previous-attempt.json")) + "\nassert sys.argv[sys.argv.index('--expected-previous-attempt-sha256')+1] == " + strconv.Quote(labInstallDigest(previousRaw)) + "\nprint(json.dumps({'completed':True,'phase':'stop','operationId':'" + p.OperationID + "'}))\n")
+	if err := os.WriteFile(entry, v2Entry, 0600); err != nil {
+		t.Fatal(err)
+	}
+	v2.ImplementationSHA256["install-dashboard-fresh.py"] = labInstallDigest(v2Entry)
+	v2Raw, _ := json.Marshal(v2)
+	v2Set, _ := json.MarshalIndent(v2.ImplementationSHA256, "", "  ")
+	if err := os.WriteFile(filepath.Join(staging, "plan.json"), v2Raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	v2Driver, err := labInstallLoad(labRoot, root, staging, labInstallDigest(v2Raw), labInstallDigest(append(v2Set, '\n')))
+	if err != nil || v2Driver.run(t.Context(), "stop", "") != nil {
+		t.Fatal("v2 scope and private receipt were not passed", err)
+	}
+	if err := os.WriteFile(entry, originalEntry, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(staging, "plan.json"), raw, 0600); err != nil {
+		t.Fatal(err)
+	}
 	adapterRoot := filepath.Join(root, "private-adapter")
 	if err := os.Mkdir(adapterRoot, 0700); err != nil {
 		t.Fatal(err)
@@ -745,5 +838,51 @@ func TestLabInstallationAdapterAdmission(t *testing.T) {
 	}
 	if _, err := driver.withAdapter(path, digest); err == nil {
 		t.Fatal("non-private adapter accepted")
+	}
+}
+
+func TestLabInstallationV2ScopeBeforeTransport(t *testing.T) {
+	origin, clientID, listen, err := labInstallScope("v2")
+	if err != nil || origin != "https://dashboard.lab.test:49443" || clientID != "jobman-dashboard-install-web-v2" || listen != "10.77.0.10:49443" {
+		t.Fatal("v2 fixed scope differs")
+	}
+	calls := 0
+	client := &http.Client{Transport: labInstallRoundTrip(func(r *http.Request) (*http.Response, error) {
+		calls++
+		if r.URL.Host != "dashboard.lab.test:49443" {
+			t.Fatal("wrong installation reached transport")
+		}
+		return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader("ok"))}, nil
+	})}
+	for _, scope := range []string{"v1", "", "v3"} {
+		if _, err := labInstallExchange(t.Context(), client, "GET", origin+"/healthz", nil, nil, scope); err == nil {
+			t.Fatal("cross-scope request allowed")
+		}
+	}
+	if _, err := labInstallExchange(t.Context(), client, "GET", labInstallOrigin+"/healthz", nil, nil, "v2"); err == nil {
+		t.Fatal("v2 reached failed v1")
+	}
+	if calls != 0 {
+		t.Fatal("rejected request reached transport")
+	}
+	if _, err := labInstallExchange(t.Context(), client, "GET", origin+"/healthz", nil, nil, "v2"); err != nil || calls != 1 {
+		t.Fatal("valid v2 denied", err)
+	}
+	state := strings.Repeat("s", 43)
+	q := url.Values{"client_id": {clientID}, "redirect_uri": {origin + "/auth/callback"}, "response_type": {"code"}, "code_challenge_method": {"S256"}, "code_challenge": {strings.Repeat("c", 43)}, "nonce": {strings.Repeat("n", 43)}, "state": {state}, "resource": {"jobman-dashboard-api"}, "scope": {"openid profile"}}
+	header := func() http.Header {
+		return http.Header{"Location": {labWebIssuerOrigin + "/realms/jobman-lab/protocol/openid-connect/auth?" + q.Encode()}}
+	}
+	if _, err := labInstallAuthorization(header(), state, "v2"); err != nil {
+		t.Fatal(err)
+	}
+	q.Set("client_id", labInstallClient)
+	if _, err := labInstallAuthorization(header(), state, "v2"); err == nil {
+		t.Fatal("v1 client accepted for v2")
+	}
+	q.Set("client_id", clientID)
+	q.Set("redirect_uri", labInstallOrigin+"/auth/callback")
+	if _, err := labInstallAuthorization(header(), state, "v2"); err == nil {
+		t.Fatal("v1 callback accepted for v2")
 	}
 }
