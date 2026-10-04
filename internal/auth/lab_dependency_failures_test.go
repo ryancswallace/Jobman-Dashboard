@@ -520,7 +520,7 @@ func (s *labFaultState) baseline() {
 	raw, err := labScaleReadFile(os.Getenv("JOBMAN_DASHBOARD_LAB_FAULT_SLURM_RECEIPT"), 32768)
 	s.must(err)
 	sum := sha256.Sum256(raw)
-	if hex.EncodeToString(sum[:]) != "186719a51c266e8d48157a508d5e485382811e7a60b1fbc32b1a2f1ab2107801" || json.Unmarshal(raw, &s.slurm) != nil || !s.slurm.valid() {
+	if hex.EncodeToString(sum[:]) != labAcceptedCurrentSlurmReceiptSHA || json.Unmarshal(raw, &s.slurm) != nil || !s.slurm.valid() {
 		s.t.Fatal("exact accepted actual Slurm completion receipt required")
 	}
 	s.jobPath = labMultiPrefix(api.Scope{DeploymentID: labDeployment, NamespaceID: labMixedOperationsNS}) + "/jobs/" + s.slurm.Jobs["task-2"]

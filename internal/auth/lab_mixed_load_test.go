@@ -33,6 +33,10 @@ import (
 	"github.com/ryancswallace/jobman/protocol"
 )
 
+// Derived after the verified Control upgrade: original execution evidence is
+// unchanged, with fresh diagnosis pairs and preserved historical reports.
+const labAcceptedCurrentSlurmReceiptSHA = "929a9e93e83069dc330734b699bd6077432507397e56ec484367c6af954be530"
+
 const labMixedRounds = 18
 const labMixedPeriod = 5 * time.Second
 const labMixedInflight = 28
@@ -958,7 +962,7 @@ func TestLabDeployedMixedLoad(t *testing.T) {
 	}
 	var slurm labMixedSlurm
 	result.SlurmReceiptSHA256 = read(slurmPath, 32768, &slurm)
-	if !slurm.valid() || result.SlurmReceiptSHA256 != "186719a51c266e8d48157a508d5e485382811e7a60b1fbc32b1a2f1ab2107801" {
+	if !slurm.valid() || result.SlurmReceiptSHA256 != labAcceptedCurrentSlurmReceiptSHA {
 		t.Fatal("exact independently accepted actual complete Slurm receipt required")
 	}
 	var host labActualReceipt

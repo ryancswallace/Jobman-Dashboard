@@ -250,3 +250,10 @@ Recovery removes only its predeclared exact firewall table, even if the apply
 reply was lost; counter changes do not authorize changing the rule semantics.
 The driver closes the operation only after all fault-specific restoration proofs
 and the final unchanged database authority check. No pending evidence is deleted.
+
+After the source upgrade, use the separately reviewed refreshed Slurm receipt
+`/private/tmp/jobman-dashboard-slurm-report-refresh-control04bd-v1.json`, SHA256
+`929a9e93e83069dc330734b699bd6077432507397e56ec484367c6af954be530`.
+It retains the original actual execution evidence and refreshed diagnosis pairs;
+all original reports/citations remain intact. See [report refresh](LAB_REPORT_REFRESH.md).
+Earlier directory/broker results retain their original receipt pins.

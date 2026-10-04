@@ -1,6 +1,6 @@
 # Deployed mixed monitoring load
 
-Status: implemented for review; **no live mixed-load result is claimed**. The
+Status: independently reviewed; attempt1 stopped at report preflight before any new rule/job or load. **No passing live mixed-load result is claimed**. The
 opt-in harness is `TestLabDeployedMixedLoad` in
 `internal/auth/lab_mixed_load_test.go`. It extends healthy-dependency contention
 coverage without changing the separate [accepted-scale test](LAB_SCALE.md).
@@ -26,7 +26,10 @@ The harness never installs the scale fixture or changes source configuration.
   This creates no new executor, enrollment, target or directory.
 - Investigation assets come from the independently accepted complete Slurm run,
   including its repaired Core `807f1f2` provenance. Supply its exact public receipt
-  with SHA256 `186719a51c266e8d48157a508d5e485382811e7a60b1fbc32b1a2f1ab2107801`.
+  with SHA256 `929a9e93e83069dc330734b699bd6077432507397e56ec484367c6af954be530`.
+  This derived receipt preserves the original execution evidence and uses two
+  current-version reports prepared after the Control upgrade, with all historical
+  reports/citations unchanged; see [report refresh](LAB_REPORT_REFRESH.md).
   The harness pins task2 to its accepted runner-completion execution, then reads
   the current source-qualified job and verifies its owner, target generation and
   exact run ID/number/execution. Its report must name that same run before sampling.
@@ -138,7 +141,7 @@ Example invocation after review and live coordination:
 ```sh
 JOBMAN_DASHBOARD_LAB_ROOT=/Users/rcw/home/code/jobman-lab \
 JOBMAN_DASHBOARD_LAB_MIXED_LOAD=1 \
-JOBMAN_DASHBOARD_LAB_MIXED_SLURM_RECEIPT=/private/tmp/jobman-dashboard-actual-slurm-complete-acceptance-v1.json \
+JOBMAN_DASHBOARD_LAB_MIXED_SLURM_RECEIPT=/private/tmp/jobman-dashboard-slurm-report-refresh-control04bd-v1.json \
 JOBMAN_DASHBOARD_LAB_MIXED_RESULT=/private/tmp/dashboard-mixed-unique-result.json \
 GOWORK=off GOTOOLCHAIN=go1.26.6 \
 go test -race -tags integration -run '^TestLabDeployedMixedLoad$' \
