@@ -60,6 +60,7 @@ type labInstallPlan struct {
 
 type labInstallDriver struct {
 	root, implementationRoot, staging, planSHA, implementationSHA string
+	adapterPath, adapterSHA                                       string
 	plan                                                          labInstallPlan
 }
 
@@ -113,6 +114,29 @@ func labInstallLoad(root, implementationRoot, staging, planSHA, implementationSH
 	return result, nil
 }
 
+// An optional independently reviewed, self-contained continuation is explicit.
+// Its single hash covers all added code; it can load only the already pinned
+// original implementation. It never changes the original plan or nine hashes.
+func (d labInstallDriver) withAdapter(path, digest string) (labInstallDriver, error) {
+	if path == "" && digest == "" {
+		return d, nil
+	}
+	decoded, err := hex.DecodeString(digest)
+	if !filepath.IsAbs(path) || len(decoded) != 32 || err != nil || strings.ToLower(digest) != digest {
+		return d, errors.New("reviewed installation adapter path and hash required together")
+	}
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil || resolved != path {
+		return d, errors.New("installation adapter must have a canonical path")
+	}
+	raw, err := labRestorePrivate(path, 128<<10)
+	if err != nil || len(raw) == 0 || labInstallDigest(raw) != digest {
+		return d, errors.New("installation adapter unavailable or changed")
+	}
+	d.adapterPath, d.adapterSHA = path, digest
+	return d, nil
+}
+
 func (d labInstallDriver) run(ctx context.Context, phase, selected string) error {
 	if phase != "verify" && phase != "upgrade" && phase != "rollback" && phase != "stop" && phase != "retire-identity" && phase != "close" {
 		return errors.New("installation harness phase denied")
@@ -120,7 +144,17 @@ func (d labInstallDriver) run(ctx context.Context, phase, selected string) error
 	if _, err := labInstallLoad(d.root, d.implementationRoot, d.staging, d.planSHA, d.implementationSHA); err != nil {
 		return err
 	}
-	args := []string{filepath.Join(d.implementationRoot, "scripts/install-dashboard-fresh.py"), phase, "--lab-root", d.root, "--staging", d.staging, "--expected-plan-sha256", d.planSHA, "--expected-implementation-sha256", d.implementationSHA}
+	entry := filepath.Join(d.implementationRoot, "scripts/install-dashboard-fresh.py")
+	if _, err := d.withAdapter(d.adapterPath, d.adapterSHA); err != nil {
+		return err
+	}
+	if d.adapterPath != "" {
+		entry = d.adapterPath
+	}
+	args := []string{entry, phase, "--lab-root", d.root, "--staging", d.staging, "--expected-plan-sha256", d.planSHA, "--expected-implementation-sha256", d.implementationSHA}
+	if d.adapterPath != "" {
+		args = append(args, "--implementation-root", d.implementationRoot, "--expected-adapter-sha256", d.adapterSHA)
+	}
 	if phase == "verify" {
 		if selected != "baseline" && selected != "upgrade" && selected != "rollback" {
 			return errors.New("installation selection invalid")
@@ -292,6 +326,10 @@ func TestLabFreshInstallationAndSupportedRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal("Reviewed disposable installation is unavailable")
 	}
+	driver, err = driver.withAdapter(os.Getenv("JOBMAN_DASHBOARD_LAB_INSTALL_ADAPTER"), os.Getenv("JOBMAN_DASHBOARD_LAB_INSTALL_ADAPTER_SHA256"))
+	if err != nil {
+		t.Fatal("Reviewed installation continuation is unavailable")
+	}
 	var baseline struct {
 		Completed   bool
 		Phase       string
@@ -307,7 +345,7 @@ func TestLabFreshInstallationAndSupportedRollback(t *testing.T) {
 			t.Fatal("Installation acceptance was already attempted; retain evidence and review recovery")
 		}
 	}
-	labRestoreWrite(t, driver.staging, "acceptance-started.json", map[string]any{"operationId": driver.plan.OperationID, "synthetic": true, "scope": "new-empty-db-post-fix-packages"})
+	labRestoreWrite(t, driver.staging, "acceptance-started.json", map[string]any{"operationId": driver.plan.OperationID, "synthetic": true, "scope": "new-empty-db-post-fix-packages", "adapterSHA256": driver.adapterSHA})
 	ctx, cancel := context.WithTimeout(t.Context(), 11*time.Minute)
 	defer cancel()
 	var web *http.Client
@@ -627,10 +665,74 @@ func TestLabInstallationImplementationPins(t *testing.T) {
 	} else if err := driver.run(t.Context(), "stop", ""); err != nil {
 		t.Fatal("isolated archived-script invocation failed: ", err)
 	}
+	driver, err := labInstallLoad(labRoot, root, staging, planHash, implementationHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	adapterRoot := filepath.Join(root, "private-adapter")
+	if err := os.Mkdir(adapterRoot, 0700); err != nil {
+		t.Fatal(err)
+	}
+	adapter := filepath.Join(adapterRoot, "reviewed-continuation.py")
+	adapterRaw := []byte("import json,sys\nassert sys.argv[1] == 'stop'\nassert sys.argv[sys.argv.index('--implementation-root')+1] == " + strconv.Quote(root) + "\nassert sys.argv[sys.argv.index('--lab-root')+1] == " + strconv.Quote(labRoot) + "\nassert len(sys.argv[sys.argv.index('--expected-adapter-sha256')+1]) == 64\nassert '--apply' in sys.argv\nprint(json.dumps({'completed': True, 'phase': 'stop', 'operationId': '" + p.OperationID + "'}))\n")
+	if err := os.WriteFile(adapter, adapterRaw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	driver, err = driver.withAdapter(adapter, labInstallDigest(adapterRaw))
+	if err != nil || driver.run(t.Context(), "stop", "") != nil {
+		t.Fatal("explicit hash-bound continuation invocation failed", err)
+	}
+	if err := os.WriteFile(adapter, []byte("raise Exception('changed')\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := driver.run(t.Context(), "stop", ""); err == nil || err.Error() != "installation adapter unavailable or changed" {
+		t.Fatal("changed adapter was executed", err)
+	}
 	if err := os.WriteFile(filepath.Join(scripts, labInstallFiles[0]), []byte("# altered\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := labInstallLoad(labRoot, root, staging, planHash, implementationHash); err == nil {
 		t.Fatal("changed reviewed implementation accepted")
+	}
+}
+
+func TestLabInstallationAdapterAdmission(t *testing.T) {
+	driver := labInstallDriver{}
+	if result, err := driver.withAdapter("", ""); err != nil || result.adapterPath != "" {
+		t.Fatal("unmodified original driver should remain the default")
+	}
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(root, 0700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(root, "adapter.py")
+	raw := []byte("# independently reviewed self-contained adapter\n")
+	if err := os.WriteFile(path, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	digest := labInstallDigest(raw)
+	if _, err := driver.withAdapter(path, digest); err != nil {
+		t.Fatal("valid private adapter rejected", err)
+	}
+	for _, test := range [][2]string{{path, ""}, {"", digest}, {"relative.py", digest}, {path, strings.ToUpper(digest)}, {path, strings.Repeat("g", 64)}, {path, strings.Repeat("0", 64)}} {
+		if _, err := driver.withAdapter(test[0], test[1]); err == nil {
+			t.Fatal("unreviewed adapter accepted")
+		}
+	}
+	link := filepath.Join(root, "alias.py")
+	if err := os.Symlink(path, link); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := driver.withAdapter(link, digest); err == nil {
+		t.Fatal("adapter symlink accepted")
+	}
+	if err := os.Chmod(path, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := driver.withAdapter(path, digest); err == nil {
+		t.Fatal("non-private adapter accepted")
 	}
 }
