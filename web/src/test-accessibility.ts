@@ -6,6 +6,9 @@ import { expect } from "vitest";
 // cannot run in jsdom; the rendered browser matrix remains a separate gate.
 export async function auditAccessibility() {
   const results = await axe.run(document.body, {
+    // Execute the same rules and retain every violation node. Avoid expensive
+    // selector serialization for passing nodes that this oracle never consumes.
+    resultTypes: ["violations"],
     runOnly: {
       type: "tag",
       values: [

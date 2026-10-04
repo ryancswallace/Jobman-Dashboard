@@ -194,7 +194,7 @@ it("audits populated ceiling graph exploration with the unchanged accessibility 
   await auditAccessibility();
 });
 
-it("replaces pages and resets dependency cursors when the selected direction changes", async () => {
+it("replaces dependency pages and resets the cursor when direction changes", async () => {
   render(view());
   await screen.findByRole("heading", { name: "Synthetic ceiling graph" });
   fireEvent.click(
@@ -207,49 +207,43 @@ it("replaces pages and resets dependency cursors when the selected direction cha
   });
   fireEvent.change(direction, { target: { value: "outgoing" } });
   await screen.findByText("100 returned of 9,999 matching dependencies");
-  expect(rows(edgeTable())).toHaveLength(100);
-  fireEvent.click(screen.getByRole("button", { name: /Next dependency page/ }));
-  await waitFor(() =>
-    expect(
-      within(edgeTable()).getByRole("button", {
-        name: graphNodeName(101),
-      }),
-    ).toBeVisible(),
-  );
+  // Paging checks inspect actual table membership; role and keyboard semantics
+  // are covered above. Rebuilding the complete accessibility tree for each
+  // row assertion measures jsdom's query oracle, not client navigation.
+  expect(traversalRows("Predicate state")).toHaveLength(100);
+  await clickPage("Next dependency page →");
+  const edges = traversalRows("Predicate state");
+  expect(edges).toHaveLength(100);
+  expect(edges[0]).toHaveTextContent(graphNodeName(101));
   expect(
-    within(edgeTable()).queryByRole("button", {
-      name: graphNodeName(1),
-    }),
+    within(edgeTable()).queryByText(graphNodeName(1), { selector: "button" }),
   ).not.toBeInTheDocument();
-  fireEvent.change(direction, { target: { value: "incoming" } });
-  await screen.findByText("No dependencies match this view");
+  await act(async () => {
+    fireEvent.change(direction, { target: { value: "incoming" } });
+  });
+  expect(screen.getByText("No dependencies match this view")).toBeVisible();
   expect(
     new URL(
       fixture.calls.at(-1)!.path,
       "https://synthetic.invalid",
     ).searchParams.has("cursor"),
   ).toBe(false);
-  fireEvent.click(screen.getByRole("button", { name: /^Next page/ }));
-  await waitFor(() =>
-    expect(
-      within(nodesTable()).getByRole("button", {
-        name: graphNodeName(50),
-      }),
-    ).toBeVisible(),
-  );
+});
+
+it("replaces child pages and returns to the first page without accumulating rows", async () => {
+  render(view());
+  await screen.findByRole("heading", { name: "Synthetic ceiling graph" });
+  expect(traversalRows("Node / child")).toHaveLength(50);
+  await clickPage("Next page →");
+  const nodes = traversalRows("Node / child");
+  expect(nodes).toHaveLength(50);
+  expect(nodes[0]).toHaveTextContent(graphNodeName(50));
   expect(
-    within(nodesTable()).queryByRole("button", {
-      name: graphNodeName(0),
-    }),
+    within(nodesTable()).queryByText(graphNodeName(0), { selector: "button" }),
   ).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "First page" }));
-  await waitFor(() =>
-    expect(
-      within(nodesTable()).getByRole("button", {
-        name: graphNodeName(0),
-      }),
-    ).toBeVisible(),
-  );
+  await clickPage("First page");
+  expect(traversalRows("Node / child")).toHaveLength(50);
+  expect(traversalRows("Node / child")[0]).toHaveTextContent(graphNodeName(0));
 });
 
 it("clears private graph content on lost authority and ignores a cancelled old-account response", async () => {
