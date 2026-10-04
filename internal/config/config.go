@@ -33,6 +33,12 @@ type Config struct {
 	Controls              []Control          `json:"controls"`
 	LogBrokers            []RemoteBroker     `json:"logBrokers"`
 	LogMappings           []RemoteLogMapping `json:"logMappings"`
+	Reports               Reports            `json:"reports"`
+}
+
+type Reports struct {
+	ObjectRoot    string `json:"objectRoot"`
+	RedactionFile string `json:"redactionFile"`
 }
 
 type ServerTLS struct {
@@ -213,6 +219,16 @@ func (c Config) Validate() error {
 			return fmt.Errorf("%s must be a clean absolute file-system path", field)
 		}
 	}
+	if c.Reports.ObjectRoot != "" {
+		if !absolutePath(c.Reports.ObjectRoot) || c.Reports.ObjectRoot == "/" || c.Reports.ObjectRoot == c.WebRoot || strings.HasPrefix(c.Reports.ObjectRoot, c.WebRoot+"/") || strings.HasPrefix(c.WebRoot, c.Reports.ObjectRoot+"/") {
+			return errors.New("reports.objectRoot must be a clean private path outside webRoot")
+		}
+		if c.Reports.RedactionFile != "" && !absolutePath(c.Reports.RedactionFile) {
+			return errors.New("reports.redactionFile must be a clean absolute private file path")
+		}
+	} else if c.Reports.RedactionFile != "" {
+		return errors.New("reports.redactionFile requires reports.objectRoot")
+	}
 	if _, err := httpsURL(c.OIDC.Issuer, false); err != nil {
 		return errors.New("oidc.issuer must be an HTTPS URL without credentials, query or fragment")
 	}
@@ -253,7 +269,10 @@ func (c Config) Validate() error {
 	if err := validateControls(c.Controls); err != nil {
 		return err
 	}
-	return validateRemoteLogs(c.Controls, c.LogBrokers, c.LogMappings)
+	if err := validateRemoteLogs(c.Controls, c.LogBrokers, c.LogMappings); err != nil {
+		return err
+	}
+	return c.validatePrivatePaths()
 }
 
 func validateControls(controls []Control) error {

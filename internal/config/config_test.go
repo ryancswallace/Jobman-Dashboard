@@ -251,3 +251,26 @@ func TestPublicCertificatesRetainFileAndByteBounds(t *testing.T) {
 		t.Fatal("public certificate symlink accepted")
 	}
 }
+
+func TestReportStorageIsPrivateAndSeparateFromWebRoot(t *testing.T) {
+	c := example(t)
+	c.Reports = Reports{ObjectRoot: "/var/lib/jobman-dashboard/reports", RedactionFile: "/run/secrets/report-policy.json"}
+	if err := c.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	for _, root := range []string{"relative", "/", c.WebRoot, c.WebRoot + "/reports", "/opt/jobman-dashboard"} {
+		changed := c
+		changed.Reports.ObjectRoot = root
+		if changed.Validate() == nil {
+			t.Fatalf("unsafe report root accepted: %s", root)
+		}
+	}
+	c.Reports = Reports{RedactionFile: "/private/policy"}
+	if c.Validate() == nil {
+		t.Fatal("policy accepted without object storage")
+	}
+	c.Reports = Reports{}
+	if err := c.Validate(); err != nil {
+		t.Fatal("additive configuration broke existing monitoring deployment", err)
+	}
+}

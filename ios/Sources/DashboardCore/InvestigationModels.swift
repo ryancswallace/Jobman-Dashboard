@@ -71,20 +71,6 @@ public struct LogChunk: Decodable, Sendable {
     public let startOffset: String; public let endOffset: String; public let nextCursor: String?
     public let state: String; public let truncated: Bool?; public let capturedAt: String?
 }
-public struct DiagnosisReport: Decodable, Sendable, Identifiable {
-    public struct Citation: Decodable, Sendable, Identifiable {
-        public let id: String; public let label: String; public let text: String?; public let startOffset: String?; public let endOffset: String?
-    }
-    public struct Finding: Decodable, Sendable, Identifiable {
-        public let id: String; public let severity: String; public let title: String; public let explanation: String
-        public let confidence: Double?; public let confidenceBasis: String?; public let citations: [Citation]
-        public let suggestions: [String]?; public let generated: Bool?
-    }
-    public let id: String; public let state: String; public let createdAt: String?; public let sourceRevision: String?
-    public let evidenceId: String?; public let analysisEvidenceId: String?; public let engineVersion: String?
-    public let disclosure: String?; public let findings: [Finding]; public let missingEvidence: [String]
-    public let warnings: [String]?; public let retryAdvice: String?; public let message: String?
-}
 public struct AlertRule: Codable, Sendable, Identifiable {
     public struct Activation: Codable, Sendable { public let deploymentId: String; public let status: String }
     public var id: String; public var revision: String; public var name: String; public var enabled: Bool

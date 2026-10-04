@@ -39,18 +39,7 @@ enum NativeFixtures {
             return ["bytesBase64":bytes.base64EncodedString(),"executionId":"execution-fixture","runId":"run-fixture","stream":stream,"startOffset":"0","endOffset":String(bytes.count),"state":"active","nextCursor":"expired-fixture-cursor","runNumber":"9007199254740993","capturedAt":date(now)]
         }
         if path.hasSuffix("/artifacts") { return page([["id":"artifact-fixture","name":"synthetic-summary.txt","sizeBytes":"120","checksum":"synthetic-checksum","availability":"metadata_only","publishedAt":date(now),"runNumber":"9007199254740993","runId":"run-fixture","executionId":"execution-fixture","targetGenerationId":"generation-fixture"]]) }
-        if path.contains("/citations/") { return ["id":"citation-fixture","label":"Synthetic exit evidence","text":"Synthetic source observation: exited with status 2.","startOffset":"0","endOffset":"48"] }
-        if path.hasSuffix("/reports") {
-            let finding: [String: Any] = ["id":"finding-fixture","severity":"error","title":"Synthetic execution failed",
-                                           "explanation":"This is a UI fixture for report presentation, not a generated diagnosis of a real workload.",
-                                           "confidence":1.0,"confidenceBasis":"Fixture observation",
-                                           "citations":[["id":"citation-fixture","label":"Synthetic exit evidence"]],
-                                           "suggestions":["Inspect the authorized job log."]]
-            let report: [String: Any] = ["id":"report-fixture","state":"ready","createdAt":date(now),"sourceRevision":"42",
-                                          "evidenceId":"evidence-fixture","engineVersion":"synthetic-ui-fixture",
-                                          "disclosure":"metadata only","findings":[finding],"missingEvidence":[]]
-            return page([report])
-        }
+        if path.contains("/reports") { return NativeReportFixtures.response(path: path, query: query, timestamp: date(now)) }
         if path.contains("/jobs/") { return ["job":job(path.contains("/west/") ? "west":"east", path.split(separator: "/").last.map(String.init) ?? "job-042"),"fetchedAt":date(now)] }
         if path == "/api/v1/targets" || path.contains("/targets/") {
             let generation: [String: Any] = ["id":"generation-fixture", "number":"9007199254740993", "executionBackend":"slurm", "transport":"agent-api", "runtimes":["native"], "operatingSystems":["linux"], "architectures":["x86_64"], "capabilities":["arrays", "collections"], "partitions":[["name":"batch", "isDefault":true]], "partitionCount":"201", "partitionsTruncated":true, "logStore":["name":"lab-logs", "version":"1"], "artifactStores":[], "provider":["kind":"on-prem"]]
@@ -126,9 +115,11 @@ private final class FixtureProtocol: URLProtocol, @unchecked Sendable {
             let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems ?? []
             let expired = request.url!.path.hasSuffix("/logs") && query.contains { $0.name == "cursor" }
             let targetChanged = request.url!.path.hasSuffix("/partitions") && query.contains { $0.name == "cursor" && $0.value == "target-generation-changed" }
-            let status = request.httpMethod != "GET" ? 422 : (expired || targetChanged) ? 409 : 200
+            let deniedCitation = request.url!.path.hasSuffix("/citations/citation-denied")
+            let status = deniedCitation ? 403 : request.httpMethod != "GET" ? 422 : (expired || targetChanged) ? 409 : 200
             let data: Data
-            if targetChanged { data = try JSONSerialization.data(withJSONObject: ["code":"target_changed", "message":"Synthetic target generation changed."]) }
+            if deniedCitation { data = try JSONSerialization.data(withJSONObject: ["code":"forbidden", "message":"Synthetic citation permission revoked."]) }
+            else if targetChanged { data = try JSONSerialization.data(withJSONObject: ["code":"target_changed", "message":"Synthetic target generation changed."]) }
             else if expired { data = try JSONSerialization.data(withJSONObject: ["error":["code":"cursor_expired","message":"Synthetic cursor expired."]]) }
             else if request.httpMethod == "GET" { data = try NativeFixtures.data(path: request.url!.path, query: query) }
             else { data = try JSONSerialization.data(withJSONObject: ["code":"fixture_read_only","message":"Synthetic previews do not mutate real services."]) }

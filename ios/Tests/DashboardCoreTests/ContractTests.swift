@@ -23,11 +23,11 @@ private let jobJSON = #"{"deploymentId":"east","namespaceId":"team","id":"same-i
     #expect(result.completeness == "partial")
 }
 
-@Test func reportConfidenceIsNumericAndCitationIsReferenceOnly() throws {
-    let json = #"{"id":"report1","state":"ready","findings":[{"id":"f1","severity":"warning","title":"Synthetic","explanation":"Fixture","confidence":0.75,"citations":[{"id":"c1","label":"Evidence"}]}],"missingEvidence":[]}"#
-    let report = try JSONDecoder().decode(DiagnosisReport.self, from: Data(json.utf8))
-    #expect(report.findings[0].confidence == 0.75)
-    #expect(report.findings[0].citations[0].text == nil)
+@Test func reportConfidenceAndCitationRemainTypedReferences() throws {
+    let confidence = try JSONDecoder().decode(DashboardAPI.ReportConfidence.self, from: Data(#"{"score":75,"band":"high","basis":"Fixture"}"#.utf8))
+    let citation = try JSONDecoder().decode(DashboardAPI.CitationRef.self, from: Data(#"{"id":"c1","code":"exit","label":"Evidence","kind":"item"}"#.utf8))
+    #expect(confidence.score == 75)
+    #expect(citation.sourceEvidenceId == nil)
 }
 
 @Test func duplicateWorkloadIDsRemainSeparateAcrossDeployments() throws {

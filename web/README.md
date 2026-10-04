@@ -41,6 +41,7 @@ npm run format:check
 - `src/lib/useResource.ts`: one active read per view, hidden-tab polling suspension, bounded retry delay, obsolete-response rejection and current-scope request cancellation.
 - `src/pages/`: Overview, Jobs/detail, workloads, Targets, Inbox, alert rules, Settings.
 - `src/components/LogViewer.tsx`: authorized bounded base64 reads, incremental UTF-8 decoding, plain-text rendering, offset/gap/execution checks, pause/resume and loaded-text search.
+- `src/components/Reports.tsx` and `src/lib/reports.ts`: generated report DTOs, bounded history and task polling, strict profile/run requests, retry-safe idempotency, source-qualified sealed citation identities, exact JSON/byte rendering, provenance and disclosure. Request cancellation and read-generation changes prevent account/job or failed-authority content from reappearing. Report suggestions remain text-only; no provider or job-control action is invoked.
 - `src/lib/workloads.ts`: generated workload/dependency/neighborhood DTO normalization; source counts and decimal values remain intact.
 - `src/components/GraphView.tsx` and `GraphInspector.tsx`: bounded selected-node neighborhoods, worker layout with obsolete-result rejection, complete incoming dependency counts, paginated incoming/outgoing edge inspection and equivalent accessible lists.
 - `api-contract-notes.md`: secondary endpoint field sets; `../api/openapi.json` is the authoritative contract and `make contracts-check` checks deterministic generation.
@@ -48,6 +49,8 @@ npm run format:check
 All job and namespace access remains server-enforced. Scope selection cannot grant access. Broader Control roles never add execution controls to this application.
 
 The browser stores no API data or credentials in Web Storage. A single benign sign-out-pending flag keeps private views cleared across reloads when the server cannot confirm sign-out; a successful sign-out removes it.
+
+Report tests cover pending-to-ready polling, unknown original byte mapping, wide JSON integers, canonical base64/binary/empty citations, bounded previews, account-change cancellation, history continuations, current-authority failure clearing, fresh reads after retry, and distinct idempotency behavior for uncertain versus definitive failures.
 
 ## Integration and acceptance status
 

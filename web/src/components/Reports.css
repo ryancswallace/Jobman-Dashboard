@@ -1,0 +1,65 @@
+.report-run {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 440px;
+  margin-top: 16px;
+}
+.report-run input {
+  width: 100%;
+}
+.report-history {
+  margin: 20px 0;
+}
+.report-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.report-list > li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 22px;
+  border-top: 1px solid var(--line);
+}
+.report-list > li > div:last-child {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.report-list .mono {
+  overflow-wrap: anywhere;
+}
+.report-evidence-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 14px;
+  margin-top: 12px;
+}
+.report-card .finding summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.report-card .finding > ul {
+  padding-left: 20px;
+}
+.report-card .finding > ul > li {
+  margin: 7px 0;
+  overflow-wrap: anywhere;
+}
+.report-card .citation {
+  margin-top: 18px;
+}
+.report-card .facts dd {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .report-list > li {
+    align-items: start;
+    flex-direction: column;
+  }
+}

@@ -37,6 +37,10 @@ func testDB(t *testing.T) *Store {
 		t.Fatal("invalid test database configuration")
 	}
 	cfg.ConnConfig.RuntimeParams["search_path"] = schema
+	// The dedicated Lab migration role has a small connection ceiling. Two
+	// pooled connections still exercise concurrent transactions; other goroutines
+	// wait in pgx instead of exceeding that operator-enforced role limit.
+	cfg.MaxConns = 2
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		t.Fatal("cannot open isolated schema")

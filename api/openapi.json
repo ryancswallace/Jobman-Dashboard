@@ -673,7 +673,8 @@
             "in": "query",
             "name": "cursor",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "description": "Account/job-owned task cursor; restart list if expired or inaccessible."
             }
           },
           {
@@ -681,9 +682,9 @@
             "name": "limit",
             "schema": {
               "type": "integer",
-              "default": 50,
+              "default": 20,
               "minimum": 1,
-              "maximum": 200
+              "maximum": 20
             }
           }
         ],
@@ -785,76 +786,8 @@
               }
             }
           }
-        }
-      }
-    },
-    "/api/v1/deployments/{deploymentId}/namespaces/{namespaceId}/jobs/{jobId}/reports/{reportId}/citations/{citationId}": {
-      "get": {
-        "operationId": "citation",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "deploymentId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "namespaceId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "jobId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "reportId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "citationId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Authorized result",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Citation"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Safe error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
+        },
+        "description": "Request a deterministic report. Reused ready tasks also return202 without detail; GET the task for current authorized detail."
       }
     },
     "/api/v1/rules": {
@@ -1659,6 +1592,136 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/deployments/{deploymentId}/namespaces/{namespaceId}/jobs/{jobId}/reports/{taskId}/citations/{citationId}": {
+      "get": {
+        "operationId": "citation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deploymentId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "namespaceId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "taskId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "citationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Citation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/deployments/{deploymentId}/namespaces/{namespaceId}/jobs/{jobId}/reports/{taskId}": {
+      "get": {
+        "operationId": "report",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deploymentId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "namespaceId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "taskId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Report"
                 }
               }
             }
@@ -2570,26 +2633,16 @@
           "id": {
             "type": "string"
           },
-          "label": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "label"
-        ],
-        "additionalProperties": false
-      },
-      "Citation": {
-        "type": "object",
-        "properties": {
-          "id": {
+          "code": {
             "type": "string"
           },
           "label": {
             "type": "string"
           },
-          "text": {
+          "kind": {
+            "type": "string"
+          },
+          "sourceEvidenceId": {
             "type": "string"
           },
           "startOffset": {
@@ -2603,15 +2656,135 @@
         },
         "required": [
           "id",
+          "code",
           "label",
-          "text"
+          "kind"
         ],
         "additionalProperties": false
+      },
+      "Citation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "sourceEvidenceId": {
+            "type": "string"
+          },
+          "startOffset": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "endOffset": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "reportId": {
+            "type": "string"
+          },
+          "evidenceId": {
+            "type": "string"
+          },
+          "analysisEvidenceId": {
+            "type": "string"
+          },
+          "valueJSON": {
+            "type": "string"
+          },
+          "bytesBase64": {
+            "type": "string",
+            "format": "byte"
+          },
+          "rangeBasis": {
+            "type": "string",
+            "enum": [
+              "sanitized_artifact_bytes"
+            ]
+          },
+          "originalStartOffset": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "originalEndOffset": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "originalOffsetsExact": {
+            "type": "boolean"
+          },
+          "sourceEntityId": {
+            "type": "string"
+          },
+          "sourceRevision": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "runId": {
+            "type": "string"
+          },
+          "runNumber": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "executionId": {
+            "type": "string"
+          },
+          "stream": {
+            "type": "string"
+          },
+          "quality": {
+            "type": "string"
+          },
+          "disclosure": {
+            "type": "string"
+          },
+          "capturedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "label",
+          "kind",
+          "taskId",
+          "reportId",
+          "evidenceId",
+          "analysisEvidenceId",
+          "originalOffsetsExact",
+          "quality",
+          "disclosure"
+        ],
+        "additionalProperties": false,
+        "description": "Exact sealed citation data. Item JSON is a string to preserve wide numeric values. Byte offsets address sanitized artifact data; original source offsets are only included when exact. No current log read occurs."
       },
       "Finding": {
         "type": "object",
         "properties": {
           "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "category": {
             "type": "string"
           },
           "severity": {
@@ -2624,52 +2797,90 @@
             "type": "string"
           },
           "confidence": {
-            "type": "number"
+            "$ref": "#/components/schemas/ReportConfidence"
           },
-          "confidenceBasis": {
-            "type": "string"
-          },
-          "citations": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CitationRef"
-            }
-          },
-          "suggestions": {
+          "supportingEvidence": {
             "type": "array",
             "items": {
               "type": "string"
             }
           },
-          "generated": {
-            "type": "boolean"
+          "contradictingEvidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "contradictingFindings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "analyzer": {
+            "type": "string"
           }
         },
         "required": [
           "id",
+          "code",
+          "category",
           "severity",
           "title",
           "explanation",
-          "citations"
+          "confidence",
+          "supportingEvidence",
+          "contradictingEvidence",
+          "contradictingFindings",
+          "analyzer"
         ],
         "additionalProperties": false
       },
       "Report": {
         "type": "object",
         "properties": {
-          "id": {
+          "deploymentId": {
             "type": "string"
           },
-          "state": {
+          "namespaceId": {
             "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "jobId": {
+            "type": "string"
+          },
+          "sourceRevision": {
+            "type": "string"
+          },
+          "runId": {
+            "type": "string"
+          },
+          "profile": {
+            "type": "string",
+            "enum": [
+              "metadata",
+              "include_log_tail"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "description": "Mutable task state; outdated independently describes the recorded snapshot."
           },
           "createdAt": {
             "type": "string",
             "format": "date-time"
           },
-          "sourceRevision": {
+          "expiresAt": {
             "type": "string",
-            "pattern": "^[0-9]+$"
+            "format": "date-time"
+          },
+          "outdated": {
+            "type": "boolean"
+          },
+          "reportId": {
+            "type": "string"
           },
           "evidenceId": {
             "type": "string"
@@ -2677,57 +2888,43 @@
           "analysisEvidenceId": {
             "type": "string"
           },
-          "engineVersion": {
+          "failureCode": {
             "type": "string"
           },
-          "disclosure": {
-            "type": "string"
-          },
-          "findings": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Finding"
-            }
-          },
-          "missingEvidence": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "warnings": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "retryAdvice": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
+          "detail": {
+            "$ref": "#/components/schemas/ReportDetail"
           }
         },
         "required": [
-          "id",
+          "deploymentId",
+          "namespaceId",
+          "taskId",
+          "jobId",
+          "sourceRevision",
+          "profile",
           "state",
-          "findings",
-          "missingEvidence"
+          "createdAt",
+          "expiresAt",
+          "outdated"
         ],
         "additionalProperties": false
       },
       "ReportRequest": {
         "type": "object",
         "properties": {
-          "includeLogTail": {
-            "type": "boolean"
+          "profile": {
+            "type": "string",
+            "enum": [
+              "metadata",
+              "include_log_tail"
+            ]
           },
           "runId": {
             "type": "string"
           }
         },
         "required": [
-          "includeLogTail"
+          "profile"
         ],
         "additionalProperties": false
       },
@@ -3151,15 +3348,6 @@
           "nextCursor": {
             "type": "string"
           },
-          "completeness": {
-            "type": "string"
-          },
-          "sources": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SourceStatus"
-            }
-          },
           "fetchedAt": {
             "type": "string",
             "format": "date-time"
@@ -3167,8 +3355,6 @@
         },
         "required": [
           "items",
-          "completeness",
-          "sources",
           "fetchedAt"
         ],
         "additionalProperties": false
@@ -3795,6 +3981,491 @@
         ],
         "additionalProperties": false,
         "description": "Generation-pinned partitions in byte-order by name. A changed generation returns target_changed (409); refresh target detail and discard partition cursor history before retrying."
+      },
+      "ReportVersions": {
+        "type": "object",
+        "properties": {
+          "companion": {
+            "type": "string"
+          },
+          "engine": {
+            "type": "string"
+          },
+          "jobman": {
+            "type": "string"
+          },
+          "collector": {
+            "type": "string"
+          },
+          "evidenceSchema": {
+            "type": "integer"
+          },
+          "reportSchema": {
+            "type": "integer"
+          },
+          "generationSchema": {
+            "type": "integer"
+          },
+          "proposalSchema": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "companion",
+          "engine",
+          "jobman",
+          "collector",
+          "evidenceSchema",
+          "reportSchema",
+          "generationSchema",
+          "proposalSchema"
+        ],
+        "additionalProperties": false
+      },
+      "ReportAnalyzer": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "ReportGenerator": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "profile": {
+            "type": "string"
+          },
+          "locality": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "model",
+          "profile",
+          "locality"
+        ],
+        "additionalProperties": false
+      },
+      "ReportConfidence": {
+        "type": "object",
+        "properties": {
+          "score": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "band": {
+            "type": "string"
+          },
+          "basis": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "score",
+          "band",
+          "basis"
+        ],
+        "additionalProperties": false
+      },
+      "ReportAction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "supportingEvidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "requiresConfirmation": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "kind",
+          "summary",
+          "description",
+          "supportingEvidence",
+          "requiresConfirmation"
+        ],
+        "additionalProperties": false
+      },
+      "ReportRetry": {
+        "type": "object",
+        "properties": {
+          "verdict": {
+            "type": "string"
+          },
+          "existingPolicy": {
+            "type": "string"
+          },
+          "confidence": {
+            "$ref": "#/components/schemas/ReportConfidence"
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "supportingEvidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "earliestAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "verdict",
+          "existingPolicy",
+          "confidence",
+          "rationale",
+          "reasons",
+          "supportingEvidence"
+        ],
+        "additionalProperties": false
+      },
+      "ReportMissingEvidence": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "description"
+        ],
+        "additionalProperties": false
+      },
+      "ReportWarning": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "ReportOmission": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "affects": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "code",
+          "affects"
+        ],
+        "additionalProperties": false
+      },
+      "ReportRedaction": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "affects": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "count": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "required": [
+          "code",
+          "affects",
+          "count"
+        ],
+        "additionalProperties": false
+      },
+      "ReportDisclosure": {
+        "type": "object",
+        "properties": {
+          "providerInvoked": {
+            "type": "boolean"
+          },
+          "generatedContentUsed": {
+            "type": "boolean"
+          },
+          "locality": {
+            "type": "string"
+          },
+          "profile": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "classes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "itemIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "artifactIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "enrichmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "itemCount": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "artifactCount": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "enrichmentCount": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "artifactBytes": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "enrichmentBytes": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "requestBytes": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "redactionNoticeCount": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "required": [
+          "providerInvoked",
+          "generatedContentUsed",
+          "locality",
+          "classes",
+          "itemIds",
+          "artifactIds",
+          "enrichmentIds",
+          "itemCount",
+          "artifactCount",
+          "enrichmentCount",
+          "artifactBytes",
+          "enrichmentBytes",
+          "requestBytes",
+          "redactionNoticeCount"
+        ],
+        "additionalProperties": false
+      },
+      "ReportDetail": {
+        "type": "object",
+        "properties": {
+          "capturedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "controlInstanceId": {
+            "type": "string"
+          },
+          "controlVersion": {
+            "type": "string"
+          },
+          "contractVersion": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunReference"
+            }
+          },
+          "versions": {
+            "$ref": "#/components/schemas/ReportVersions"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "primaryFindingId": {
+            "type": "string"
+          },
+          "analyzers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportAnalyzer"
+            }
+          },
+          "generators": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportGenerator"
+            }
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            }
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportAction"
+            }
+          },
+          "retry": {
+            "$ref": "#/components/schemas/ReportRetry"
+          },
+          "citations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CitationRef"
+            }
+          },
+          "missingEvidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportMissingEvidence"
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportWarning"
+            }
+          },
+          "disclosure": {
+            "$ref": "#/components/schemas/ReportDisclosure"
+          },
+          "omissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportOmission"
+            }
+          },
+          "redactionNotices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportRedaction"
+            }
+          }
+        },
+        "required": [
+          "capturedAt",
+          "generatedAt",
+          "controlInstanceId",
+          "controlVersion",
+          "contractVersion",
+          "platform",
+          "phase",
+          "runs",
+          "versions",
+          "mode",
+          "primaryFindingId",
+          "analyzers",
+          "generators",
+          "findings",
+          "actions",
+          "retry",
+          "citations",
+          "missingEvidence",
+          "warnings",
+          "disclosure",
+          "omissions",
+          "redactionNotices"
+        ],
+        "additionalProperties": false,
+        "description": "Projection of a reauthorized, fully verified original evidence/report pair; advice is text and never executes actions."
       }
     }
   }

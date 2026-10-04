@@ -146,6 +146,48 @@ final class DashboardUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Previous partition page"].exists)
     }
 
+    func testReportSnapshotFindingsExactCitationAndRevokedAccess() {
+        let app = fixtureApp()
+        app.tabBars.buttons["Jobs"].tap()
+        let job = app.staticTexts["Synthetic alignment run"]
+        XCTAssertTrue(job.waitForExistence(timeout: 10)); job.tap()
+        let diagnosis = app.buttons["Diagnosis"]
+        reveal(diagnosis, app: app); diagnosis.tap()
+        let next = app.buttons["Next report page"]
+        reveal(next, app: app); next.tap()
+        XCTAssertTrue(app.staticTexts["Diagnosis · failed"].waitForExistence(timeout: 10))
+        app.buttons["Previous report page"].tap()
+        let report = app.buttons["report-90000000-0000-4000-8000-000000000099"]
+        XCTAssertTrue(report.waitForExistence(timeout: 10)); report.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["reportState"].waitForExistence(timeout: 10))
+        let outdated = app.staticTexts["reportOutdated"]
+        reveal(outdated, app: app)
+        XCTAssertTrue(outdated.label.contains("recorded snapshot"))
+        XCUIDevice.shared.press(.home)
+        app.activate()
+        XCTAssertTrue(app.descendants(matching: .any)["reportState"].waitForExistence(timeout: 10))
+        let finding = app.buttons["Synthetic execution failed"]
+        reveal(finding, app: app); finding.tap()
+        let citation = app.buttons["citation-citation-fixture"]
+        reveal(citation, app: app)
+        capture("Native report findings and provenance", app: app)
+        citation.tap()
+        XCTAssertTrue(app.staticTexts["citationValue"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.staticTexts["citationValue"].label, "17")
+        capture("Native exact sealed citation", app: app)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let denied = app.buttons["citation-citation-denied"]
+        capture("Native report return from citation", app: app)
+        for _ in 0..<6 { if denied.exists && denied.isHittable { break }; app.swipeDown() }
+        reveal(denied, app: app); denied.tap()
+        let revoked = app.staticTexts["Your current permissions do not allow this view."]
+        XCTAssertTrue(revoked.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["citationValue"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["reportState"].exists)
+        reveal(revoked, app: app)
+        capture("Native report access revoked and cached content removed", app: app)
+    }
+
     private func fixtureApp() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--dashboard-ui-fixtures"]

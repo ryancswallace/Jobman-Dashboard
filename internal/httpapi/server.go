@@ -33,6 +33,7 @@ type Server struct {
 	AuthRoutes  interface{ RegisterRoutes(*http.ServeMux) }
 	Preferences PreferenceStore
 	Logs        LogService
+	Reports     ReportService
 }
 type actorKey struct{}
 
@@ -40,6 +41,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	s.registerGroupRoutes(mux)
 	s.registerTargetRoutes(mux)
+	s.registerReportRoutes(mux)
 	if s.AuthRoutes != nil {
 		s.AuthRoutes.RegisterRoutes(mux)
 	}
@@ -142,7 +144,7 @@ func writeError(w http.ResponseWriter, _ *http.Request, err error) {
 		status = 403
 	case "not_found_or_inaccessible":
 		status = 404
-	case "cursor_expired", "revision_conflict", "target_changed":
+	case "cursor_expired", "revision_conflict", "target_changed", "snapshot_changed":
 		status = 409
 	case "invalid_request":
 		status = 400
