@@ -1,7 +1,7 @@
 # Jobman Dashboard initial-release handoff
 
 Status: **release candidate; final acceptance remains open**. This handoff is
-being completed as the exact candidate is exercised in the synthetic Lab. See
+supported by exact candidate checks in the synthetic Lab. See
 [implementation status](IMPLEMENTATION_STATUS.md) for the chronological evidence,
 retained failures and requirement/work-package coverage. Nothing in this document
 authorizes a production installation or company app distribution.
@@ -10,31 +10,33 @@ authorizes a production installation or company app distribution.
 
 | Component | Exact candidate | Delivery / evidence |
 | --- | --- | --- |
-| Dashboard API, worker, broker and web | `v0.1.0-rc.6`; `633b5e3fdc08cc973e9f318faefccc298c713295` | [Passing candidate CI37225710875](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37225710875); exact Lab upgrade, large-graph traversal and recorded-run GET acceptance pass; publication pending |
-| Native iPhone app | Marketing version`0.1.0`, build`8`; same Dashboard source | Same passing CI; verified unsigned arm64 iPhoneOS archive; signing/device acceptance pending |
+| Dashboard API, worker, broker and web | `v0.1.0-rc.7`; `d10fb5f813efa3599a0bc5f79b3ca88826210510` | [Passing candidate CI37229091125](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37229091125); packages verified; all 13 Lab upgrade phases and 57 authenticated run/log GET checks pass |
+| Native iPhone app | Marketing version `0.1.0`, build `9`; same Dashboard source | Same passing CI; verified unsigned arm64 iPhoneOS archive; signing/device acceptance pending |
 | Jobman Control | `63641e922a4452bd6d63d6c41c5726b49fbfa6cf` | [PR29](https://github.com/ryancswallace/Jobman-Control/pull/29); full CI, PostgreSQL run-catalog tests and both Lab source upgrades pass |
 | Jobman producer ACL/Slurm integration | `7eae7cc7164a308ca8d12de9011610ef6177a7a0` | [PR54](https://github.com/ryancswallace/Jobman/pull/54); CI and independent review pass; formal approval remains |
 | Jobman Diagnose integration | `883f563b981e7fbd6ab6cbdb16d4489bbaf757fd` | [PR11](https://github.com/ryancswallace/Jobman-Diagnose/pull/11); CI and independent review pass; formal approval remains |
 
 Dashboard embeds immutable public development module versions, with verified
-checksums: Core`v1.8.1-0.20261003211041-62ac89b14547` and
-Diagnose`v0.6.1-0.20261003234632-f47b6058c06e`. These differ from the separate
+checksums: Core `v1.8.1-0.20261003211041-62ac89b14547` and
+Diagnose `v0.6.1-0.20261003234632-f47b6058c06e`. These differ from the separate
 producer/Control executable revisions above. Final release requires compatible
 published stable upstream tags and renewed dependency/compatibility checks.
 GitHub branch protection and required eligible approvals remain enabled.
+
+Published artifacts: [v0.1.0-rc.7 prerelease](https://github.com/ryancswallace/Jobman-Dashboard/releases/tag/v0.1.0-rc.7). The ten uploaded assets were downloaded and verified against the reviewed checksums; the tag resolves to the exact candidate source.
 
 Verified candidate archives:
 
 | File | SHA-256 |
 | --- | --- |
-| `jobman-dashboard_v0.1.0-rc.6_linux_amd64.tar.gz` | `ff7ba705c377595020454c658da3e2feaaf29b8e5d4cbb9e414e737149e3905f` |
-| `jobman-dashboard_v0.1.0-rc.6_linux_arm64.tar.gz` | `c705c532b7c6261bc191e7cfa5a92dc7c1e1927368a37207245f38292cb8ad3c` |
-| `JobmanDashboard-unsigned.xcarchive.tar.gz` | `46c546a2dc9f6278b52987989329e3384af7fc091c91ac811cce0f775957b707` |
+| `jobman-dashboard_v0.1.0-rc.7_linux_amd64.tar.gz` | `cb459bb5d8672a80306532951ffa5ade899764af71d3fe10c0268d83b0009e4b` |
+| `jobman-dashboard_v0.1.0-rc.7_linux_arm64.tar.gz` | `19b3ded0315e4781f07f3885fdca360371c0ac0d28f19abf9a6c53d0ad7e9956` |
+| `JobmanDashboard-unsigned.xcarchive.tar.gz` | `10b0a93c676749d966a9a8e3a43963a122c896c570448f63963f0dd4063b5650` |
 
 Both Linux architectures were built twice in CI with identical archive checksums.
-Each contains55 files and54 verified internal checksum entries. Bundled docs and
-deployment examples match the committed source; both retain the same18-migration
-ledger. The native archive's11-file inventory, source archive and executable/Info
+Each contains 58 files and 57 verified internal checksum entries. Bundled docs and
+deployment examples match the committed source; both retain the same 18-migration
+ledger. The native archive's 11-file inventory, source archive and executable/Info
 hashes were independently verified. Native packaging is not claimed to be byte
 reproducible, signed, installable, or approved for internal distribution.
 
@@ -56,7 +58,7 @@ directory, preserving the package directory name, before the `cd` below:
 
 ```sh
 sha256sum -c SHA256SUMS
-cd jobman-dashboard_v0.1.0-rc.6_linux_arm64
+cd jobman-dashboard_v0.1.0-rc.7_linux_arm64
 sha256sum -c SHA256SUMS
 ./bin/jobman-dashboard version
 ./bin/jobman-log-broker version
@@ -64,7 +66,7 @@ sha256sum -c SHA256SUMS
 
 For source checks, use the exact Go/Node/npm versions recorded in `go.version`,
 `node.version`, and `npm.version`, a clean checkout and the committed dependency
-locks. CI supplies an isolated PostgreSQL17.6 database to the test environment:
+locks. CI supplies an isolated PostgreSQL 17.6 database to the test environment:
 
 ```sh
 npm ci --prefix web
@@ -100,16 +102,28 @@ and notification-device lifecycle. The product remains monitoring-only.
 The retained Lab evidence includes actual subprocess and Slurm executions,
 cross-user local/NFS log access, two-Control authorization and aggregation,
 direct-group capability unions and active revocation, real diagnosis/citations,
-terminal events and inbox deduplication,25-viewer metadata/mixed workload checks,
+terminal events and inbox deduplication, 25-viewer metadata/mixed workload checks,
 authentication-key rotation, restore/replay, a fresh installation with compatible
-upgrade/rollback, actual150-second recovery-watchdog intervention, and bounded
+upgrade/rollback, actual 150-second recovery-watchdog intervention, and bounded
 directory, broker, database, slow-Control and hard-NFS fault recovery. Original
 failed attempts remain identifiable in the status document.
 
 The packaged API and worker also refused a synthetic newer-schema ledger, with
 unchanged database and configuration; the status document retains the two harness
 failures and independently reviewed continuations that established this result.
-Exact RC6 upgrade, recorded-run GET acceptance and complete large-graph traversal pass. The final web refresh-preference correction passes173 tests and independent review; the next candidate package is being prepared.
+Exact RC7 deployment passes all 13 upgrade phases. API, worker and broker match
+the verified arm64 binaries; schema 18, configuration 8 and both source authorities
+remain unchanged. Its authenticated recorded-run smoke passes 57 GET requests
+in 0.854317 seconds. The reused immutable test binary comes from RC6 source
+`633b5e3`; its authentication test source and Go dependencies are unchanged.
+Complete 10,000-node/100,000-edge graph traversal and 64-page Back replay passed
+on RC6/Control636 in 51.31 seconds. RC7 adds the reviewed web refresh repair
+(173 web tests pass) and packaged handoff/run/graph guides. Go, native, contract
+and migration source is unchanged; earlier fault and load scenarios remain tied
+to their recorded versions rather than being claimed rerun on RC7.
+
+This separately attached handoff records post-build evidence. The immutable Linux
+bundles retain the build-time handoff from the exact candidate source.
 The current Control executor supports one run per submitted job. Actual retained
 jobs therefore demonstrate single-run source integration; real PostgreSQL and
 client fixtures separately test selection among multiple recorded runs. No retry
