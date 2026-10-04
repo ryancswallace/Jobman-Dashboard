@@ -5,11 +5,12 @@ Status: directory outage and same-session recovery acceptance passed on rc.3 in
 exact-process pause/recovery acceptance also pass in16.83 seconds, including
 authorized log recovery after the startup fence. Original failed attempts and
 subsequent passing results are retained separately. Database acceptance remains
-open. Root coordinates every Lab invocation after the exact
+open. The primary-Control pause extension is implemented and checked offline;
+it has no live acceptance result. Root coordinates every Lab invocation after the exact
 driver, plan, and recovery actions have been reviewed. This supplements T02, T05, and T11
 in [the design](DESIGN.md); it does not replace healthy scale acceptance.
 
-Run three separate scenarios and stop after any unexpected failure. Each scenario
+Run four separate scenarios and stop after any unexpected failure. Each scenario
 has a fresh immutable receipt, an independent preflight, and cleanup registered
 before its first effect. Preserve failed receipts; never create another scenario
 to hide a failed attempt.
@@ -18,6 +19,7 @@ to hide a failed attempt.
 | --- | --- | --- |
 | Directory freshness | Six minutes | Interrupt only the primary synthetic LDAPS unit until its actual proof expires; restore the same unit and await complete normal reconciliation. |
 | Log broker | Six minutes | Stop/start only the dedicated broker, then pause/continue its exact process in a separate interval to exercise connection unavailability and response timeout. |
+| Primary Control response stall | Six minutes | Pause/continue only the exact primary Control process; observe sensitive-route failure and healthy secondary partial results within 25 seconds. |
 | Dashboard database | Six minutes | Temporarily reject, then separately drop, only database-bound packets from the Dashboard API/worker UIDs on storage01. Remove only this operation's firewall table. |
 
 Each test reserves an independent 60-second cleanup budget inside its outer limit.
@@ -111,6 +113,54 @@ I/O. The real NFS mount remains intact. A future hard-stall test needs its own
 isolated mount/process arrangement and recovery review; stopping the shared NFS
 service or repeatedly restarting brokers is not an acceptable substitute.
 
+## Slow primary Control
+
+The `control` scenario contains only `control_pause`. Its sole signal target is
+`jobman-dashboard-lab-control` on control01, UID 21902. No secondary source,
+directory, broker, original Control or Dashboard process is stopped or restarted.
+The acknowledged 45-second watchdog, boot ID, unit/executable hashes, UID, PID and
+process-start checks are the same safeguards used for broker pause. Recheck the
+identity immediately before SIGSTOP and SIGCONT; after continuation require the
+exact same identity. Recovery reads only local process/material state until
+SIGCONT completes: contacting the paused source would obstruct recovery.
+Generic status remains available after recovery: it reports `paused: false` only
+after matching the restored receipt and exact current process/local material.
+The acceptance harness requires `paused: true` before requesting recovery.
+
+The ordinary observation interval is at most 25 seconds, including the final
+local-only proof that the pinned process remains stopped. No more than four
+checks run concurrently across all protected, healthy-scope and liveness reads.
+Each check has a ten-second caller budget within that shared interval. The source
+adapter bounds response headers to five seconds and total transport to eight;
+monitoring discovery has its own 1.5-second budget. Do not relax these product
+limits or replace the fault with a client-side delay.
+
+Native Alice and her existing web session must receive only sanitized 503 responses
+for primary job metadata, the retained log cursor, sealed report and citation,
+and inbox list/detail. Route-specific current-authority behavior matters:
+metadata/inbox return `authorization_unavailable`; the log/report/citation source
+adapter returns `source_unavailable` for the stalled transport. Neither 401 nor 403,
+an empty successful page, a cleared session cookie, private error text, or a
+successful stale result counts as an unavailable source. Bob's previously
+accessible primary research job must fail safely too.
+
+The same three credentials must still read secondary research metadata. Both
+native and web aggregate job pages must equal the healthy secondary-only baseline;
+all returned rows are explicitly source-qualified. Both aggregate overviews must
+match only the healthy secondary counts for one fixed microsecond-precision time
+window. Require exactly two contribution records: explicit primary
+`authorization_unavailable` without stale `asOf`, and secondary `available` with
+current provenance. No unavailable primary counts may be added to the subtotal.
+Public liveness and private process/SQL readiness remain 200; the latter does not
+claim that an external Control dependency is ready.
+
+After exact-process continuation, the original job facts, source-qualified log
+bytes/run/offsets, pre-fault cursor, inbox record/read state, sealed report/citation,
+immutable accounts, roles/capabilities and web session must remain usable. The
+final driver proof checks unchanged source/configuration/database authority and
+monotonic feed progress. No fixture submission, notification rule, grant update,
+source restart or feed recovery is part of this scenario.
+
 ## Dashboard database connection failures
 
 On storage01, create one uniquely named temporary nftables table with exactly one
@@ -172,7 +222,19 @@ configuration. Root reviews drift or an unconfirmed restoration before another
 scenario begins. Keep both guest and host recovery evidence.
 
 The Go harness bounds HTTP concurrency, body sizes, request time, source IDs and
-retained samples. The Python driver bounds SSH/process output, command duration,
+retained samples. Driver failures expose only an allowlisted phase, one finite
+category (`deadline`, `cancelled`, `exit`, `output_bound`, `json` or
+`unexpected_stderr`), and a reviewed literal driver code or `withheld`. A code is
+accepted only from the exact single-line Python failure format and the fixed
+vocabulary in `labFaultDriverCodes`; arbitrary/multiline stderr and unknown codes
+are never copied. Child output is drained with 32 KiB stdout and 64 KiB stderr
+retention limits. Child cancellation retains the existing phase budget with at
+most two additional seconds to close inherited pipes. Offline tests run real
+local Python children for success, malformed JSON, known/hostile diagnostics,
+output overflow and deadlines. A finite failure never proves whether a mutation
+was admitted: inspect and recover the original receipt, without repeating begin.
+
+The Python driver bounds SSH/process output, command duration,
 file types/owners/modes and accepted phase inputs. Offline tests must reproduce
 late-begin/watchdog interleavings, wrong/reused process identity, uncertain replies,
 firewall drift, permission/umask errors and unauthorized route/data responses.
@@ -205,20 +267,21 @@ python3 scripts/dashboard-dependency-faults.py stage --apply \
   --expected-implementation-sha256 REVIEWED_IMPLEMENTATION_SHA256
 ```
 
-Use a fresh separately reviewed plan for `broker` or `database`, with first fault
-`broker_stop` or `database_reject`. Never alter a prepared plan or reuse another
-scenario's result path. The snapshot/plan must name the exact deployed revision
+Use a fresh separately reviewed plan for `broker`, `database` or `control`, with
+first fault `broker_stop`, `database_reject` or `control_pause`, respectively.
+Never alter a prepared plan or reuse another scenario's result path. The snapshot/plan must name the exact deployed revision
 containing the reviewed 15-second API/auth and five-second claim deadlines before
 running database DROP acceptance.
 
 The Go tests are `TestLabDependencyDirectory`, `TestLabDependencyBroker` and
-`TestLabDependencyDatabase` in `internal/auth/lab_dependency_failures_test.go`.
+`TestLabDependencyDatabase` in `internal/auth/lab_dependency_failures_test.go`,
+and `TestLabDependencyControl` in `internal/auth/lab_control_fault_test.go`.
 Run one exact test per process with `-tags integration -race -count=1 -timeout=6m`.
 Required environment variables contain paths, scenario names and public digests;
 none contains a token, password or cookie:
 
 - `JOBMAN_DASHBOARD_LAB_ROOT`: the authorized Lab checkout.
-- `JOBMAN_DASHBOARD_LAB_DEPENDENCY_FAULT`: exactly `directory`, `broker` or `database`.
+- `JOBMAN_DASHBOARD_LAB_DEPENDENCY_FAULT`: exactly `directory`, `broker`, `database` or `control`.
 - `JOBMAN_DASHBOARD_LAB_FAULT_DRIVER`: the reviewed archived driver path.
 - `JOBMAN_DASHBOARD_LAB_FAULT_PLAN`: its private staged plan directory.
 - `JOBMAN_DASHBOARD_LAB_FAULT_PLAN_SHA256` and
@@ -230,8 +293,8 @@ none contains a token, password or cookie:
 - Database case only: `JOBMAN_DASHBOARD_LAB_NOTIFICATION_RECEIPTS`, a new empty
   owner0700 canonical `/private/tmp/jobman-dashboard-notification-receipts-<unique>`
   directory. The captured path is passed explicitly to every normal-cancellation
-  wrapper call; the eight retained failed-scenario IDs remain excluded. Directory
-  and broker cases do not use it. See `LAB_MULTISOURCE_NOTIFICATIONS.md`.
+  wrapper call; the eight retained failed-scenario IDs remain excluded. Directory,
+  broker and Control cases do not use it. See `LAB_MULTISOURCE_NOTIFICATIONS.md`.
 
 The main context ends 65 seconds before the six-minute outer deadline; cleanup
 gets an independent 60 seconds. Sign-in/baseline must finish within 90 seconds,

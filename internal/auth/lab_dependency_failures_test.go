@@ -55,11 +55,105 @@ func (d labFaultDriver) call(ctx context.Context, phase, fault string, output an
 	call, stop := context.WithTimeout(ctx, bound)
 	defer stop()
 	command := exec.CommandContext(call, "python3", args...)
-	command.Stderr = io.Discard
-	var raw labExecutionOutput
-	command.Stdout = &raw
-	if command.Run() != nil || json.Unmarshal(raw.Bytes(), output) != nil {
-		return errors.New("reviewed fault phase failed; retain pending receipts")
+	return labFaultCommand(call, command, phase, output)
+}
+
+// These diagnostics never return child stdout/stderr or exec error strings. The
+// code set is the frozen driver's literal failure vocabulary plus its fixed
+// remote phases; a future driver code requires a separate reviewed addition.
+const labFaultDriverCodes = `another_fault_pending another_operation_pending api_observability api_observability_shape boot_changed
+completed_recovery_changed continued_process_changed control_restore_receipt_changed dashboard_release database_authority_changed
+database_fault database_host database_identity database_roles database_schema
+database_shape database_snapshot delivery_hold duplicate_json_field explicit_apply_required
+explicit_phase_required explicit_stage_required failure_code fault_already_started fault_host
+fault_not_admitted fault_not_planned fault_not_verified fault_process_owner fault_remote_begin
+fault_remote_database_check fault_remote_observe_api fault_remote_recover fault_remote_snapshot fault_remote_stage
+fault_remote_status fault_remote_verify fault_required fault_restart fault_stop
+fault_stop_unconfirmed fault_window_expired feed_not_healthy feed_progress_regressed feed_scope
+feed_shape file_changed file_parent firewall_apply firewall_apply_unconfirmed
+firewall_baseline firewall_check firewall_counter firewall_counter_regressed firewall_intent_changed
+firewall_reappeared firewall_remove firewall_remove_unconfirmed firewall_table_drift firewall_table_exists
+guest_failed guest_host guest_required host_authority_changed host_baseline
+host_directory host_file host_file_changed host_lock host_path
+host_receipt_changed implementation_changed implementation_hashes intent_changed invalid_failure_code
+invalid_json_number lab_root lock_busy lock_identity nft_table
+nft_tables observer_host operation_deadline operation_directory operation_history_bound
+operation_identity operation_not_admitted pause_process_changed paused_process_replaced pending_scale_operation
+pending_source_operation phase_failed phase_invalid plan_changed plan_expired
+plan_flags plan_shape plan_time previous_fault_unrestored previous_fault_unverified
+previous_recovery_identity private_file process_baseline process_image process_image_replaced
+process_inactive receipt_changed recovered_process_changed recovery_watchdog remote_payload_bound
+remote_phase request_bound reviewed_plan_required scenario_identity secret_reference_scope
+signal_unconfirmed snapshot_arguments snapshot_host snapshot_hosts source_capabilities
+source_identity source_root_identity ssh_boundary ssh_host stage_files
+stage_hashes stage_host stage_incomplete stage_missing staged_implementation_changed
+staged_plan_changed stop_policy target_binary_or_unit_changed target_material_changed uncertain_begin_requires_recovery
+unit_fragment unit_properties unit_properties_shape unit_transitional unrelated_firewall_changed
+unrelated_process_changed watchdog_ack watchdog_arm watchdog_deadline watchdog_host
+watchdog_not_armed watchdog_path watchdog_result watchdog_service_failed watchdog_status
+watchdog_unconfirmed`
+
+// Drain each pipe without retaining data beyond its independent bound. Returning
+// full writes avoids blocking a verbose child; its context and WaitDelay still
+// bound process and inherited-pipe lifetime.
+type labFaultOutput struct {
+	buffer   bytes.Buffer
+	limit    int
+	overflow bool
+}
+
+func (w *labFaultOutput) Write(raw []byte) (int, error) {
+	n := len(raw)
+	keep := min(n, w.limit-w.buffer.Len())
+	if keep > 0 {
+		_, _ = w.buffer.Write(raw[:keep])
+	}
+	if keep < n {
+		w.overflow = true
+	}
+	return n, nil
+}
+
+func labFaultDriverCode(raw []byte) string {
+	const prefix = "Dependency fault phase stopped ("
+	const suffix = "); preserve receipts; do not repeat an uncertain begin.\n"
+	text := string(raw)
+	if !strings.HasPrefix(text, prefix) || !strings.HasSuffix(text, suffix) {
+		return "withheld"
+	}
+	code := strings.TrimSuffix(strings.TrimPrefix(text, prefix), suffix)
+	if !slices.Contains(strings.Fields(labFaultDriverCodes), code) {
+		return "withheld"
+	}
+	return code
+}
+
+func labFaultCommand(ctx context.Context, command *exec.Cmd, phase string, output any) error {
+	if !slices.Contains([]string{"begin", "recover", "status", "verify", "observe-api", "close"}, phase) {
+		return errors.New("fault phase denied")
+	}
+	stdout, stderr := &labFaultOutput{limit: 32768}, &labFaultOutput{limit: 65536}
+	command.Stdout, command.Stderr = stdout, stderr
+	command.WaitDelay = 2 * time.Second
+	err := command.Run()
+	category, code := "", "withheld"
+	switch {
+	case stdout.overflow || stderr.overflow:
+		category = "output_bound"
+	case errors.Is(ctx.Err(), context.DeadlineExceeded):
+		category = "deadline"
+	case ctx.Err() != nil:
+		category = "cancelled"
+	case err != nil:
+		category = "exit"
+		code = labFaultDriverCode(stderr.buffer.Bytes())
+	case stderr.buffer.Len() > 0:
+		category = "unexpected_stderr"
+	case json.Unmarshal(stdout.buffer.Bytes(), output) != nil:
+		category = "json"
+	}
+	if category != "" {
+		return fmt.Errorf("reviewed fault phase failed (phase=%s category=%s code=%s); retain pending receipts", phase, category, code)
 	}
 	return nil
 }
@@ -362,7 +456,9 @@ func labFaultRun(t *testing.T, scenario string) {
 		defer done()
 		if s.active != "" {
 			var value map[string]any
-			if s.driver.call(cleanup, "recover", s.active, &value) != nil || value["restored"] != true {
+			if err := s.driver.call(cleanup, "recover", s.active, &value); err != nil {
+				t.Errorf("fault cleanup unconfirmed: %v; independent watchdog/private receipts require inspection", err)
+			} else if value["restored"] != true {
 				t.Error("fault cleanup unconfirmed; independent guest watchdog and private receipts require operator inspection")
 			}
 		}
@@ -417,6 +513,8 @@ func labFaultRun(t *testing.T, scenario string) {
 		s.broker()
 	case "database":
 		s.database()
+	case "control":
+		s.control()
 	}
 	s.healthy()
 	var closed struct{ Closed bool }
