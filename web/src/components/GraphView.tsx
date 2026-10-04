@@ -71,7 +71,7 @@ export function GraphView({
           <svg
             width={layout.width}
             height={layout.height}
-            role="img"
+            role="group"
             aria-label="Source-reported dependencies"
           >
             <defs>

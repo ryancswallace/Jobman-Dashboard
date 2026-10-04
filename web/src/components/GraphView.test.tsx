@@ -1,6 +1,8 @@
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { GraphView } from "./GraphView";
+import userEvent from "@testing-library/user-event";
+import { auditAccessibility } from "../test-accessibility";
 import type { GraphNode } from "../lib/models";
 class ControlledWorker {
   static instances: ControlledWorker[] = [];
@@ -32,6 +34,24 @@ beforeEach(() => {
   vi.stubGlobal("Worker", ControlledWorker);
 });
 afterEach(() => vi.unstubAllGlobals());
+it("names diagram controls and supports keyboard selection", async () => {
+  const select = vi.fn();
+  render(
+    <main>
+      <h1>Graph detail</h1>
+      <GraphView nodes={[node("job")]} onSelect={select} />
+    </main>,
+  );
+  act(() => ControlledWorker.instances[0].finish("job"));
+  await auditAccessibility();
+  const user = userEvent.setup();
+  await user.tab();
+  expect(screen.getByRole("region")).toHaveFocus();
+  await user.tab();
+  expect(screen.getByRole("button", { name: /job, running/ })).toHaveFocus();
+  await user.keyboard("{Enter} ");
+  expect(select.mock.calls).toEqual([["job"], ["job"]]);
+});
 it("hides removed-node layouts and ignores obsolete replies after a page replacement", () => {
   const select = vi.fn();
   const view = render(<GraphView nodes={[node("old")]} onSelect={select} />);
@@ -40,7 +60,9 @@ it("hides removed-node layouts and ignores obsolete replies after a page replace
   expect(screen.getByRole("button", { name: /old, running/ })).toBeVisible();
   view.rerender(<GraphView nodes={[node("new")]} onSelect={select} />);
   expect(old.terminate).toHaveBeenCalledOnce();
-  expect(screen.queryByRole("img")).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("group", { name: "Source-reported dependencies" }),
+  ).not.toBeInTheDocument();
   expect(screen.getByText("Laying out this node page…")).toBeVisible();
   act(() => ControlledWorker.instances[1].finish("new"));
   expect(screen.getByRole("button", { name: /new, running/ })).toBeVisible();
@@ -71,7 +93,11 @@ it("invalidates a layout when dependency edges change with the same nodes", () =
       onSelect={() => {}}
     />,
   );
-  expect(screen.queryByRole("img")).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("group", { name: "Source-reported dependencies" }),
+  ).not.toBeInTheDocument();
   act(() => ControlledWorker.instances[1].finish("same"));
-  expect(screen.getByRole("img")).toBeVisible();
+  expect(
+    screen.getByRole("group", { name: "Source-reported dependencies" }),
+  ).toBeVisible();
 });

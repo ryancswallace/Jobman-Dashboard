@@ -9,6 +9,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type * as Wire from "../../../contracts/typescript/dashboard.generated";
 import { Reports } from "./Reports";
+import { auditAccessibility } from "../test-accessibility";
 const session = vi.hoisted(() => ({
   identity: "alice:east:research",
   bootstrap: { preferences: { timezone: "UTC" } },
@@ -163,6 +164,34 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+it("provides accessible findings, disclosure and sealed citation controls", async () => {
+  fetcher.mockImplementation(async (path: string) =>
+    Response.json(
+      path.includes("/citations/")
+        ? citation
+        : path.endsWith("/task")
+          ? ready
+          : page([ready]),
+    ),
+  );
+  render(
+    <main>
+      <h1>Job diagnosis</h1>
+      <Reports job={job} />
+    </main>,
+  );
+  await userEvent.click(
+    await screen.findByRole("button", { name: "Open report" }),
+  );
+  await screen.findByText("Recorded nonzero exit");
+  await auditAccessibility();
+  await userEvent.click(
+    screen.getByRole("button", { name: "Captured stdout" }),
+  );
+  await screen.findByText("proof");
+  await auditAccessibility();
 });
 
 it("uses the strict profile/run contract and retries an uncertain request with the same idempotency key", async () => {

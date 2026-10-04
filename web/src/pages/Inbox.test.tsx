@@ -9,6 +9,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { InboxPage, InboxDetailPage } from "./Inbox";
 import type { InboxItem, InboxItemPage } from "../lib/inbox";
+import { auditAccessibility } from "../test-accessibility";
 const session = vi.hoisted(() => ({
   identity: "alice",
   scope: { deployments: [] as string[] },
@@ -133,6 +134,14 @@ beforeEach(() => {
   );
 });
 afterEach(() => vi.unstubAllGlobals());
+it.each(["/inbox", `/inbox/${id(1)}`])(
+  "provides accessible populated notification content at %s",
+  async (path) => {
+    render(<main>{view(path)}</main>);
+    await screen.findByText("Synthetic job");
+    await auditAccessibility();
+  },
+);
 it("renders immutable context, exact counts and source-qualified refreshed destination", async () => {
   page.unreadCount = "9007199254740993";
   show();

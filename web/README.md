@@ -31,6 +31,11 @@ npm run build
 npm run format:check
 ```
 
+Automated accessibility checks cover route structure, names, errors, keyboard
+entry/focus, populated reports/inbox/devices and graph controls. The jsdom
+checks exclude visual contrast; rendered browser and screen-reader acceptance
+remain separate. See the [accessibility procedure](../docs/ACCESSIBILITY.md).
+
 `npm test` exercises source-qualified duplicate IDs, unknown lifecycle values, cancellation intent, null counts, safe redirects, CSRF/session transport, stale-request cancellation, revoked-data clearing, bounded log buffers, stream gaps and terminal controls, plus rendered job, group and alert-editing workflows. Group tests verify source-qualified duplicate wrapper IDs, partial subtotals, exact large decimal counts, zero indices, bounded neighborhood queries, omission labels, source dependency counts and filtered edge pagination. Build output is in `dist/` and is not committed.
 
 ## Client structure

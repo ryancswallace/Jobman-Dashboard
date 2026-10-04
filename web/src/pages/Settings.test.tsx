@@ -11,6 +11,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SettingsPage } from "./Settings";
 import { setCSRFToken } from "../lib/transport";
 import type { Device } from "../lib/devices";
+import { auditAccessibility } from "../test-accessibility";
 const session = vi.hoisted(() => ({
   identity: "alice",
   bootstrap: {
@@ -102,6 +103,26 @@ afterEach(() => {
   setCSRFToken();
 });
 const phone = () => screen.getByRole("article", { name: "Alice phone" });
+it("keeps owned device details, editing and removal confirmation accessible", async () => {
+  render(
+    <main>
+      <SettingsPage />
+    </main>,
+  );
+  await screen.findByRole("article", { name: "Alice phone" });
+  await auditAccessibility();
+  await userEvent.click(
+    within(phone()).getByRole("button", { name: "Edit device" }),
+  );
+  await screen.findByLabelText("Device label");
+  await auditAccessibility();
+  await userEvent.click(screen.getByRole("button", { name: "Cancel editing" }));
+  await userEvent.click(
+    within(phone()).getByRole("button", { name: "Remove device" }),
+  );
+  await screen.findByRole("button", { name: "Confirm removal" });
+  await auditAccessibility();
+});
 it("lists owned devices with setup/permission state and no unsupported paging query", async () => {
   current = [{ ...base, revocationReady: false }];
   render(<SettingsPage />);
