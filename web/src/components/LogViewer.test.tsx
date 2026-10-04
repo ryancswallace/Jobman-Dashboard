@@ -130,3 +130,95 @@ it("restarts an expired continuation from a fresh tail on explicit refresh", asy
   expect(screen.getByLabelText("stdout log output")).toHaveTextContent("B");
   expect(screen.getByLabelText("stdout log output")).not.toHaveTextContent("A");
 });
+
+it("pins selected run provenance and shows the last successful read independently of a later failure", async () => {
+  const run = {
+    id: "historical-run",
+    number: "9007199254740993",
+    executionId: "historical-execution",
+    phase: "terminal",
+    desiredState: "run",
+    createdAt: chunk.capturedAt,
+    updatedAt: chunk.capturedAt,
+  };
+  fetcher
+    .mockResolvedValueOnce(
+      Response.json({
+        ...chunk,
+        runId: run.id,
+        runNumber: run.number,
+        executionId: run.executionId,
+        state: "open",
+        endOffset: "1",
+        bytesBase64: "QQ==",
+        nextCursor: "historical-cursor",
+      }),
+    )
+    .mockResolvedValueOnce(
+      Response.json({
+        ...chunk,
+        runId: "other-run",
+        runNumber: "2",
+        executionId: "other-execution",
+        state: "complete",
+        startOffset: "1",
+        endOffset: "2",
+        bytesBase64: "Qg==",
+      }),
+    );
+  await act(async () => {
+    render(<LogViewer job={job} run={run} />);
+  });
+  const fetched = screen
+    .getByTitle("Last successful authorized log read")
+    .getAttribute("datetime");
+  expect(fetched).toBeTruthy();
+  expect(String(fetcher.mock.calls[0][0])).toContain(
+    "runNumber=9007199254740993",
+  );
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(5000);
+  });
+  expect(String(fetcher.mock.calls[1][0])).toContain(
+    "runNumber=9007199254740993",
+  );
+  expect(String(fetcher.mock.calls[1][0])).toContain(
+    "cursor=historical-cursor",
+  );
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "response no longer matches the selected run",
+  );
+  expect(screen.getByLabelText("stdout log output")).toHaveTextContent("A");
+  expect(screen.getByLabelText("stdout log output")).not.toHaveTextContent("B");
+  expect(
+    screen.getByTitle("Last successful authorized log read"),
+  ).toHaveAttribute("datetime", fetched!);
+});
+
+it("accepts factual no-execution runs without inventing an execution", async () => {
+  const run = {
+    id: "unassigned-run",
+    number: "1",
+    phase: "pending",
+    desiredState: "run",
+    createdAt: chunk.capturedAt,
+    updatedAt: chunk.capturedAt,
+  };
+  fetcher.mockResolvedValue(
+    Response.json({
+      ...chunk,
+      runId: run.id,
+      runNumber: run.number,
+      executionId: "",
+      state: "not_captured",
+    }),
+  );
+  await act(async () => {
+    render(<LogViewer job={job} run={run} />);
+  });
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect(screen.getByText("Not captured")).toBeVisible();
+  expect(
+    screen.getByTitle("Last successful authorized log read"),
+  ).toBeVisible();
+});

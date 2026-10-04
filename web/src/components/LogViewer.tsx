@@ -1,3 +1,4 @@
+import type * as Wire from "../../../contracts/typescript/dashboard.generated";
 import { useEffect, useRef, useState } from "react";
 import type { JobRef, LogChunk } from "../lib/models";
 import {
@@ -8,9 +9,10 @@ import {
 } from "../lib/transport";
 import { appendLog, type LogBuffer } from "../lib/logs";
 import { useSession } from "../lib/session";
-import { ErrorNotice, Spinner, Status } from "./States";
-export function LogViewer({ job }: { job: JobRef }) {
+import { ErrorNotice, Freshness, Spinner, Status } from "./States";
+export function LogViewer({ job, run }: { job: JobRef; run?: Wire.JobRun }) {
   const { identity } = useSession();
+  const [fetchedAt, setFetchedAt] = useState<string>();
   const [stream, setStream] = useState("stdout"),
     [following, setFollowing] = useState(true),
     [search, setSearch] = useState(""),
@@ -51,8 +53,9 @@ export function LogViewer({ job }: { job: JobRef }) {
     decoder.current = new TextDecoder();
     requestedTick.current = undefined;
     setState("loading");
+    setFetchedAt(undefined);
     setError(undefined);
-  }, [identity, path, stream]);
+  }, [identity, path, stream, run?.id]);
   useEffect(() => {
     let live = true,
       stopped = false,
@@ -65,10 +68,21 @@ export function LogViewer({ job }: { job: JobRef }) {
       try {
         const params = new URLSearchParams({ stream, limitBytes: "262144" });
         if (cursor.current) params.set("cursor", cursor.current);
+        if (run) params.set("runNumber", run.number);
         const chunk = await request<LogChunk>(`${path}/logs?${params}`, {
           signal: controller.signal,
         });
         if (live) {
+          if (
+            run &&
+            (chunk.runId !== run.id ||
+              chunk.runNumber !== run.number ||
+              chunk.executionId !== (run.executionId ?? ""))
+          )
+            throw new APIError(
+              "stream_changed",
+              "The response no longer matches the selected run. Refresh run selection.",
+            );
           if (execution.current && chunk.executionId !== execution.current)
             throw new APIError(
               "stream_changed",
@@ -110,6 +124,7 @@ export function LogViewer({ job }: { job: JobRef }) {
           execution.current = chunk.executionId;
           setState(chunk.truncated ? "truncated" : chunk.state);
           setError(undefined);
+          setFetchedAt(new Date().toISOString());
           if (
             chunk.state === "complete" ||
             (!chunk.nextCursor && bytes.length > 0)
@@ -157,7 +172,16 @@ export function LogViewer({ job }: { job: JobRef }) {
       controller?.abort();
       document.removeEventListener("visibilitychange", visible);
     };
-  }, [identity, path, stream, following, tick]);
+  }, [
+    identity,
+    path,
+    stream,
+    following,
+    tick,
+    run?.id,
+    run?.number,
+    run?.executionId,
+  ]);
   useEffect(() => {
     if (following && view.current)
       view.current.scrollTop = view.current.scrollHeight;
@@ -237,6 +261,15 @@ export function LogViewer({ job }: { job: JobRef }) {
       )}
       <div className="log-footer">
         <Status value={state} />
+        <Freshness fetchedAt={fetchedAt} loading={loading} error={!!error} />
+        {fetchedAt && (
+          <time
+            dateTime={fetchedAt}
+            title="Last successful authorized log read"
+          >
+            {fetchedAt}
+          </time>
+        )}
         <span>
           Original byte range {buffer.startOffset ?? "—"}–
           {buffer.endOffset ?? "—"} · {following ? "Following" : "Paused"}

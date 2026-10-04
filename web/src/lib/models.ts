@@ -203,6 +203,7 @@ export interface LogChunk {
   text?: string;
   stream: string;
   runId?: string;
+  runNumber?: string;
   startOffset: string;
   endOffset: string;
   nextCursor?: string;

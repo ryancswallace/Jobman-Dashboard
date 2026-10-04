@@ -120,6 +120,9 @@ func (c *Client) get(ctx context.Context, actor monitoring.Actor, operation, nam
 	case http.StatusServiceUnavailable:
 		return monitoring.ErrAuthority
 	case http.StatusConflict:
+		if operation == "jobs.read" && strings.HasSuffix(path, "/runs") {
+			return monitoring.ErrCursor
+		}
 		if operation == "targets.read" {
 			return monitoring.ErrTargetChanged
 		}

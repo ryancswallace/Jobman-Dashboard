@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+import { APIError } from "../lib/transport";
 import { useSearchParams } from "react-router-dom";
 import type * as Wire from "../../../contracts/typescript/dashboard.generated";
 import { decodeMeta } from "../lib/api";
@@ -13,16 +15,42 @@ const decodeArtifacts = (value: unknown) => {
     meta: decodeMeta(dto),
   };
 };
-export function ArtifactList({ path }: { path: string }) {
+export function ArtifactList({
+  path,
+  run: selectedRun,
+}: {
+  path: string;
+  run?: Wire.JobRun;
+}) {
   const { identity, bootstrap } = useSession();
   const [search, setSearch] = useSearchParams();
   const cursor = search.get("artifactCursor");
-  const run = search.get("artifactRun");
+  const run = selectedRun?.number ?? search.get("artifactRun");
+  const decode = useMemo(
+    () => (value: unknown) => {
+      const out = decodeArtifacts(value);
+      if (
+        selectedRun &&
+        out.data.items.some(
+          (item) =>
+            item.runId !== selectedRun.id ||
+            item.runNumber !== selectedRun.number ||
+            item.executionId !== selectedRun.executionId,
+        )
+      )
+        throw new APIError(
+          "invalid_response",
+          "Artifact metadata does not match the selected run.",
+        );
+      return out;
+    },
+    [selectedRun?.id, selectedRun?.number, selectedRun?.executionId],
+  );
   const result = useResource(
     `${path}/artifacts?${new URLSearchParams({ limit: "50", ...(cursor ? { cursor } : {}), ...(run ? { runNumber: run } : {}) })}`,
     identity,
     0,
-    decodeArtifacts,
+    decode,
   );
   const firstPage = () => {
     if (cursor) {
@@ -52,6 +80,7 @@ export function ArtifactList({ path }: { path: string }) {
             pattern="[1-9][0-9]*"
             placeholder="All runs"
             value={run ?? ""}
+            readOnly={!!selectedRun}
             onChange={(event) => {
               const q = new URLSearchParams(search);
               q.delete("artifactCursor");

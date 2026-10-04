@@ -248,3 +248,12 @@ it("resolves opaque inbox detail and rejects a substituted record", async () => 
   await screen.findByRole("alert");
   expect(screen.queryByText("Synthetic job")).not.toBeInTheDocument();
 });
+
+it("offers a credential-free native link only for the authorized opaque inbox item", async () => {
+  handle = (c) =>
+    c.path === `/api/v1/inbox/${base.id}` ? json(base) : undefined;
+  show(`/inbox/${base.id}`);
+  expect(
+    await screen.findByRole("link", { name: "Open in app" }),
+  ).toHaveAttribute("href", `jobman-dashboard://inbox/${base.id}`);
+});

@@ -1,3 +1,4 @@
+import { nativeInboxLink } from "../lib/privateLinks";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useSession } from "../lib/session";
@@ -362,9 +363,19 @@ export function InboxDetailPage() {
         title="Job update"
         description="A retained event with current authorization and refreshed job availability."
         actions={
-          <Link className="button secondary" to="/inbox">
-            ← Inbox
-          </Link>
+          <>
+            {result.data && !result.error && (
+              <a
+                className="button secondary"
+                href={nativeInboxLink(result.data.id)}
+              >
+                Open in app
+              </a>
+            )}
+            <Link className="button secondary" to="/inbox">
+              ← Inbox
+            </Link>
+          </>
         }
       />
       {(read.error || result.error) && (

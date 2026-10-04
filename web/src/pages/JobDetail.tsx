@@ -1,3 +1,7 @@
+import { useMemo } from "react";
+import { RunSelector } from "../components/RunSelector";
+import { runDetailForJob, validRunId } from "../lib/runs";
+import { nativeJobLink } from "../lib/privateLinks";
 import {
   Link,
   useLocation,
@@ -34,6 +38,30 @@ export function JobDetailPage() {
       decodeJobDetail,
     ),
     job = result.data?.data;
+  const selectedRunId = search.get("runId") ?? "";
+  const runDecode = useMemo(
+    () => (value: unknown) => runDetailForJob(value, ref, selectedRunId),
+    [deploymentId, namespaceId, jobId, selectedRunId],
+  );
+  const runResult = useResource(
+    selectedRunId && validRunId(selectedRunId)
+      ? `${path}/runs/${selectedRunId}`
+      : null,
+    identity,
+    bootstrap.preferences.refreshSeconds * 1000,
+    runDecode,
+  );
+  const selectedRun = runResult.error ? undefined : runResult.data?.data;
+  const selectRun = (id?: string) => {
+    const next = new URLSearchParams(search);
+    if (id) next.set("runId", id);
+    else next.delete("runId");
+    next.delete("artifactRun");
+    next.delete("artifactCursor");
+    setSearch(next);
+  };
+  const runReady = !selectedRunId || !!selectedRun;
+
   return (
     <>
       <Link
@@ -49,13 +77,18 @@ export function JobDetailPage() {
         description={job?.name ? jobId : undefined}
         actions={
           job && (
-            <Link
-              className="button secondary"
-              to="/alerts"
-              state={{ watchJob: ref }}
-            >
-              ☆ Watch this job
-            </Link>
+            <>
+              <a className="button secondary" href={nativeJobLink(ref)}>
+                Open in app
+              </a>
+              <Link
+                className="button secondary"
+                to="/alerts"
+                state={{ watchJob: ref }}
+              >
+                ☆ Watch this job
+              </Link>
+            </>
           )
         }
       />
@@ -106,6 +139,37 @@ export function JobDetailPage() {
                 Imported history. Original ownership and lifecycle facts are
                 shown only when reported by Control.
               </p>
+            )}
+            <RunSelector
+              key={`${identity}:${path}`}
+              job={ref}
+              selected={selectedRun}
+              select={selectRun}
+            />
+            {selectedRunId && !validRunId(selectedRunId) && (
+              <p role="alert">
+                The selected run ID is invalid.{" "}
+                <button onClick={() => selectRun()}>
+                  Use current defaults
+                </button>
+              </p>
+            )}
+            {runResult.error && (
+              <>
+                <ErrorNotice
+                  error={runResult.error}
+                  retry={runResult.refresh}
+                />
+                <button
+                  className="button secondary"
+                  onClick={() => selectRun()}
+                >
+                  Use current defaults
+                </button>
+              </>
+            )}
+            {selectedRunId && !runResult.error && runResult.loading && (
+              <Spinner label="Verifying selected run" />
             )}
             <nav className="tabs" aria-label="Job sections">
               {["details", "logs", "artifacts", "diagnosis"].map((t) => (
@@ -290,14 +354,26 @@ export function JobDetailPage() {
                 </section>
               </div>
             )}
-            {tab === "logs" && (
-              <LogViewer key={`${identity}:${path}`} job={ref} />
+            {tab === "logs" && runReady && (
+              <LogViewer
+                key={`${identity}:${path}:${selectedRunId}`}
+                job={ref}
+                run={selectedRun}
+              />
             )}
-            {tab === "diagnosis" && (
-              <Reports key={`${identity}:${path}`} job={ref} />
+            {tab === "diagnosis" && runReady && (
+              <Reports
+                key={`${identity}:${path}:${selectedRunId}`}
+                job={ref}
+                run={selectedRun}
+              />
             )}
-            {tab === "artifacts" && (
-              <ArtifactList key={`${identity}:${path}`} path={path} />
+            {tab === "artifacts" && runReady && (
+              <ArtifactList
+                key={`${identity}:${path}:${selectedRunId}`}
+                path={path}
+                run={selectedRun}
+              />
             )}
           </>
         )
