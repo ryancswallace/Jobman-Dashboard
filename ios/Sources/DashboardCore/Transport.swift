@@ -9,6 +9,7 @@ public enum DashboardError: Error, Equatable, Sendable, LocalizedError {
     case sourceUnavailable
     case unsupportedContract
     case cursorExpired
+    case targetChanged
     case streamChanged
     case logGap
     case storageUnavailable
@@ -29,6 +30,7 @@ public enum DashboardError: Error, Equatable, Sendable, LocalizedError {
         case .sourceUnavailable: "A Control deployment is unavailable. Other deployments may still be usable."
         case .unsupportedContract: "This service version is not compatible with the app. Contact your administrator."
         case .cursorExpired: "This page has expired. Refresh to start a new list."
+        case .targetChanged: "The target generation changed. Refresh the target before browsing partitions."
         case .streamChanged: "The log execution changed. Refresh to start a new stream."
         case .logGap: "Log bytes are no longer contiguous. Refresh to start a new stream."
         case .storageUnavailable: "Log storage is unavailable. No empty output has been assumed."
@@ -50,6 +52,7 @@ public enum DashboardError: Error, Equatable, Sendable, LocalizedError {
         case "source_unavailable": .sourceUnavailable
         case "unsupported_contract": .unsupportedContract
         case "cursor_expired": .cursorExpired
+        case "target_changed": .targetChanged
         case "stream_changed": .streamChanged
         case "log_gap": .logGap
         case "storage_unavailable": .storageUnavailable

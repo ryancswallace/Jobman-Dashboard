@@ -197,28 +197,6 @@ struct MoreView: View {
     }
 }
 
-private struct TargetsView: View {
-    var body: some View {
-        List {
-            Section { ScopeMenu(); Text("Configured state indicates policy, not agent liveness or cluster health.").font(.footnote) }
-            PagedRows<Target, TargetRow>(path: "/api/v1/targets") { TargetRow(target: $0) }
-        }.navigationTitle("Targets")
-    }
-}
-private struct TargetRow: View {
-    let target: Target
-    var body: some View {
-        DisclosureGroup(target.name) {
-            Text("\(target.deploymentId) / \(target.namespaceId)")
-            LabeledContent("Configured state", value: target.state)
-            LabeledContent("Generation", value: target.generation ?? "Unavailable")
-            LabeledContent("Backend", value: target.backend ?? "Unavailable")
-            LabeledContent("Provider", value: target.provider ?? "Unavailable")
-            ForEach(target.capabilities, id: \.self) { Text($0) }
-        }
-    }
-}
-
 struct SettingsView: View {
     @Environment(DashboardStore.self) private var store
     @State private var appearance = "system"

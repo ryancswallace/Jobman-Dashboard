@@ -39,6 +39,7 @@ type actorKey struct{}
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	s.registerGroupRoutes(mux)
+	s.registerTargetRoutes(mux)
 	if s.AuthRoutes != nil {
 		s.AuthRoutes.RegisterRoutes(mux)
 	}
@@ -141,7 +142,7 @@ func writeError(w http.ResponseWriter, _ *http.Request, err error) {
 		status = 403
 	case "not_found_or_inaccessible":
 		status = 404
-	case "cursor_expired", "revision_conflict":
+	case "cursor_expired", "revision_conflict", "target_changed":
 		status = 409
 	case "invalid_request":
 		status = 400

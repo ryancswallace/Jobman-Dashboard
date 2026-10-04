@@ -114,6 +114,38 @@ final class DashboardUITests: XCTestCase {
         capture("Log refresh after cursor expiry", app: app)
     }
 
+    func testTargetGenerationPartitionPagingAndReplacementRecovery() {
+        let app = fixtureApp()
+        app.tabBars.buttons["More"].tap()
+        app.buttons["Targets"].tap()
+        let target = app.staticTexts["Synthetic Slurm"]
+        XCTAssertTrue(target.waitForExistence(timeout: 10)); target.tap()
+        let generation = app.descendants(matching: .any)["targetGeneration"]
+        reveal(generation, app: app)
+        XCTAssertTrue(generation.label.contains("9007199254740993"))
+        let preview = app.staticTexts["targetPartitionPreview"]
+        reveal(preview, app: app)
+        XCTAssertTrue(preview.label.contains("201"))
+        capture("Target generation and bounded partition preview", app: app)
+        let browse = app.buttons["Browse all partitions"]
+        reveal(browse, app: app); browse.tap()
+        XCTAssertTrue(app.staticTexts["batch (default)"].waitForExistence(timeout: 10))
+        app.buttons["Next partition page"].tap()
+        XCTAssertTrue(app.staticTexts["gpu"].waitForExistence(timeout: 10))
+        app.buttons["Previous partition page"].tap()
+        XCTAssertTrue(app.staticTexts["batch (default)"].waitForExistence(timeout: 10))
+        app.buttons["Next partition page"].tap()
+        XCTAssertTrue(app.staticTexts["gpu"].waitForExistence(timeout: 10))
+        app.buttons["Next partition page"].tap()
+        let changed = app.staticTexts["The target generation changed. Refresh the target before browsing partitions."]
+        XCTAssertTrue(changed.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["Next partition page"].exists)
+        capture("Target generation change requires refresh", app: app)
+        app.buttons["restartTargetPartitions"].tap()
+        XCTAssertTrue(app.staticTexts["batch (default)"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["Previous partition page"].exists)
+    }
+
     private func fixtureApp() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--dashboard-ui-fixtures"]

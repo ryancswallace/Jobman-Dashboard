@@ -24,12 +24,6 @@ public struct WorkloadDetail: Decodable, Sendable {
     public let workload: Workload; public let children: [WorkloadChild]; public let nextCursor: String?
     public let total: String; public let completeness: String; public let sources: [SourceStatus]; public let fetchedAt: String
 }
-public struct Target: Decodable, Sendable, Identifiable {
-    public let targetId: String; public let deploymentId: String; public let namespaceId: String
-    public let name: String; public let state: String; public let provider: String?; public let backend: String?
-    public let generation: String?; public let capabilities: [String]
-    public var id: String { [deploymentId, namespaceId, targetId].map(APIPath.component).joined(separator: "/") }
-}
 public typealias Artifact = DashboardAPI.Artifact
 extension DashboardAPI.Artifact: Identifiable {}
 public typealias GraphEdge = DashboardAPI.GraphEdge

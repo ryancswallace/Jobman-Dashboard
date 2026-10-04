@@ -52,7 +52,17 @@ enum NativeFixtures {
             return page([report])
         }
         if path.contains("/jobs/") { return ["job":job(path.contains("/west/") ? "west":"east", path.split(separator: "/").last.map(String.init) ?? "job-042"),"fetchedAt":date(now)] }
-        if path == "/api/v1/targets" { return page([["deploymentId":"east","namespaceId":"research","targetId":"slurm-batch","name":"Synthetic Slurm","state":"active","provider":"native","backend":"slurm","generation":"1","capabilities":["collections","arrays"]]]) }
+        if path == "/api/v1/targets" || path.contains("/targets/") {
+            let generation: [String: Any] = ["id":"generation-fixture", "number":"9007199254740993", "executionBackend":"slurm", "transport":"agent-api", "runtimes":["native"], "operatingSystems":["linux"], "architectures":["x86_64"], "capabilities":["arrays", "collections"], "partitions":[["name":"batch", "isDefault":true]], "partitionCount":"201", "partitionsTruncated":true, "logStore":["name":"lab-logs", "version":"1"], "artifactStores":[], "provider":["kind":"on-prem"]]
+            let target: [String: Any] = ["deploymentId":"east", "namespaceId":"research", "targetId":"slurm-batch", "name":"Synthetic Slurm", "kind":"slurm", "state":"active", "revision":"4", "createdAt":date(now), "updatedAt":date(now), "asOf":date(now), "generation":generation]
+            let source = [sources[0]]
+            if path.hasSuffix("/partitions") {
+                let second = value("cursor") != nil
+                return ["targetId":"slurm-batch", "generationId":"generation-fixture", "items":[["name":second ? "gpu" : "batch", "isDefault":!second]], "total":"201", "nextCursor":second ? "target-generation-changed" : "partitions-second", "sources":source, "completeness":"complete", "fetchedAt":date(now)]
+            }
+            if path == "/api/v1/targets" { var result = page([target]); result["totals"] = [["deploymentId":"east", "namespaceId":"research", "total":"1", "asOf":date(now)]]; return result }
+            return ["target":target, "sources":source, "completeness":"complete", "fetchedAt":date(now)]
+        }
         if path.contains("/workloads/") {
             let kind = path.contains("/graph") ? "graph" : path.contains("/array") ? "array" : "collection"
             let workload: [String: Any] = ["id":"workload-fixture","kind":kind,"name":"Synthetic \(kind)","deploymentId":"east","namespaceId":"research","createdAt":date(now),"revision":"9007199254740993","asOf":date(now),"totalChildren":"5","counts":["success":"1","failure":"1","blocked":"3"],"concurrency":"4","failurePolicy":"continue","arrayPolicy":"prefer_array","arrayMode":"native","arrayId":"12345","unsatisfiedPolicy":"block"]
@@ -115,9 +125,11 @@ private final class FixtureProtocol: URLProtocol, @unchecked Sendable {
         do {
             let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems ?? []
             let expired = request.url!.path.hasSuffix("/logs") && query.contains { $0.name == "cursor" }
-            let status = request.httpMethod != "GET" ? 422 : expired ? 409 : 200
+            let targetChanged = request.url!.path.hasSuffix("/partitions") && query.contains { $0.name == "cursor" && $0.value == "target-generation-changed" }
+            let status = request.httpMethod != "GET" ? 422 : (expired || targetChanged) ? 409 : 200
             let data: Data
-            if expired { data = try JSONSerialization.data(withJSONObject: ["error":["code":"cursor_expired","message":"Synthetic cursor expired."]]) }
+            if targetChanged { data = try JSONSerialization.data(withJSONObject: ["code":"target_changed", "message":"Synthetic target generation changed."]) }
+            else if expired { data = try JSONSerialization.data(withJSONObject: ["error":["code":"cursor_expired","message":"Synthetic cursor expired."]]) }
             else if request.httpMethod == "GET" { data = try NativeFixtures.data(path: request.url!.path, query: query) }
             else { data = try JSONSerialization.data(withJSONObject: ["code":"fixture_read_only","message":"Synthetic previews do not mutate real services."]) }
             client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1", headerFields: ["Content-Type":"application/json"])!, cacheStoragePolicy: .notAllowed)

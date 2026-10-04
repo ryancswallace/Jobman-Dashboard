@@ -1531,6 +1531,140 @@
           }
         }
       }
+    },
+    "/api/v1/deployments/{deploymentId}/namespaces/{namespaceId}/targets/{targetId}": {
+      "get": {
+        "operationId": "target",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deploymentId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "namespaceId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "targetId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TargetDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/deployments/{deploymentId}/namespaces/{namespaceId}/targets/{targetId}/partitions": {
+      "get": {
+        "operationId": "targetPartitions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deploymentId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "namespaceId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "targetId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "generationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "minimum": 1,
+              "maximum": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TargetPartitionPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2284,24 +2418,30 @@
           "name": {
             "type": "string"
           },
+          "kind": {
+            "type": "string"
+          },
           "state": {
             "type": "string"
           },
-          "provider": {
-            "type": "string"
+          "revision": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
           },
-          "backend": {
-            "type": "string"
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
           },
           "generation": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          },
-          "capabilities": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+            "$ref": "#/components/schemas/TargetGeneration"
           }
         },
         "required": [
@@ -2309,10 +2449,16 @@
           "namespaceId",
           "targetId",
           "name",
+          "kind",
           "state",
-          "capabilities"
+          "revision",
+          "createdAt",
+          "updatedAt",
+          "asOf",
+          "generation"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Configured execution target. State and advertised capabilities are configuration facts, not health, utilization or capacity. Unknown string enums remain displayable."
       },
       "Artifact": {
         "type": "object",
@@ -2912,7 +3058,8 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Target"
-            }
+            },
+            "maxItems": 200
           },
           "nextCursor": {
             "type": "string"
@@ -2929,15 +3076,29 @@
           "fetchedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "total": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
+          },
+          "totals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TargetTotal"
+            },
+            "maxItems": 320
           }
         },
         "required": [
           "items",
           "completeness",
           "sources",
-          "fetchedAt"
+          "fetchedAt",
+          "total",
+          "totals"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Source-grouped catalog (deployment ID then namespace ID; within source creation time DESC and target ID DESC). At most 200 rows and 2 MiB encoded rows, except a single source-qualified row may use up to 3 MiB; a page may contain fewer rows. Total sums only available source contributions; completeness and sources identify unavailable contributions. Server-held continuations bind account, query, source epoch and authorization."
       },
       "ArtifactPage": {
         "type": "object",
@@ -3391,6 +3552,249 @@
           "fetchedAt"
         ],
         "additionalProperties": false
+      },
+      "TargetPartition": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "isDefault"
+        ],
+        "additionalProperties": false
+      },
+      "TargetStore": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
+          }
+        },
+        "required": [
+          "name",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "TargetProvider": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string"
+          },
+          "clusterName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "additionalProperties": false
+      },
+      "TargetGeneration": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "number": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
+          },
+          "executionBackend": {
+            "type": "string"
+          },
+          "transport": {
+            "type": "string"
+          },
+          "runtimes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 1024
+          },
+          "operatingSystems": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 1024
+          },
+          "architectures": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 1024
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 1024
+          },
+          "partitions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TargetPartition"
+            },
+            "maxItems": 200
+          },
+          "partitionCount": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
+          },
+          "partitionsTruncated": {
+            "type": "boolean"
+          },
+          "logStore": {
+            "$ref": "#/components/schemas/TargetStore"
+          },
+          "artifactStores": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TargetStore"
+            },
+            "maxItems": 64
+          },
+          "provider": {
+            "$ref": "#/components/schemas/TargetProvider"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "executionBackend",
+          "transport",
+          "runtimes",
+          "operatingSystems",
+          "architectures",
+          "capabilities",
+          "partitions",
+          "partitionCount",
+          "partitionsTruncated",
+          "artifactStores",
+          "provider"
+        ],
+        "additionalProperties": false
+      },
+      "TargetTotal": {
+        "type": "object",
+        "properties": {
+          "deploymentId": {
+            "type": "string"
+          },
+          "namespaceId": {
+            "type": "string"
+          },
+          "total": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
+          },
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "deploymentId",
+          "namespaceId",
+          "total",
+          "asOf"
+        ],
+        "additionalProperties": false
+      },
+      "TargetDetail": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "$ref": "#/components/schemas/Target"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceStatus"
+            }
+          },
+          "completeness": {
+            "type": "string"
+          },
+          "fetchedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "target",
+          "sources",
+          "completeness",
+          "fetchedAt"
+        ],
+        "additionalProperties": false
+      },
+      "TargetPartitionPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TargetPartition"
+            },
+            "maxItems": 200
+          },
+          "nextCursor": {
+            "type": "string"
+          },
+          "completeness": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceStatus"
+            }
+          },
+          "fetchedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "total": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "generationId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "completeness",
+          "sources",
+          "fetchedAt",
+          "total",
+          "targetId",
+          "generationId"
+        ],
+        "additionalProperties": false,
+        "description": "Generation-pinned partitions in byte-order by name. A changed generation returns target_changed (409); refresh target detail and discard partition cursor history before retrying."
       }
     }
   }
