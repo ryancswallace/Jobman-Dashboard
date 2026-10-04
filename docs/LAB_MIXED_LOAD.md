@@ -1,6 +1,6 @@
 # Deployed mixed monitoring load
 
-Status: independently reviewed; attempt1 stopped at report preflight before any new rule/job or load. **No passing live mixed-load result is claimed**. The
+Status: **PASS on October4 at exact9fc4420** with current-version reports. Attempt1 stopped at report preflight before any new rule/job or load and remains preserved. The
 opt-in harness is `TestLabDeployedMixedLoad` in
 `internal/auth/lab_mixed_load_test.go`. It extends healthy-dependency contention
 coverage without changing the separate [accepted-scale test](LAB_SCALE.md).
@@ -168,3 +168,37 @@ Slow Control/NFS/directory/APNs/database injections, worker restarts, resource
 profiling and client rendering remain separately reviewable T11 phases. Their
 configuration deltas, time limits, restoration proofs and process ownership must
 be explicit; delaying this test client is not evidence of a slow backend.
+
+## Recorded mixed-load result
+
+Exact harness `9fc4420942fb50df1bb46d30fe39da0164a02c2e` (race binary SHA256
+`55b68c795bb6a96a0326ec03bb3d56deb19736d675c44d8f624abd9d10ad3f7b`)
+passes both90-second modes in183.70seconds. Dashboard rc.3/configuration8 and
+both upgraded04bd83d Controls remain the runtime under test. There are25distinct
+signed-in viewers and peak25concurrent HTTP requests, below the28limit.
+
+| Mode | List p95 | Detail p95 | Overview p95 | Timed requests/errors |
+| --- | --- | --- | --- | --- |
+| One Control |1091.00ms|298.24ms|1251.58ms|1422/0|
+| Two Controls |961.49ms|358.14ms|1133.48ms|1422/0|
+
+Each mode contains414samples per metadata operation and18per investigation
+operation. Across both modes, all16actual host jobs finish with twelve successes
+and four intended exit7 failures. Original event/run identities, exactly one
+current-authorized inbox per job and matched test rule are verified. Conservative
+foreground freshness is at most4912.85ms; inbox persistence at most8825.698ms,
+below10s/30s. Seven queue observations per mode include the final proof. Both
+owned rules are confirmed stopped; jobs/events/inbox/logs remain as evidence.
+
+Evidence directory: `/private/tmp/jobman-dashboard-mixed-current-zbem6a1u`.
+`acceptance.json` SHA256:
+`ad7e70e347b4c1e40e0fbe61c7ebe7573b1a7ab6e99a3d7fea9fbee67b085865`.
+Journal SHA256:
+`7ae119dc78829a69c10e6910af671cd2efabbd575bcb69d389b186f5c05f22af`.
+Log SHA256:
+`fb4d63bed8313a224c5702effe478eef8f54553f721d41f8b2bf6417ea56af53`.
+Window: `2026-10-04T14:01:12.35362Z`–`14:04:16.052076Z`.
+The earlier preflight failure remains under
+`/private/tmp/jobman-dashboard-mixed-53eac75-v1`; the admission keys were unchanged
+and had not been used before the passing attempt. This evidence does not establish
+browser/native rendering latency, APNs, corporate identity or hard-NFS recovery.
