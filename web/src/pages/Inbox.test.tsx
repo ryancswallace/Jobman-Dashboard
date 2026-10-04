@@ -82,6 +82,7 @@ function show(path = "/inbox") {
 }
 beforeEach(() => {
   session.identity = "alice";
+  session.bootstrap.preferences.refreshSeconds = 60;
   session.scope = { deployments: [id(2)] };
   session.bootstrap.sources = [
     {
@@ -133,7 +134,10 @@ beforeEach(() => {
     }),
   );
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 it.each(["/inbox", `/inbox/${id(1)}`])(
   "provides accessible populated notification content at %s",
   async (path) => {
@@ -257,3 +261,36 @@ it("offers a credential-free native link only for the authorized opaque inbox it
     await screen.findByRole("link", { name: "Open in app" }),
   ).toHaveAttribute("href", `jobman-dashboard://inbox/${base.id}`);
 });
+
+it.each([0, 5, 10, 30])(
+  "honors %is inbox-detail refresh and retains explicit and foreground reads",
+  async (seconds) => {
+    vi.useFakeTimers();
+    session.bootstrap.preferences.refreshSeconds = seconds;
+    await act(async () => {
+      show(`/inbox/${id(1)}`);
+    });
+    expect(screen.getByText("Synthetic job")).toBeVisible();
+    expect(calls).toHaveLength(1);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(seconds ? seconds * 1000 - 1 : 60000);
+    });
+    expect(calls).toHaveLength(1);
+    if (seconds) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(calls).toHaveLength(2);
+    }
+    const before = calls.length;
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    });
+    expect(calls).toHaveLength(before + 1);
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(calls).toHaveLength(before + 2);
+    expect(calls.every((call) => call.method === "GET")).toBe(true);
+  },
+);

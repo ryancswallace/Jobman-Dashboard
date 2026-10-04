@@ -342,7 +342,7 @@ export function InboxPage() {
 }
 export function InboxDetailPage() {
   const { inboxId = "" } = useParams(),
-    { identity } = useSession(),
+    { identity, bootstrap } = useSession(),
     [generation, setGeneration] = useState(0);
   const decode = useCallback(
     (value: unknown) => decodeInboxItem(value, inboxId),
@@ -351,7 +351,7 @@ export function InboxDetailPage() {
   const result = useResource(
     `/api/v1/inbox/${encodeURIComponent(inboxId)}`,
     `${identity}:${inboxId}:${generation}`,
-    5000,
+    bootstrap.preferences.refreshSeconds * 1000,
     decode,
   );
   const read = useReadState(`${identity}:${inboxId}`, result.refresh, () =>
@@ -372,6 +372,9 @@ export function InboxDetailPage() {
                 Open in app
               </a>
             )}
+            <button className="button secondary" onClick={result.refresh}>
+              Refresh
+            </button>
             <Link className="button secondary" to="/inbox">
               ← Inbox
             </Link>

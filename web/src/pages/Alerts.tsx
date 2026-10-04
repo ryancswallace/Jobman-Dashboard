@@ -50,7 +50,7 @@ function AlertWorkspace() {
   const rules = useResource(
     `/api/v1/rules?${new URLSearchParams({ limit: "20", ...(cursor ? { cursor } : {}) })}`,
     identity,
-    10000,
+    bootstrap.preferences.refreshSeconds * 1000,
     decodeRulePage,
   );
   const [edit, setEdit] = useState<{ rule?: Rule; job?: JobRef } | undefined>(

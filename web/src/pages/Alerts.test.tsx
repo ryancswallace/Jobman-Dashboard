@@ -14,7 +14,7 @@ import type { Rule, RuleInput } from "../lib/rules";
 const session = vi.hoisted(() => ({
   identity: "alice",
   bootstrap: {
-    preferences: { timezone: "UTC" },
+    preferences: { timezone: "UTC", refreshSeconds: 5 },
     sources: [] as {
       deploymentId: string;
       displayName: string;
@@ -71,6 +71,7 @@ function show(state?: unknown) {
 }
 beforeEach(() => {
   session.identity = "alice";
+  session.bootstrap.preferences.refreshSeconds = 5;
   session.bootstrap.sources = [ref, other].map((value, index) => ({
     deploymentId: value.deploymentId,
     displayName: index ? "West" : "East",
@@ -115,6 +116,7 @@ beforeEach(() => {
   );
 });
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -447,3 +449,37 @@ it("keeps unknown rule values inspectable without coercing them into a writable 
   expect(screen.getByRole("button", { name: "Edit rule" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Stop rule" })).toBeEnabled();
 });
+
+it.each([0, 5, 10, 30])(
+  "honors %is rule refresh and retains explicit and foreground reads",
+  async (seconds) => {
+    vi.useFakeTimers();
+    session.bootstrap.preferences.refreshSeconds = seconds;
+    current = [base];
+    await act(async () => {
+      show();
+    });
+    expect(screen.getByText("Team failures")).toBeVisible();
+    expect(calls).toHaveLength(1);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(seconds ? seconds * 1000 - 1 : 60000);
+    });
+    expect(calls).toHaveLength(1);
+    if (seconds) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(calls).toHaveLength(2);
+    }
+    const before = calls.length;
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Refresh rules" }));
+    });
+    expect(calls).toHaveLength(before + 1);
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(calls).toHaveLength(before + 2);
+    expect(calls.every((call) => call.method === "GET")).toBe(true);
+  },
+);

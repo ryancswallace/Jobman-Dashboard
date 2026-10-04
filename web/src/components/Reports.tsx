@@ -46,7 +46,7 @@ function ReportBrowser({ job, run }: { job: JobRef; run?: Wire.JobRun }) {
   const results = useResource(
     `${path}/reports?${new URLSearchParams({ limit: "20", ...(cursor ? { cursor } : {}) })}`,
     `${identity}:${readGeneration}`,
-    5000,
+    bootstrap.preferences.refreshSeconds * 1000,
     decode,
   );
   useEffect(() => () => pending.current?.abort(), []);
@@ -330,7 +330,24 @@ function ReportView({
     },
     [job.deploymentId, job.namespaceId, job.jobId, taskId],
   );
-  const result = useResource(path, identity, 5000, decode);
+  const interval = bootstrap.preferences.refreshSeconds * 1000;
+  const result = useResource(path, identity, interval, decode);
+  // Following a selected pending task is explicit progress feedback, even in
+  // manual mode. Ordinary report/citation reads keep the user's preference.
+  useEffect(() => {
+    if (
+      interval === 5000 ||
+      result.loading ||
+      result.error ||
+      !result.data ||
+      !["queued", "collecting", "analyzing"].includes(result.data.state)
+    )
+      return;
+    const timer = setTimeout(() => {
+      if (document.visibilityState !== "hidden") result.refresh();
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [interval, result.data, result.loading, result.error, result.refresh]);
   useEffect(() => {
     if (result.error) onReadError(result.error);
   }, [result.error, onReadError]);
@@ -387,7 +404,7 @@ function ReportView({
           {!report.detail && !report.failureCode && (
             <p role="status">
               {["queued", "collecting", "analyzing"].includes(report.state)
-                ? "The report is in progress. Status updates automatically while this view is visible."
+                ? "The report is in progress. Status updates every five seconds while this view is visible, including in manual refresh mode."
                 : "Sealed findings are not available for this task."}
             </p>
           )}
@@ -704,7 +721,12 @@ function CitationView({
       citationId,
     ],
   );
-  const result = useResource(path, identity, 5000, decode);
+  const result = useResource(
+    path,
+    identity,
+    bootstrap.preferences.refreshSeconds * 1000,
+    decode,
+  );
   useEffect(() => {
     if (result.error) onReadError(result.error);
   }, [result.error, onReadError]);

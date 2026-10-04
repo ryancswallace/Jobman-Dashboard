@@ -12,7 +12,7 @@ import { Reports } from "./Reports";
 import { auditAccessibility } from "../test-accessibility";
 const session = vi.hoisted(() => ({
   identity: "alice:east:research",
-  bootstrap: { preferences: { timezone: "UTC" } },
+  bootstrap: { preferences: { timezone: "UTC", refreshSeconds: 5 } },
 }));
 vi.mock("../lib/session", () => ({ useSession: () => session }));
 const job = { deploymentId: "east", namespaceId: "research", jobId: "job" };
@@ -158,6 +158,7 @@ const page = (items: Wire.Report[], nextCursor?: string) => ({
 let fetcher: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   session.identity = "alice:east:research";
+  session.bootstrap.preferences.refreshSeconds = 5;
   fetcher = vi.fn();
   vi.stubGlobal("fetch", fetcher);
 });
@@ -412,4 +413,152 @@ it("uses bounded opaque history continuations and can return to the first page",
   expect(
     screen.getByRole("button", { name: "Previous reports" }),
   ).toBeDisabled();
+});
+
+it.each([0, 5, 10, 30])(
+  "honors %is ordinary report/history/citation refresh without disabling explicit or online reads",
+  async (seconds) => {
+    vi.useFakeTimers();
+    session.bootstrap.preferences.refreshSeconds = seconds;
+    fetcher.mockImplementation(async (path: string) =>
+      Response.json(
+        path.includes("/citations/")
+          ? citation
+          : path.endsWith("/task")
+            ? ready
+            : page([ready]),
+      ),
+    );
+    await act(async () => {
+      render(<Reports job={job} />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Open report" }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Captured stdout" }));
+    });
+    expect(screen.getByText("proof")).toBeVisible();
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(seconds ? seconds * 1000 - 1 : 60000);
+    });
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    if (seconds) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(fetcher).toHaveBeenCalledTimes(6);
+    }
+    const previous = fetcher.mock.calls.length;
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: "Refresh selected report" }),
+      );
+    });
+    expect(fetcher).toHaveBeenCalledTimes(previous + 1);
+    await act(async () => {
+      window.dispatchEvent(new Event("online"));
+    });
+    expect(fetcher).toHaveBeenCalledTimes(previous + 4);
+    expect(screen.getByText("proof")).toBeVisible();
+  },
+);
+
+it.each([0, 30])(
+  "follows each pending report state every 5s at preference %is and returns to ordinary cadence when ready",
+  async (seconds) => {
+    vi.useFakeTimers();
+    session.bootstrap.preferences.refreshSeconds = seconds;
+    let current = pending;
+    fetcher.mockImplementation(async (path: string) =>
+      Response.json(path.endsWith("/task") ? current : page([pending])),
+    );
+    await act(async () => {
+      render(<Reports job={job} />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Open report" }));
+    });
+    for (const next of [
+      { ...pending, state: "collecting" },
+      { ...pending, state: "analyzing" },
+      ready,
+    ]) {
+      current = next;
+      const before = fetcher.mock.calls.length;
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(4999);
+      });
+      expect(fetcher).toHaveBeenCalledTimes(before);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(fetcher).toHaveBeenCalledTimes(before + 1);
+    }
+    expect(screen.getByText("Recorded nonzero exit")).toBeVisible();
+    const details = () =>
+      fetcher.mock.calls.filter(([path]) => String(path).endsWith("/task"))
+        .length;
+    expect(details()).toBe(4);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(seconds ? 29999 : 60000);
+    });
+    expect(details()).toBe(4);
+    if (seconds) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(details()).toBe(5);
+    }
+  },
+);
+
+it("pauses pending follow while hidden and reauthorizes on foreground without overlapping a pending read", async () => {
+  vi.useFakeTimers();
+  session.bootstrap.preferences.refreshSeconds = 0;
+  let visible = true;
+  vi.spyOn(document, "visibilityState", "get").mockImplementation(() =>
+    visible ? "visible" : "hidden",
+  );
+  let finish: ((value: Response) => void) | undefined;
+  fetcher.mockImplementation(async (path: string) =>
+    Response.json(path.endsWith("/task") ? pending : page([pending])),
+  );
+  await act(async () => {
+    render(<Reports job={job} />);
+  });
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Open report" }));
+  });
+  visible = false;
+  await act(async () => {
+    document.dispatchEvent(new Event("visibilitychange"));
+    await vi.advanceTimersByTimeAsync(10000);
+  });
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  fetcher.mockImplementation((path: string) =>
+    path.endsWith("/task")
+      ? new Promise<Response>((resolve) => {
+          finish = resolve;
+        })
+      : Promise.resolve(Response.json(page([pending]))),
+  );
+  visible = true;
+  await act(async () => {
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  expect(fetcher).toHaveBeenCalledTimes(4);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(10000);
+  });
+  expect(fetcher).toHaveBeenCalledTimes(4);
+  await act(async () => {
+    finish!(Response.json(ready));
+  });
+  expect(screen.getByText("Recorded nonzero exit")).toBeVisible();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(10000);
+  });
+  expect(fetcher).toHaveBeenCalledTimes(4);
 });
