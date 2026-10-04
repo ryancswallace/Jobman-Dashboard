@@ -29,7 +29,7 @@ Existing workload and client tests cover separate requirements.
   already installed at
   `/usr/local/libexec/jobman-dashboard-scale/367006818e72315b01860f56f971004e17c24886/jobman-control-lab-helper`,
   SHA256 `6f511e91434dac2499d464f0b424607fe0b099b966148c992499e5371a333f65`.
-  The wrapper pins each running source binary to the reviewed d332a2b5 build,
+  The wrapper pins each running source binary to the reviewed04bd83d build (`7faac82263dfa281d2fec7c3e8a52a55a121294e39e7e2d1706115751d4a2123`),
   verifies its UID/process identity, private source configuration and immutable
   fixture metadata, and requires unchanged process/configuration after each
   normal Store operation. Both the Control and separate LDAP fixture roots must
@@ -45,12 +45,18 @@ research scopes. No caller-supplied database, namespace or source path is accept
 
 ## Run and bounds
 
-From the Dashboard repository after review and deployment:
+From the Dashboard repository after review and deployment, with a newly
+pre-created canonical owner0700 empty directory immediately under `/private/tmp`
+named `jobman-dashboard-notification-receipts-<unique>`. The harness refuses a
+nonempty root before sign-in and passes it explicitly to each wrapper call. The
+wrapper independently checks owner, mode and canonical identity on every call.
+Do not reuse a directory from any prior attempt.
 
 ```sh
 JOBMAN_DASHBOARD_LAB_ROOT=/Users/rcw/home/code/jobman-lab \
 JOBMAN_DASHBOARD_LAB_RUNTIME=1 \
 JOBMAN_DASHBOARD_LAB_MULTISOURCE_NOTIFICATIONS=1 \
+JOBMAN_DASHBOARD_LAB_NOTIFICATION_RECEIPTS=/private/tmp/jobman-dashboard-notification-receipts-REVIEWED_UNIQUE \
 GOTOOLCHAIN=go1.26.6 GOWORK=off \
 go test -race -tags integration ./internal/auth \
   -run '^TestLabTwoControlTerminalNotifications$' -count=1 -v -timeout=13m
@@ -106,7 +112,7 @@ actual durable completion state.
 Retain the verbose test log with the exact deployed Dashboard and Control build
 receipts. It contains public nonce, job, original event and inbox identities, not
 bearer tokens, DSNs, source log contents or provider credentials. Host receipts
-are mode0600 under `.lab/dashboard/multisource-notifications/{primary,secondary}`;
+are mode0600 under the reviewed temporary root’s `{primary,secondary}` directories;
 source helper receipts use the same fresh nonce in their fixed private fixture
 root. They are separate from restore and primary-only acceptance host receipts.
 
@@ -136,10 +142,27 @@ errors, stderr and private material are never echoed. Both output streams are
 bounded; malformed diagnostic frames become a fixed generic failure. This
 instrumentation does not establish the cause of a previous live failure.
 
-A fresh run uses two newly generated nonce receipts. It does not reopen the
-original uncertain primary receipt `7ae1782e0d424061e8f056f7d4dde9bf` or secondary
-receipt `ecf5578b777a10c0a997e3a15218fcfb`. Those original jobs and retained evidence
-require separate explicit review; this harness does not repair or cancel them.
+A fresh run uses two newly generated nonce receipts. Both the harness and explicit
+root wrapper exclude every retained prior receipt:
+
+- `7ae1782e0d424061e8f056f7d4dde9bf`, `ecf5578b777a10c0a997e3a15218fcfb`
+- `63861951db782332bb16cc5f58a0a5d6`, `28bd57c3d4a8d292c37c0b1d1520c821`
+- `8281f530b049327cf138cfeabd32f268`, `e406f287dc15461d0d79351de1d5485c`
+
+Their original jobs and evidence stay at their original paths. This change does
+not copy, repair, migrate or cancel them. A prepare call in the explicit root
+also refuses an existing receipt, rather than adopting an uncertain earlier run.
+
+The third run's finite diagnostic located `common_file_identity`. A separate
+synthetic19-byte local probe reproduced a transient second hard link in the Lab
+tree: unchanged owner0600/content/mtime, but link count1→2 and a changed ctime.
+The strict read correctly rejected it; a parallel `/private/tmp` probe retained
+link count1. The extra link disappeared after the call. Its creator is unknown.
+The explicit root avoids that observed host-directory behavior while preserving
+all regular-file, owner,0600, single-link, bounded-size and immutable-byte guards.
+No directory permission or source authorization check is relaxed. The wrapper's
+legacy default path remains for compatibility; new deployed acceptance uses the
+explicit private root. This local finding is not a passing notification result.
 
 Offline tests run without live opt-ins:
 

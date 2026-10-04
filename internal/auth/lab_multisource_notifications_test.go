@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"testing"
@@ -24,6 +25,38 @@ import (
 )
 
 const labMultiNotificationHelperCommit = "367006818e72315b01860f56f971004e17c24886"
+
+var labMultiNotificationRetainedReceipts = []string{
+	"7ae1782e0d424061e8f056f7d4dde9bf", "ecf5578b777a10c0a997e3a15218fcfb",
+	"63861951db782332bb16cc5f58a0a5d6", "28bd57c3d4a8d292c37c0b1d1520c821",
+	"8281f530b049327cf138cfeabd32f268", "e406f287dc15461d0d79351de1d5485c",
+}
+
+func labMultiNotificationFreshReceipt(receipt string) bool {
+	return regexp.MustCompile(`^[0-9a-f]{32}$`).MatchString(receipt) && !slices.Contains(labMultiNotificationRetainedReceipts, receipt)
+}
+
+// The operator pre-creates this empty private root for a single new run. Python
+// additionally verifies ownership at every call; its strict link/mode guard is
+// unchanged. Existing Lab receipts are never read, copied or adopted here.
+func labMultiNotificationReceiptRoot(path, parent string) error {
+	if path == "" || filepath.Dir(path) != parent || filepath.Clean(path) != path || !regexp.MustCompile(`^jobman-dashboard-notification-receipts-[A-Za-z0-9_-]{1,64}$`).MatchString(filepath.Base(path)) {
+		return errors.New("explicit canonical private temporary receipt root required")
+	}
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil || resolved != path {
+		return errors.New("receipt root must be an existing real directory")
+	}
+	info, err := os.Lstat(path)
+	if err != nil || !info.IsDir() || info.Mode().Perm() != 0700 {
+		return errors.New("receipt root must be private")
+	}
+	entries, err := os.ReadDir(path)
+	if err != nil || len(entries) != 0 {
+		return errors.New("receipt root must be empty for a new run")
+	}
+	return nil
+}
 
 var labMultiNotificationReasonCodes = []string{
 	"common_command_deadline",
@@ -222,6 +255,10 @@ func TestLabTwoControlTerminalNotifications(t *testing.T) {
 	if os.Getenv("JOBMAN_DASHBOARD_LAB_RUNTIME") != "1" || os.Getenv("JOBMAN_DASHBOARD_LAB_MULTISOURCE_NOTIFICATIONS") != "1" {
 		t.Skip("set runtime and two-source notification opt-ins after independent review")
 	}
+	receiptRoot := os.Getenv("JOBMAN_DASHBOARD_LAB_NOTIFICATION_RECEIPTS")
+	if err := labMultiNotificationReceiptRoot(receiptRoot, "/private/tmp"); err != nil {
+		t.Fatal(err)
+	}
 	sessions := []labNativeSession{labNativeSignIn(t, "alice", "71000000-0000-4000-8000-000000000001"), labNativeSignIn(t, "bob", "71000000-0000-4000-8000-000000000002")}
 	for i, want := range []string{"a09dbdf8-aa70-42e7-b58e-fa724f9e3b0d", "bf296166-4679-441c-b673-71148032d752"} {
 		if sessions[i].subject != want {
@@ -243,6 +280,7 @@ func TestLabTwoControlTerminalNotifications(t *testing.T) {
 		if selected != "" {
 			args = append(args, selected)
 		}
+		args = append(args, "--host-receipt-root", receiptRoot)
 		command := exec.CommandContext(callCtx, "python3", args...)
 		var output, diagnostic labBoundedNotificationOutput
 		command.Stdout, command.Stderr = &output, &diagnostic
@@ -318,6 +356,9 @@ func TestLabTwoControlTerminalNotifications(t *testing.T) {
 			t.Fatal("Scenario nonce unavailable")
 		}
 		receipt := hex.EncodeToString(nonce[:])
+		if !labMultiNotificationFreshReceipt(receipt) {
+			t.Fatal("Fresh scenario receipt collided with retained evidence; no call made")
+		}
 		t.Logf("Synthetic %s scenario receipt %s (retain on uncertainty)", profile, receipt)
 		var f labMultiNotificationFixture
 		if err := scenario(ctx, &f, profile, "prepare", receipt, ""); err != nil {
@@ -717,5 +758,57 @@ func TestLabMultiNotificationUncertainCancellationNeverRetries(t *testing.T) {
 	}
 	if err := attempted.once("secondary-first", call); err == nil || calls != 3 {
 		t.Fatal("Validation failure after successful command could permit cleanup replay")
+	}
+}
+
+func TestLabMultiNotificationReceiptRootGuards(t *testing.T) {
+	base, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(base, "jobman-dashboard-notification-receipts-guard")
+	if os.Mkdir(root, 0700) != nil {
+		t.Fatal("root creation")
+	}
+	if err := labMultiNotificationReceiptRoot(root, base); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"", "relative", base, root + "/../" + filepath.Base(root), filepath.Join(base, "wrong-prefix"), filepath.Join(base, "jobman-dashboard-notification-receipts-absent")} {
+		if labMultiNotificationReceiptRoot(path, base) == nil {
+			t.Fatal("invalid root accepted")
+		}
+	}
+	if labMultiNotificationReceiptRoot(root, "/wrong-parent") == nil {
+		t.Fatal("other parent accepted")
+	}
+	alias := filepath.Join(base, "jobman-dashboard-notification-receipts-alias")
+	if err := os.Symlink(root, alias); err != nil {
+		t.Fatal(err)
+	}
+	if labMultiNotificationReceiptRoot(alias, base) == nil {
+		t.Fatal("aliased root accepted")
+	}
+	if os.Chmod(root, 0750) != nil {
+		t.Fatal("mode change")
+	}
+	if labMultiNotificationReceiptRoot(root, base) == nil {
+		t.Fatal("nonprivate root accepted")
+	}
+	if os.Chmod(root, 0700) != nil {
+		t.Fatal("mode restore")
+	}
+	if os.WriteFile(filepath.Join(root, "retained.json"), []byte(`{"synthetic":true}`), 0600) != nil {
+		t.Fatal("synthetic receipt")
+	}
+	if labMultiNotificationReceiptRoot(root, base) == nil {
+		t.Fatal("prior receipt root reused")
+	}
+	if !labMultiNotificationFreshReceipt("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
+		t.Fatal("new receipt rejected")
+	}
+	for _, receipt := range append(slices.Clone(labMultiNotificationRetainedReceipts), "invalid", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA") {
+		if labMultiNotificationFreshReceipt(receipt) {
+			t.Fatal("retained or malformed receipt accepted")
+		}
 	}
 }

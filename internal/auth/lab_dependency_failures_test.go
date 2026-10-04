@@ -227,6 +227,7 @@ type labFaultState struct {
 	uncertainRule                     bool
 	ruleStopped                       bool
 	fixture                           labMultiNotificationFixture
+	notificationReceiptRoot           string
 	event                             labNotificationEvent
 	started                           time.Time
 	result                            *os.File
@@ -728,7 +729,7 @@ func (s *labFaultState) broker() {
 
 func (s *labFaultState) sourceScenario(ctx context.Context, action, selected string, output any) error {
 	root := s.sessions[0].root
-	for name, want := range map[string]string{"dashboard-multisource-notification-scenario.py": "2974ca794895b8271fe78d63f75e23d3dbceb907fdcb3ec28de18d7801259b80", "dashboard-scale-source-common.py": "deb95b8dc32334cddcbcb2f7c1d24584d43de699212f26661c24499339b8cecb"} {
+	for name, want := range map[string]string{"dashboard-multisource-notification-scenario.py": "0065431b3f827e37ef7232a556bf809e4c3a06f7d918bc1192de2fa2a97f7c60", "dashboard-scale-source-common.py": "deb95b8dc32334cddcbcb2f7c1d24584d43de699212f26661c24499339b8cecb"} {
 		raw, err := labScaleReadFile(filepath.Join(root, "scripts", name), 128<<10)
 		sum := sha256.Sum256(raw)
 		if err != nil || hex.EncodeToString(sum[:]) != want {
@@ -738,10 +739,14 @@ func (s *labFaultState) sourceScenario(ctx context.Context, action, selected str
 	if !slices.Contains([]string{"prepare", "complete", "settled"}, action) || (action == "prepare" && selected != "") || (action != "prepare" && !slices.Contains([]string{"first", "stopped"}, selected)) {
 		return errors.New("source helper selection denied")
 	}
+	if s.notificationReceiptRoot == "" || !labMultiNotificationFreshReceipt(s.fixture.Receipt) {
+		return errors.New("fresh private receipt selection required")
+	}
 	args := []string{filepath.Join(root, "scripts/dashboard-multisource-notification-scenario.py"), "primary", action, s.fixture.Receipt}
 	if selected != "" {
 		args = append(args, selected)
 	}
+	args = append(args, "--host-receipt-root", s.notificationReceiptRoot)
 	command := exec.CommandContext(ctx, "python3", args...)
 	command.Stderr = io.Discard
 	var raw labExecutionOutput
@@ -771,13 +776,15 @@ func (s *labFaultState) cleanupRule(ctx context.Context) {
 	s.ruleStopped = true
 }
 func (s *labFaultState) database() {
+	s.notificationReceiptRoot = os.Getenv("JOBMAN_DASHBOARD_LAB_NOTIFICATION_RECEIPTS")
+	s.must(labMultiNotificationReceiptRoot(s.notificationReceiptRoot, "/private/tmp"))
 	plan, err := labScaleReadFile(filepath.Join(s.driver.staging, "plan.json"), 2<<20)
 	s.must(err)
 	var header struct{ OperationID string }
 	s.must(json.Unmarshal(plan, &header))
 	receipt := strings.ReplaceAll(header.OperationID, "-", "")
-	if len(receipt) != 32 {
-		s.t.Fatal("fixed operation receipt unavailable")
+	if !labMultiNotificationFreshReceipt(receipt) {
+		s.t.Fatal("fresh fixed operation receipt unavailable")
 	}
 	s.fixture.Receipt = receipt
 	setup, done := context.WithTimeout(s.ctx, 35*time.Second)

@@ -225,8 +225,13 @@ none contains a token, password or cookie:
   `JOBMAN_DASHBOARD_LAB_FAULT_IMPLEMENTATION_SHA256`: reviewed digest values.
 - `JOBMAN_DASHBOARD_LAB_FAULT_RESULT`: a new private output filename.
 - `JOBMAN_DASHBOARD_LAB_FAULT_SLURM_RECEIPT`: accepted complete-array receipt,
-  fixed SHA256 `186719a51c266e8d48157a508d5e485382811e7a60b1fbc32b1a2f1ab2107801`.
+  fixed current-report SHA256 `929a9e93e83069dc330734b699bd6077432507397e56ec484367c6af954be530`.
 - `JOBMAN_DASHBOARD_LAB_SECONDARY_FIXTURE`: the accepted secondary public fixture.
+- Database case only: `JOBMAN_DASHBOARD_LAB_NOTIFICATION_RECEIPTS`, a new empty
+  owner0700 canonical `/private/tmp/jobman-dashboard-notification-receipts-<unique>`
+  directory. The captured path is passed explicitly to every normal-cancellation
+  wrapper call; the six retained failed-scenario IDs remain excluded. Directory
+  and broker cases do not use it. See `LAB_MULTISOURCE_NOTIFICATIONS.md`.
 
 The main context ends 65 seconds before the six-minute outer deadline; cleanup
 gets an independent 60 seconds. Sign-in/baseline must finish within 90 seconds,
