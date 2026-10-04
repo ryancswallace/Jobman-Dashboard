@@ -56,6 +56,14 @@ CAS, revocation and database-clock expiry. A local skipped database test is not
 PostgreSQL evidence, and these tests do not establish a successful live HTTP or
 rendered-client rerun.
 
+The reviewed `ca0b66cf19a63af1135f121b769ba776cec90d35` implementation passed the
+actual verified-TLS Lab PostgreSQL disposable-schema tests: complete traversal
+2.57 seconds, CAS/expiry 0.13 seconds, full store suite 30.850 seconds. The three
+existing role-creation tests were skipped under that bounded test identity.
+Evidence is `/private/tmp/jobman-group-cursor-real-postgres.log`, SHA-256
+`9935433a816875094596e33be5c4ea0f76185dd78d47ec9887dc0f549eb1b1b3`.
+This is database/engine evidence, not a replacement for the pending live rerun.
+
 ## Existing source evidence
 
 Control's opt-in `TestGraphNavigationCeilingIntegration` builds a synthetic graph
@@ -317,7 +325,14 @@ Before and after real client navigation, the HTTP harness must verify the curren
 source fingerprint and signed account, decode current namespace authorization and
 capabilities, and pin the graph identity. It must walk bounded opaque cursors,
 compare complete counts and edge endpoints, reject cross-source/cross-query cursor
-reuse, and test a denied account. Authorization/source failure remains an error or
+reuse, and test a denied account. The updated harness retains only the last 65
+selectors and hashes of immutable facts per traversal. After each complete walk,
+it reads the previous 64 pages in reverse order, checks exact page facts and
+unchanged successor selectors, then rereads the terminal page. It separately
+requires `409` for a deliberately evicted early selector; account/query/scope
+probes use still-valid recent selectors. These 130 additional successful GETs
+stay inside the unchanged eight-minute overall ceiling and two-MiB response cap.
+The earlier 1,200 forward-page bound and complete relation oracle remain intact. Authorization/source failure remains an error or
 explicit partial result, never a fabricated empty complete graph. A recovery
 must use fresh current authority; no cached token, old grant or guessed ID may
 stand in for that evidence.

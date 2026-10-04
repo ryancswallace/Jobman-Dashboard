@@ -171,6 +171,35 @@ func labCeilingGrant(t *testing.T, read labMultiRead, m labCeilingManifest, allo
 	}
 }
 
+// Keep only current plus64 prior selectors and hashes of immutable page facts.
+// The test oracle never caches full pages or all historical cursor tokens.
+type labCeilingReadPage struct {
+	cursor, next string
+	facts        [32]byte
+}
+type labCeilingReadHistory struct{ pages []labCeilingReadPage }
+
+func (h *labCeilingReadHistory) remember(cursor, next string, items any) error {
+	raw, err := json.Marshal(items)
+	if err != nil || len(raw) > 2<<20 || len(cursor) > 512 || len(next) > 512 || next != "" && next == cursor {
+		return errors.New("graph replay facts or selectors exceed bounds")
+	}
+	for _, page := range h.pages {
+		if page.cursor == cursor {
+			return errors.New("graph pagination repeated a retained selector")
+		}
+	}
+	h.pages = append(h.pages, labCeilingReadPage{cursor: cursor, next: next, facts: sha256.Sum256(raw)})
+	if len(h.pages) > 65 {
+		h.pages = slices.Clone(h.pages[1:])
+	}
+	return nil
+}
+func (p labCeilingReadPage) matches(next string, items any) bool {
+	raw, err := json.Marshal(items)
+	return err == nil && len(raw) <= 2<<20 && p.next == next && p.facts == sha256.Sum256(raw)
+}
+
 // GET-only real HTTP acceptance. Fixture admission and its source/row receipts
 // are separately reviewed Lab operations; this test never seeds or executes jobs.
 func TestLabDeployedGraphCeiling(t *testing.T) {
@@ -217,13 +246,9 @@ func TestLabDeployedGraphCeiling(t *testing.T) {
 		indices[n.ID] = n.Index
 	}
 	cursor, firstChild := "", ""
-	seenCursors := map[string]bool{}
+	childHistory := labCeilingReadHistory{}
 	count := 0
 	for pageNumber := 0; pageNumber < 200; pageNumber++ {
-		if seenCursors[cursor] {
-			t.Fatal("Child pagination repeated a cursor")
-		}
-		seenCursors[cursor] = true
 		q := url.Values{"limit": {"50"}}
 		if cursor != "" {
 			q.Set("cursor", cursor)
@@ -241,6 +266,9 @@ func TestLabDeployedGraphCeiling(t *testing.T) {
 			}
 			count++
 		}
+		if err := childHistory.remember(cursor, page.NextCursor, page.Children); err != nil {
+			t.Fatal(err)
+		}
 		cursor = page.NextCursor
 		if pageNumber == 0 {
 			firstChild = cursor
@@ -249,15 +277,31 @@ func TestLabDeployedGraphCeiling(t *testing.T) {
 			t.Fatal("Graph child pagination ended early or continued past total")
 		}
 	}
+	if len(childHistory.pages) != 65 {
+		t.Fatal("Child Back window differs")
+	}
+	for index := len(childHistory.pages) - 2; index >= 0; index-- {
+		prior := childHistory.pages[index]
+		var page api.WorkloadDetail
+		read(m.path()+"?"+url.Values{"limit": {"50"}, "cursor": {prior.cursor}}.Encode(), &page, 200)
+		labCeilingProvenance(t, m, page.Completeness, page.Sources, page.FetchedAt)
+		if page.Workload.Scope != m.scope() || page.Workload.ID != m.GraphID || page.Total != "10000" || !prior.matches(page.NextCursor, page.Children) {
+			t.Fatal("Recent child Back page or immutable successor changed")
+		}
+	}
+	lastChild := childHistory.pages[len(childHistory.pages)-1]
+	var terminalChild api.WorkloadDetail
+	read(m.path()+"?"+url.Values{"limit": {"50"}, "cursor": {lastChild.cursor}}.Encode(), &terminalChild, 200)
+	labCeilingProvenance(t, m, terminalChild.Completeness, terminalChild.Sources, terminalChild.FetchedAt)
+	if terminalChild.Workload.Scope != m.scope() || terminalChild.Workload.ID != m.GraphID || terminalChild.Total != "10000" || !lastChild.matches(terminalChild.NextCursor, terminalChild.Children) {
+		t.Fatal("Back replay evicted or changed the terminal child page")
+	}
+	read(m.path()+"?"+url.Values{"limit": {"50"}, "cursor": {firstChild}}.Encode(), nil, 409)
 	cursor, firstEdge := "", ""
-	seenCursors = map[string]bool{}
+	edgeHistory := labCeilingReadHistory{}
 	edges := map[[2]int]bool{}
 	previous := ""
 	for pageNumber := 0; pageNumber < 1000; pageNumber++ {
-		if seenCursors[cursor] {
-			t.Fatal("Dependency pagination repeated a cursor")
-		}
-		seenCursors[cursor] = true
 		q := url.Values{"limit": {"100"}}
 		if cursor != "" {
 			q.Set("cursor", cursor)
@@ -278,6 +322,9 @@ func TestLabDeployedGraphCeiling(t *testing.T) {
 			edges[pair] = true
 			previous = order
 		}
+		if err := edgeHistory.remember(cursor, page.NextCursor, page.Items); err != nil {
+			t.Fatal(err)
+		}
 		cursor = page.NextCursor
 		if pageNumber == 0 {
 			firstEdge = cursor
@@ -289,6 +336,27 @@ func TestLabDeployedGraphCeiling(t *testing.T) {
 	if count != 10000 || len(edges) != 100000 || firstChild == "" || firstEdge == "" {
 		t.Fatal("Complete graph traversal coverage differs")
 	}
+	if len(edgeHistory.pages) != 65 {
+		t.Fatal("Dependency Back window differs")
+	}
+	for index := len(edgeHistory.pages) - 2; index >= 0; index-- {
+		prior := edgeHistory.pages[index]
+		var page api.GraphEdgePage
+		read(m.path()+"/dependencies?"+url.Values{"limit": {"100"}, "cursor": {prior.cursor}}.Encode(), &page, 200)
+		labCeilingProvenance(t, m, page.Completeness, page.Sources, page.FetchedAt)
+		if page.Total != "100000" || !prior.matches(page.NextCursor, page.Items) {
+			t.Fatal("Recent dependency Back page or immutable successor changed")
+		}
+	}
+	// Back reads may not destroy the retained terminal page or reopen traversal.
+	last := edgeHistory.pages[len(edgeHistory.pages)-1]
+	var terminal api.GraphEdgePage
+	read(m.path()+"/dependencies?"+url.Values{"limit": {"100"}, "cursor": {last.cursor}}.Encode(), &terminal, 200)
+	labCeilingProvenance(t, m, terminal.Completeness, terminal.Sources, terminal.FetchedAt)
+	if terminal.Total != "100000" || !last.matches(terminal.NextCursor, terminal.Items) {
+		t.Fatal("Back replay evicted or changed the terminal dependency page")
+	}
+	read(m.path()+"/dependencies?"+url.Values{"limit": {"100"}, "cursor": {firstEdge}}.Encode(), nil, 409)
 	for _, test := range []struct{ center, nodes, edges int }{{0, 10000, 100000}, {1, 12, 66}, {9999, 2, 1}} {
 		for _, bounds := range [][2]int{{200, 500}, {3, 2}} {
 			q := url.Values{"nodeId": {m.Nodes[test.center].ID}, "maxNodes": {strconv.Itoa(bounds[0])}, "maxEdges": {strconv.Itoa(bounds[1])}}
@@ -348,21 +416,21 @@ func TestLabDeployedGraphCeiling(t *testing.T) {
 		}
 	}
 	denied(m.path(), nil, 403)
-	denied(m.path()+"/children?limit=50&cursor="+url.QueryEscape(firstChild), nil, 403)
-	denied(m.path()+"/dependencies?limit=100&cursor="+url.QueryEscape(firstEdge), nil, 403)
-	read(m.path()+"/children?limit=51&cursor="+url.QueryEscape(firstChild), nil, 409)
-	read(m.path()+"/dependencies?limit=100&nodeId="+m.Nodes[0].ID+"&cursor="+url.QueryEscape(firstEdge), nil, 409)
+	denied(m.path()+"/children?limit=50&cursor="+url.QueryEscape(lastChild.cursor), nil, 403)
+	denied(m.path()+"/dependencies?limit=100&cursor="+url.QueryEscape(last.cursor), nil, 403)
+	read(m.path()+"/children?limit=51&cursor="+url.QueryEscape(lastChild.cursor), nil, 409)
+	read(m.path()+"/dependencies?limit=100&nodeId="+m.Nodes[0].ID+"&cursor="+url.QueryEscape(last.cursor), nil, 409)
 	other := labReadMultiFixture(t, alice.root+"/.lab/dashboard/fixture-info.json", false)
 	for _, ns := range other.Namespaces {
 		if ns.Name == "dashboard-research" {
 			path := labMultiPrefix(api.Scope{DeploymentID: m.DeploymentID, NamespaceID: ns.ID}) + "/workloads/graph/" + ns.GraphID
-			read(path+"/children?limit=50&cursor="+url.QueryEscape(firstChild), nil, 409)
+			read(path+"/children?limit=50&cursor="+url.QueryEscape(lastChild.cursor), nil, 409)
 		}
 	}
 	checkIdentity()
 	labCeilingGrant(t, read, m, true)
 	labCeilingGrant(t, denied, m, false)
-	t.Log("PASS: real verified-TLS source-qualified graph HTTP navigation, 200 child pages/1000 dependency pages, exact 10000/100000 relation, bounded induced neighborhoods and account/query/scope cursor denial. Synthetic admitted metadata; no executor, rendered browser, simulator or physical-device claim.")
+	t.Log("PASS: real verified-TLS source-qualified graph HTTP navigation, 200 child pages/1000 dependency pages, exact 10000/100000 relation, recent64 Back replay with immutable successors and evicted409, bounded induced neighborhoods and account/query/scope cursor denial. Synthetic admitted metadata; no executor, rendered browser, simulator or physical-device claim.")
 }
 
 func TestLabGraphCeilingIndependentTopology(t *testing.T) {
@@ -599,5 +667,44 @@ func TestLabGraphCeilingRejectsExecutionAndWrongRelation(t *testing.T) {
 				t.Fatal("Wrong graph relation or evidence accepted")
 			}
 		})
+	}
+}
+
+func TestLabGraphCeilingReplayOracle(t *testing.T) {
+	var history labCeilingReadHistory
+	for i := 0; i < 1000; i++ {
+		if err := history.remember(fmt.Sprintf("cursor-%d", i), fmt.Sprintf("cursor-%d", i+1), []string{fmt.Sprintf("fact-%d", i)}); err != nil {
+			t.Fatal(err)
+		}
+		if len(history.pages) > 65 {
+			t.Fatal("Replay oracle retained unbounded tokens")
+		}
+	}
+	if len(history.pages) != 65 || history.pages[0].cursor != "cursor-935" || history.pages[64].cursor != "cursor-999" {
+		t.Fatal("Replay oracle window differs")
+	}
+	for i, page := range history.pages {
+		if !page.matches(fmt.Sprintf("cursor-%d", 936+i), []string{fmt.Sprintf("fact-%d", 935+i)}) {
+			t.Fatal("Original replay facts rejected")
+		}
+		if page.matches(page.next, []string{"changed"}) || page.matches("changed", []string{fmt.Sprintf("fact-%d", 935+i)}) {
+			t.Fatal("Changed facts/successor accepted")
+		}
+	}
+	before := slices.Clone(history.pages)
+	for _, test := range []struct {
+		cursor, next string
+		items        any
+	}{
+		{"cursor-999", "next", []string{"facts"}},
+		{"new", "new", []string{"facts"}},
+		{string(bytes.Repeat([]byte("x"), 513)), "next", nil},
+		{"new", string(bytes.Repeat([]byte("x"), 513)), nil},
+		{"new", "next", string(bytes.Repeat([]byte("x"), 2<<20))},
+		{"new", "next", func() {}},
+	} {
+		if err := history.remember(test.cursor, test.next, test.items); err == nil || !reflect.DeepEqual(before, history.pages) {
+			t.Fatal("Invalid replay record changed the bounded oracle")
+		}
 	}
 }
