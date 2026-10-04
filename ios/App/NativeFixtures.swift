@@ -30,7 +30,7 @@ enum NativeFixtures {
                 ["id":id, "name":"Synthetic \(id.capitalized)", "status":"available", "namespaces":[["id":"research", "name":"Research", "roles":["viewer","operator"], "capabilities":["jobs.read","logs.read","reports.read"], "authorizationVersion":"1", "authorizationCheckedAt":date(now), "authorizationExpiresAt":date(now.addingTimeInterval(120))]]]
             }
             return ["apiVersion":"jobman.dashboard/v1", "account":["id":"fixture-account", "displayName":"Synthetic researcher"], "deployments":deployments,
-                    "preferences":["revision":"1", "timezone":"UTC", "appearance":"system", "refreshSeconds":5],
+                    "preferences":["revision":"1", "timezone":"UTC", "appearance":"system", "refreshSeconds":ProcessInfo.processInfo.arguments.contains("--dashboard-manual-refresh-fixtures") ? 0 : 5],
                     "limits":["defaultPageSize":50,"maxPageSize":200,"logReadBytes":262144,"logBufferBytes":2097152,"graphNodes":200,"graphEdges":500], "completeness":"complete", "fixtureMode":true]
         }
         if path == "/api/v1/overview" { return ["active":3,"awaitingExecution":2,"running":1,"evidenceAttention":0,"missingCompletionTime":0,"terminal":["success":7,"failure":1,"cancelled":0,"timed_out":0,"aborted":0,"lost":0,"unknown":0],"window":["from":date(now.addingTimeInterval(-86400)),"to":date(now)],"sources":sources,"completeness":"complete","fetchedAt":date(now)] }

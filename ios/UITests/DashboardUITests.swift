@@ -147,7 +147,8 @@ final class DashboardUITests: XCTestCase {
     }
 
     func testReportSnapshotFindingsExactCitationAndRevokedAccess() {
-        let app = fixtureApp()
+        // Keep the denied-citation notice stable; independent authorization polling remains enabled.
+        let app = fixtureApp(extra: ["--dashboard-manual-refresh-fixtures"])
         app.tabBars.buttons["Jobs"].tap()
         let job = app.staticTexts["Synthetic alignment run"]
         XCTAssertTrue(job.waitForExistence(timeout: 10)); job.tap()
@@ -564,9 +565,9 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(app.buttons["newRule"].waitForExistence(timeout: 10))
     }
 
-    private func fixtureApp() -> XCUIApplication {
+    private func fixtureApp(extra: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["--dashboard-ui-fixtures"]
+        app.launchArguments = ["--dashboard-ui-fixtures"] + extra
         app.launch()
         XCTAssertTrue(app.staticTexts["fixtureBanner"].waitForExistence(timeout: 10))
         return app
