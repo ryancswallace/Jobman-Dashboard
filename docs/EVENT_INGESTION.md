@@ -1,7 +1,8 @@
 # Durable event ingestion
 
-`events.enabled: true` starts an independent source-feed worker for each
-configured Control. Each source requires the `durable-monitoring-events`
+In combined mode, `events.enabled: true` starts an independent source-feed worker
+for each configured Control. A separate worker selects the `ingestion` component;
+API mode never starts that loop. Each source requires the `durable-monitoring-events`
 capability and explicit service-key `events.read` permission. Human role grants
 do not grant feed access. The private runtime uses the service-only adapter in
 [EVENT_SOURCE.md](EVENT_SOURCE.md); it never retains user tokens to ingest events.
@@ -58,7 +59,7 @@ scope changes during a lease, source epochs, explicit gaps, capacity, pending
 work retention, increased/decreased replay retention and source outages.
 
 Explicit operator replay, reconciliation, restore holds and resume are described
-in [EVENT_RECOVERY.md](EVENT_RECOVERY.md). Notification evaluation, inbox and APNs
-integration are still being completed. Paused feeds must not be manually reset in
-SQL to pretend complete delivery. No release-readiness claim follows from these
-tests.
+in [EVENT_RECOVERY.md](EVENT_RECOVERY.md). Notification evaluation and inbox
+integration pass [deployed synthetic acceptance](LAB_NOTIFICATIONS.md); real APNs
+remains an external gate. Paused feeds must not be manually reset in SQL to
+pretend complete delivery. These tests do not establish full release readiness.

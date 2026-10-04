@@ -1,7 +1,8 @@
 # Linux candidate packages and service installation
 
-Status: packaging is under implementation. The first release's integrated gates
-are still open; a candidate is not production acceptance. Production installation,
+Status: the engineering candidate is published and its split services pass actual
+Lab installation/restart checks. The first release's integrated gates are still
+open; a candidate is not production acceptance. Production installation,
 AD/AD FS changes and distribution require the approvals in the adopted
 implementation prompt. The isolated synthetic Lab has separate testing authority.
 
@@ -170,6 +171,15 @@ data path; the broker has only its private state directory. Adjust mount paths t
 the actual approved log/report roots. `ProtectHome=true` intentionally prevents
 reading home-mounted logs until a specific reviewed mount policy permits them.
 Private TLS ports must be unprivileged because no bind capability is granted.
+
+When observability is configured, standalone validation needs the socket parent
+to exist before systemd has created its `RuntimeDirectory`. Provision only the
+configured parent directories with the exact service owner/group and mode0700;
+for the supplied units these are `/run/jobman-dashboard-api`,
+`/run/jobman-dashboard-worker`, and `/run/jobman-log-broker`. Verify existing
+directories and reject an unexpected owner, mode or symlink. Do not recursively
+change permissions on an existing tree. Systemd maintains these directories on
+subsequent service starts.
 
 Validate as each service identity before enabling units:
 

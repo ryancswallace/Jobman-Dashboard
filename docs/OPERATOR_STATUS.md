@@ -79,9 +79,10 @@ clock-skewed timestamps to zero; JSON retains the actual observed timestamps.
 
 This is stored operational evidence, not live dependency readiness or a liveness
 probe. It does not expose an opaque source retained-lower-bound cursor or infer a
-timestamp from it. API/source latency, authorization revocation lag, log/report
-failure instrumentation and cumulative retention-deletion counters remain separate
-instrumentation work. Retention routines currently return per-pass counts, not
+timestamp from it. API/source latency, local readiness and log/report failures
+are available separately through [process observability](PROCESS_OBSERVABILITY.md).
+Actual directory-change revocation lag needs a measured integration exercise;
+proof age is not that measurement. Retention routines return per-pass counts, not
 durable totals; this snapshot does not fabricate cumulative counters from them.
 
 Configuration/CLI tests cover minimal operator material, both output formats,

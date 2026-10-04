@@ -1,7 +1,8 @@
 # Event gaps, delivery holds and recovery
 
-The private `jobman-dashboard events` commands use the runtime database identity
-and configured Control service credentials. They are not exposed as Dashboard
+The private `jobman-dashboard events` commands use an explicitly reviewed
+operational database identity and configured Control service credentials. They
+are not exposed as Dashboard
 HTTP endpoints. They never submit or change jobs. Output contains source IDs,
 plan digests, counters and coverage summaries; opaque feed cursors, directory
 principals, job content and credentials stay private.
@@ -15,10 +16,19 @@ these commands cannot override it.
 
 ## Inspect, replay and apply a source gap
 
-Run commands on the Dashboard service host, with its private configuration and
-normal runtime database role. Substitute the IDs, generations, revisions and
-SHA-256 digest returned by each preceding command. Configuration paths in these
-examples are illustrative.
+Run commands on the Dashboard service host with a private API-shaped recovery
+configuration naming the exact source registry and the ingestion worker's Control
+service identity. Cursors are service-bound; an API caller's identity is not
+interchangeable with the worker's. Give this configuration a separately reviewed
+database credential with the operational mutation privileges needed by the
+selected commands. The split runtime grant profiles and read-only `operator`
+profile do not authorize hold changes or general recovery. Keep this credential
+out of every serving process; never broaden runtime grants to make an operator
+command pass. The recovery configuration retains ordinary strict validation and
+source/epoch/revision checks.
+
+Substitute the IDs, generations, revisions and SHA-256 digest returned by each
+preceding command. Configuration paths in these examples are illustrative.
 
 ```sh
 jobman-dashboard events gap --config /etc/jobman-dashboard/dashboard.json \
@@ -76,12 +86,16 @@ re-adding one does not restore those intervals without explicit user revalidatio
 
 ## Restoring Dashboard PostgreSQL
 
-Before starting workers against a restored database, set
-`events.deliveryHold: true` in the private runtime configuration. Startup persists
-the global hold before starting worker loops. A false setting never releases an
-already persisted hold. Alternatively establish a hold in an existing healthy
-instance with the commands below. Local `hold` and `hold-status` require no readable
-Control credentials or network connection to Control.
+Before starting split processes against a restored database, explicitly establish
+the durable hold with the privileged operational configuration and commands below.
+Set API `events.deliveryHold: true` and worker `deliveryHold: true` in their
+respective private configurations. Split startup asserts an already-established
+hold and refuses to start if it is absent; runtime roles cannot establish or
+release it. Legacy combined `serve` mode retains its earlier behavior of persisting
+a configured hold before starting worker loops when its database credential has
+that authority. A false setting never releases an already persisted hold.
+Local `hold` and `hold-status` require no readable Control credentials or network
+connection to Control.
 
 ```sh
 jobman-dashboard events hold-status --config /etc/jobman-dashboard/dashboard.json
@@ -111,8 +125,11 @@ it is not a substitute for the global hold. `--suppress-all-recovered` suppresse
 all events seen during that particular replay as an additional conservative choice.
 It does not narrow any persisted cutoff.
 
-After every configured source is active again, set `events.deliveryHold: false`
-and explicitly resume using the current hold generation:
+After every configured source is active again, change only the API and worker
+startup hold flags to false in exact reviewed configurations, validate them and
+restart the affected processes while the database hold remains set. Update the
+operational configuration's `events.deliveryHold` to false as well, then explicitly
+resume with its privileged credential and the current hold generation:
 
 ```sh
 jobman-dashboard events resume --config /etc/jobman-dashboard/dashboard.json \
@@ -144,7 +161,8 @@ scopes and authorization. A global restore/delivery hold always takes precedence
 
 Recovery, cutoff inheritance, global holds, lease fencing, atomic rollback,
 source-set checks and bounded represented-user reconciliation have unit/race and
-real synthetic Lab PostgreSQL coverage. Actual operator execution against a
-deployed notification runtime and end-to-end evaluator/provider recovery exercises
-remain required before release. There is no claim of complete historic delivery
-or exactly-once notification presentation.
+real synthetic Lab PostgreSQL coverage. Deployed worker-service identity replay
+and explicit apply preserve original event/inbox identities in
+[split acceptance](LAB_SPLIT.md). Full database-restore/evaluator/provider recovery
+exercises remain separate release gates. There is no claim of complete historic
+delivery or exactly-once notification presentation.

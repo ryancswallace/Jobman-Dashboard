@@ -23,7 +23,7 @@ API and worker registrations.
 | Shared reports | Worker-owned files0640/directories0750; reader group21906; API reads without mutation permission |
 | Database | Exact migration18 ledger, separate TLS password logins, executable least-privilege grants and protected-operation denial |
 | Secrets | API/session material and worker purpose keys have distinct private owners; cross-role reads denied |
-| Health | Private Unix liveness sockets and the operator status snapshot respond; actual database ledger is compatible |
+| Health | All three private `/readyz` endpoints report `ready` for `local_required_dependencies`; bounded metrics and operator status respond |
 | Broker | Separate API/worker callers, signed provenance, existing original log mapping preserved |
 
 The completed pre-cutover database dump was175,297bytes, SHA256
@@ -102,9 +102,48 @@ match their saved counts and SHA256 digests. Current-state reconciliation report
 unavailable in both scopes because there are no enabled rules or eligible rule
 owners; this is not complete historical coverage or a demonstrated source outage.
 Apply completed at recovery revision3 with the exact reviewed digest, using the
-explicit incomplete-coverage acknowledgment. The feed is active with no unresolved
-gap; hold generation2 remains set and existing inbox/delivery identities are
-unchanged. Explicit hold release is a separate operator step.
+explicit incomplete-coverage acknowledgment. While hold generation2 remained set,
+the API and worker startup hold flags were changed to false using exact file-hash
+checks and private backups. Only those operational flags changed; source
+configuration stayed at revision5. Both processes restarted under the still-held
+database, with actual executable/UID, private readiness and bounded metrics checks.
+
+The separate explicit resume command fetched current source checkpoints and
+released generation2, returning held=false/generation3. The feed stayed active
+with no unresolved gap; the recovered historical event completed processing
+without adding an inbox item or delivery. Original saved event/inbox/delivery
+identities remained intact. No restore cutoff, source head reset or authority
+change was introduced.
+
+A fresh notification scenario then passed13.64s (race package14.961s) on the
+split candidate. Receipt `fcfa6fa7078d2c8df29726fe464a8829` records two new normal
+Control cancellation jobs. The test verifies actual ingestion, source-clock
+activation, all three alert scopes, selected/all-terminal outcomes, overlap and
+owner filtering, inbox read/unread, cross-account denial, and no notification for
+the second event after matching rules stop. Test-owned rules were cleaned up;
+source jobs/events and public receipts remain. See
+[notification procedure and limitations](LAB_NOTIFICATIONS.md).
+
+## Direct-group change timing
+
+The existing-token revocation scenario also passes against this split candidate
+in96.77s (race package98.082s). Timing starts immediately before each atomic
+synthetic directory-helper update, so these conservative upper bounds include
+SSH/helper time:
+
+| Transition | Observed upper bound |
+| --- | --- |
+| Remove Alice's overlapping viewer grant; submitter access remains | 6.300s |
+| Restore Alice's original union | 30.648s |
+| Remove Bob's last research grant | 28.498s |
+| Restore Bob's original grant | 30.721s |
+
+Each is below the60second engineering target. The same original tokens are used
+throughout. Job, log, artifact and saved browse-cursor access is denied after the
+last grant is removed, then restored without another sign-in. Original direct
+memberships are restored on completion. The complete log is
+`/private/tmp/jobman-dashboard-split-revocation-timing.log`. Four observations are
+not a p95 estimate and do not measure corporate AD replication or AD FS behavior.
 
 This checkpoint does not cover a database restore, combined-runtime fallback,
 secret rotation, second Control, integrated load or actual APNs delivery.

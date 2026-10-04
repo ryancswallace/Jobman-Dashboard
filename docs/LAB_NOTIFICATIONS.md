@@ -17,7 +17,8 @@ remain as synthetic evidence. This is cancellation/observation acceptance, not
 actual subprocess or Slurm execution acceptance.
 
 Before running, the operator must deploy the reviewed notification-capable
-Dashboard with migrations through 17 and `events.enabled`, authorize the existing
+Dashboard with its complete compatible migration ledger and `events.enabled`
+(or the separate worker's `ingestion` and `notifications` components), authorize the existing
 Dashboard service's `events.read` scope on the isolated Control, and verify the
 feed is active. This scenario expects the Lab configuration without real APNs
 provider credentials. Physical Apple delivery and managed-device acceptance are
@@ -103,3 +104,14 @@ retained an omitted `readAt` value when marking unread. Resetting that response
 object preserved every behavioral assertion; no deployed service was changed
 between the failing and passing runs. Source jobs/events/receipts were retained,
 and test-owned rules were deleted through the authenticated API.
+
+The exact split candidate `b8f25afdd90f83b4602f32440a89e74dfa866b6c` also passes
+the complete scenario in13.64s (race package14.961s), with configuration5 and
+migrations1–18, after explicit worker-service cursor recovery and hold release.
+It uses a fresh nonce `fcfa6fa7078d2c8df29726fe464a8829`; no old completed job was
+reused to claim new ingestion. All prior assertions and cleanup pass. The new
+public receipt and first/stopped event records remain under the Lab's
+`.lab/dashboard/notifications/`, with log
+`/private/tmp/jobman-dashboard-split-notifications-live.log`. This proves the
+separate worker/database/source identities support the integrated path;
+real APNs delivery remains unverified.

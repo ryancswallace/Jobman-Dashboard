@@ -162,12 +162,20 @@ func TestLabExistingTokensRespectDirectGroupChanges(t *testing.T) {
 			}
 		}
 	})
-	waitFor := func(description string, predicate func(context.Context) bool) {
+	waitFor := func(started time.Time, description string, predicate func(context.Context) bool) {
 		t.Helper()
-		ctx, cancel := context.WithTimeout(t.Context(), 70*time.Second)
+		// Start before the atomic directory helper call. Including its SSH and
+		// update time gives a conservative upper bound on directory-visible change
+		// to observed authorization, rather than mislabeling whole-test duration.
+		ctx, cancel := context.WithDeadline(t.Context(), started.Add(60*time.Second))
 		defer cancel()
 		for {
 			if predicate(ctx) {
+				elapsed := time.Since(started)
+				if elapsed > 60*time.Second {
+					t.Fatalf("Directory change exceeded the 60-second engineering target for %s", description)
+				}
+				t.Logf("PASS: %s observed within %s from before the synthetic directory update (upper bound includes helper transport)", description, elapsed.Round(time.Millisecond))
 				return
 			}
 			select {
@@ -177,32 +185,35 @@ func TestLabExistingTokensRespectDirectGroupChanges(t *testing.T) {
 			}
 		}
 	}
-	begin := func(scenario string) {
+	begin := func(scenario string) time.Time {
 		t.Helper()
 		var nonce [16]byte
 		if _, err := rand.Read(nonce[:]); err != nil {
 			t.Fatal("Could not create private synthetic recovery identity")
 		}
 		activeReceipt = hex.EncodeToString(nonce[:])
+		started := time.Now()
 		if err := transition(t.Context(), "begin", scenario, activeReceipt); err != nil {
 			t.Fatal("Synthetic transition failed; cleanup will restore its private receipt")
 		}
+		return started
 	}
 	restore := func() {
 		t.Helper()
+		started := time.Now()
 		if err := transition(t.Context(), "restore", "", activeReceipt); err != nil {
 			t.Fatal("Synthetic restoration failed; cleanup will retry its private receipt")
 		}
 		activeReceipt = ""
-		waitFor("both original direct grants", func(ctx context.Context) bool {
+		waitFor(started, "both original direct grants", func(ctx context.Context) bool {
 			a, ap, ae := namespace(ctx, alice.accessToken)
 			b, bp, be := namespace(ctx, bob.accessToken)
 			return ae == nil && be == nil && ap && bp && slices.Contains(a.Roles, "viewer") && slices.Contains(a.Roles, "submitter") && slices.Equal(b.Roles, []string{"viewer"})
 		})
 	}
 
-	begin("alice-viewer-removed")
-	waitFor("Alice's remaining submitter grant", func(ctx context.Context) bool {
+	started := begin("alice-viewer-removed")
+	waitFor(started, "Alice's remaining submitter grant", func(ctx context.Context) bool {
 		entry, present, err := namespace(ctx, alice.accessToken)
 		return err == nil && present && slices.Equal(entry.Roles, []string{"submitter"}) && slices.Contains(entry.Capabilities, "logs.read") && entry.AuthorizationVersion != baselineAlice.AuthorizationVersion
 	})
@@ -224,8 +235,8 @@ func TestLabExistingTokensRespectDirectGroupChanges(t *testing.T) {
 		t.Fatal("Restored baseline needs an actual opaque continuation")
 	}
 	query.Set("cursor", page.NextCursor)
-	begin("bob-research-removed")
-	waitFor("Bob's last research grant removal", func(ctx context.Context) bool {
+	started = begin("bob-research-removed")
+	waitFor(started, "Bob's last research grant removal", func(ctx context.Context) bool {
 		_, present, err := namespace(ctx, bob.accessToken)
 		return err == nil && !present
 	})

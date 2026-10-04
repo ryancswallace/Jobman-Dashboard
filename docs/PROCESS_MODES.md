@@ -1,10 +1,11 @@
 # API and worker process boundaries
 
-Status: API/worker startup, role-specific local configuration, purpose-key loading
-and verified delegation provenance are implemented with focused regression tests.
-Least-privilege database grants and the split deployment acceptance below remain
-separate gates. The combined `serve` mode remains compatible; this document does
-not claim that the split has been exercised in the Lab or in production.
+Status: API/worker startup, role-specific configuration, purpose-key separation,
+verified delegation provenance and executable least-privilege database grants are
+implemented and independently reviewed. Exact packaged [Lab split acceptance](LAB_SPLIT.md)
+includes actual role denials, report conversion and worker restart. Production,
+full restore, provider and managed-device acceptance remain separate gates.
+The combined `serve` mode remains compatible.
 
 DESIGN §§2.1, 2.2 and 12 require independently deployed API and worker processes,
 with credentials appropriate to each role. Durable database leases already
@@ -110,16 +111,23 @@ for that without granting worker updates to identity or session contents.
 | Report task/requester/idempotency | Enqueue/read and owner binding | None | None | None | Lease/analyze/complete/fail | Expiry/reference cleanup |
 | Content-free audit | Insert API actions | Appropriate source actions only | Insert activation-denial actions | Insert device invalidation actions | Only defined actions | Bounded age deletion |
 
-This matrix is the review boundary; executable role grants are being developed
-and tested separately. Final grant scripts must
-be derived from actual statements, including column-restricted lock privileges,
-identity sequences and trigger dependencies. The `status --operator-config` command uses a separate minimal observation
+This matrix is the review boundary. The [executable grant plans](../deploy/postgres/README.md)
+are derived from actual statements, including column-restricted lock privileges,
+identity sequences and trigger dependencies, and have real PostgreSQL role tests.
+The `status --operator-config` command uses a separate minimal observation
 configuration and read-only database identity; legacy `--config` remains supported.
 Do not add operator grants to the API role. A restricted process-owned health or
-metrics listener is a separate integration seam, not part of the status command. Tests must run real API and worker
-operations under those roles, and independently prove denial of account identity,
+metrics listener is [separately implemented](PROCESS_OBSERVABILITY.md), not part of
+the status command. Deployment checks must run real API and worker operations
+under those roles, and independently prove denial of account identity,
 alias, session, migration-ledger and unrelated table mutation. A role that cannot
 perform its required transaction must fail closed; a broad grant is not a fix.
+
+Split startup with a configured delivery hold requires the durable hold to have
+already been established by the separately privileged operator. API, worker and
+read-only status roles cannot establish or release it. Follow
+[event recovery](EVENT_RECOVERY.md), retaining the ingestion service identity and
+exact current configuration revision.
 
 ## Configuration examples
 
