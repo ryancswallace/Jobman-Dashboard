@@ -26,6 +26,9 @@ private struct GraphSnapshotView: View {
     var body: some View {
         List {
             Section("Selected node") {
+                #if DEBUG
+                if NativeGraphFixtures.enabled { NativeGraphDisplayFacts() }
+                #endif
                 Text(center).font(.headline).accessibilityIdentifier("graphCenter")
                 Text("\(workload.deploymentId) / \(workload.namespaceId)").font(.caption)
                 NavigationLink("Browse dependencies") { GraphDependenciesView(workload: workload, node: center) }
@@ -38,8 +41,8 @@ private struct GraphSnapshotView: View {
             if loading && neighborhood == nil { ProgressView("Loading bounded neighborhood…") }
             if let neighborhood {
                 Section("Bounded graph diagram") {
-                    Text("Graph totals: \(neighborhood.totalNodes) nodes, \(neighborhood.totalEdges) edges").font(.caption)
-                    Text("Outside this neighborhood: \(neighborhood.omittedNodes) nodes, \(neighborhood.omittedEdges) edges").font(.caption).accessibilityIdentifier("graphOmissions")
+                    Text("Neighborhood totals: \(neighborhood.totalNodes) nodes, \(neighborhood.totalEdges) edges").font(.caption).accessibilityIdentifier("graphNeighborhoodTotal")
+                    Text("Not shown in this neighborhood: \(neighborhood.omittedNodes) nodes, \(neighborhood.omittedEdges) edges").font(.caption).accessibilityIdentifier("graphOmissions")
                     Toggle("Show diagram", isOn: $showDiagram)
                     if showDiagram { DependencyDiagram(neighborhood: neighborhood, select: select) }
                     Text("Select a node to recenter. The list below offers the same selection and job access with VoiceOver. Diagram edges do not determine readiness.").font(.footnote)
@@ -48,7 +51,9 @@ private struct GraphSnapshotView: View {
                     ForEach(neighborhood.nodes) { child in
                         VStack(alignment: .leading, spacing: 8) {
                             Button("Center on \(child.name ?? child.id)") { select(child.id) }
-                                .buttonStyle(.borderless).disabled(child.id == center).accessibilityIdentifier("center-\(child.id)")
+                                .buttonStyle(.borderless).disabled(child.id == center)
+                                .accessibilityAddTraits(child.id == center ? .isSelected : [])
+                                .accessibilityIdentifier("center-\(child.id)")
                             Text("Node \(child.id)").font(.caption)
                             WorkloadChildFacts(child: child)
                             NavigationLink("Open job \(child.job.id)") { JobDetailView(ref: child.job.ref) }.buttonStyle(.borderless)
@@ -102,6 +107,8 @@ private struct GraphEdgeRows: View {
         Section("\(direction.isEmpty ? "All connected" : direction.capitalized) dependencies") {
             if let page {
                 Text("\(page.items.count) edges on this page; \(page.total ?? "unavailable") matching edges at source").font(.caption).accessibilityIdentifier("edgePageTotal")
+                if !history.isEmpty { Button("Previous dependency page") { Task { await previous() } }.disabled(loading) }
+                if let cursor = page.nextCursor { Button("Next dependency page") { Task { await next(cursor) } }.disabled(loading) }
                 ForEach(page.items) { edge in
                     DisclosureGroup("\(edge.from) → \(edge.to)") {
                         LabeledContent("Predicate", value: edge.predicate)
@@ -116,8 +123,6 @@ private struct GraphEdgeRows: View {
                     }
                 }
                 if page.items.isEmpty { Text("No matching dependencies") }
-                if !history.isEmpty { Button("Previous dependency page") { Task { await previous() } }.disabled(loading) }
-                if let cursor = page.nextCursor { Button("Next dependency page") { Task { await next(cursor) } }.disabled(loading) }
                 SourceSummary(completeness: page.completeness, sources: page.sources, fetchedAt: page.fetchedAt)
             }
             if loading { ProgressView("Loading dependencies…") }

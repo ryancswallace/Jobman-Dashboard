@@ -28,6 +28,33 @@ const meta = () => ({
   ],
   fetchedAt: at,
 });
+// Integer adjacency avoids allocating all 100k wire edges for a selected-node read.
+// The independent topology oracle still enumerates every edge through graphFixtureEdge.
+function outgoing(index: number): number[] {
+  if (index === 0) return Array.from({ length: 9999 }, (_, n) => n + 1);
+  if (index >= 1 && index <= 9000)
+    return Array.from({ length: 10 }, (_, n) => index + n + 1);
+  return index === 9001 ? [9002] : [];
+}
+function incoming(index: number): number[] {
+  if (index === 0) return [];
+  const values = [0];
+  for (let n = Math.max(1, index - 10); n <= Math.min(9000, index - 1); n++)
+    values.push(n);
+  if (index === 9002) values.push(9001);
+  return values;
+}
+function nodeIndex(id: string | null): number {
+  const index = Number(id?.split("-").at(-1)) - 1;
+  if (
+    !Number.isInteger(index) ||
+    index < 0 ||
+    index >= graphFixture.nodes ||
+    graphNodeId(index) !== id
+  )
+    throw Error("invalid fixture node");
+  return index;
+}
 export function graphFixtureNode(index: number): Wire.WorkloadChild {
   if (!Number.isInteger(index) || index < 0 || index >= graphFixture.nodes)
     throw Error("invalid fixture node");
@@ -35,19 +62,11 @@ export function graphFixtureNode(index: number): Wire.WorkloadChild {
     id: graphNodeId(index),
     index: String(index),
     name: graphNodeName(index),
-    readiness: index === 0 ? "ready" : "waiting",
-    disposition: "pending",
     dependencyCounts: {
-      waiting: String(
-        index === 0
-          ? 0
-          : 1 +
-              Math.max(
-                0,
-                Math.min(index - 1, 9000) - Math.max(1, index - 10) + 1,
-              ) +
-              (index === 9002 ? 1 : 0),
-      ),
+      total: String(incoming(index).length),
+      satisfied: "0",
+      waiting: String(incoming(index).length),
+      unsatisfied: "0",
     },
     job: {
       deploymentId: graphFixture.deploymentId,
@@ -60,7 +79,8 @@ export function graphFixtureNode(index: number): Wire.WorkloadChild {
       updatedAt: at,
       desiredState: "run",
       phase: "accepted",
-      confidence: "unavailable",
+      confidence: "",
+      group: { graphId: graphFixture.graphId, graphIndex: index },
       labels: { fixture: "graph-ceiling" },
     },
   };
@@ -71,6 +91,9 @@ export function graphFixtureEdge(index: number): Wire.GraphEdge {
   const extra = index - 9999;
   const from = extra < 0 ? 0 : 1 + Math.floor(extra / 10);
   const to = extra < 0 ? index + 1 : from + 1 + (extra % 10);
+  return edgePair(from, to);
+}
+function edgePair(from: number, to: number): Wire.GraphEdge {
   return {
     from: graphNodeName(from),
     to: graphNodeName(to),
@@ -92,7 +115,17 @@ const workload: Wire.Workload = {
   asOf: at,
   revision: "1",
   totalChildren: "10000",
-  counts: { accepted: "10000" },
+  phase: "accepted",
+  counts: {
+    active: "0",
+    terminal: "0",
+    success: "0",
+    failure: "0",
+    cancelled: "0",
+    waiting: "10000",
+    skipped: "0",
+    blocked: "0",
+  },
   concurrency: "1",
   unsatisfiedPolicy: "skip",
 };
@@ -138,7 +171,11 @@ export class GraphWireFixture {
       );
     const offset = known?.offset ?? 0;
     const limit = Number(url.searchParams.get("limit") ?? "50");
-    if (!Number.isInteger(limit) || limit < 1 || limit > 200)
+    if (
+      !Number.isInteger(limit) ||
+      limit < 1 ||
+      limit > (suffix === "/dependencies" ? 500 : 200)
+    )
       throw Error("unbounded fixture request");
     if (!suffix) {
       const children = Array.from(
@@ -157,29 +194,28 @@ export class GraphWireFixture {
       } satisfies Wire.WorkloadDetail);
     }
     if (suffix === "/dependencies") {
-      const matches = function* () {
-        for (let i = 0; i < graphFixture.edges; i++) {
-          const edge = graphFixtureEdge(i);
-          if (
-            !nodeId ||
-            ((!direction || direction === "incoming") &&
-              edge.toJobId === nodeId) ||
-            ((!direction || direction === "outgoing") &&
-              edge.fromJobId === nodeId)
-          )
-            yield edge;
-        }
-      };
       const items: Wire.GraphEdge[] = [];
-      let total = nodeId ? 0 : graphFixture.edges;
+      let total: number;
       if (!nodeId) {
+        total = graphFixture.edges;
         for (let i = offset; i < Math.min(offset + limit, total); i++)
           items.push(graphFixtureEdge(i));
-      } else
-        for (const edge of matches()) {
-          if (total >= offset && items.length < limit) items.push(edge);
-          total++;
-        }
+      } else {
+        const index = nodeIndex(nodeId);
+        if (!["", "incoming", "outgoing"].includes(direction))
+          throw Error("invalid fixture direction");
+        const pairs = [
+          ...(direction === "outgoing"
+            ? []
+            : incoming(index).map((from) => [from, index])),
+          ...(direction === "incoming"
+            ? []
+            : outgoing(index).map((to) => [index, to])),
+        ];
+        total = pairs.length;
+        for (const [from, to] of pairs.slice(offset, offset + limit))
+          items.push(edgePair(from, to));
+      }
       this.maximumEdges = Math.max(this.maximumEdges, items.length);
       return this.json({
         items,
@@ -191,7 +227,7 @@ export class GraphWireFixture {
       } satisfies Wire.GraphEdgePage);
     }
     if (suffix === "/neighborhood") {
-      const center = Number(nodeId?.split("-").at(-1)) - 1;
+      const center = nodeIndex(nodeId);
       const maxNodes = Number(url.searchParams.get("maxNodes"));
       const maxEdges = Number(url.searchParams.get("maxEdges"));
       if (
@@ -203,24 +239,28 @@ export class GraphWireFixture {
         maxEdges > 500
       )
         throw Error("unbounded fixture neighborhood");
-      const neighbors = new Set<number>();
-      for (let i = 0; i < graphFixture.edges; i++) {
-        const edge = graphFixtureEdge(i);
-        if (edge.fromJobId === nodeId)
-          neighbors.add(Number(edge.toJobId.split("-").at(-1)) - 1);
-        if (edge.toJobId === nodeId)
-          neighbors.add(Number(edge.fromJobId.split("-").at(-1)) - 1);
-      }
-      const indices = [center, ...[...neighbors].sort((a, b) => a - b)].slice(
-        0,
-        maxNodes,
-      );
-      const nodes = indices.map(graphFixtureNode);
-      const ids = new Set(nodes.map((n) => n.id));
+      const neighbors = new Set([
+        center,
+        ...incoming(center),
+        ...outgoing(center),
+      ]);
+      const indices = [
+        center,
+        ...[...neighbors].filter((n) => n !== center).sort((a, b) => a - b),
+      ]
+        .slice(0, maxNodes)
+        .sort((a, b) => a - b);
+      const nodes = indices.map(graphFixtureNode),
+        selected = new Set(indices);
       const edges: Wire.GraphEdge[] = [];
-      for (let i = 0; i < graphFixture.edges && edges.length < maxEdges; i++) {
-        const edge = graphFixtureEdge(i);
-        if (ids.has(edge.fromJobId) && ids.has(edge.toJobId)) edges.push(edge);
+      let totalEdges = 0;
+      for (const from of [...neighbors].sort((a, b) => a - b)) {
+        for (const to of outgoing(from)) {
+          if (!neighbors.has(to)) continue;
+          totalEdges++;
+          if (selected.has(from) && selected.has(to) && edges.length < maxEdges)
+            edges.push(edgePair(from, to));
+        }
       }
       this.maximumNodes = Math.max(this.maximumNodes, nodes.length);
       this.maximumEdges = Math.max(this.maximumEdges, edges.length);
@@ -228,10 +268,10 @@ export class GraphWireFixture {
         centerId: nodeId!,
         nodes,
         edges,
-        totalNodes: "10000",
-        totalEdges: "100000",
-        omittedNodes: String(graphFixture.nodes - nodes.length),
-        omittedEdges: String(graphFixture.edges - edges.length),
+        totalNodes: String(neighbors.size),
+        totalEdges: String(totalEdges),
+        omittedNodes: String(neighbors.size - nodes.length),
+        omittedEdges: String(totalEdges - edges.length),
         ...meta(),
       } satisfies Wire.GraphNeighborhood);
     }

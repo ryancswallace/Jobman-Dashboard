@@ -35,6 +35,42 @@ xcrun simctl install booted "$TMPDIR/jobman-dashboard-xcode-build/Build/Products
 xcrun simctl launch booted org.jobman.dashboard --dashboard-ui-fixtures
 ```
 
+## Large graph simulator profile
+
+Debug builds additionally recognize `--dashboard-graph-ceiling-fixtures` with
+`--dashboard-ui-fixtures`. This lazy fixture represents 10,000 nodes and 100,000
+edges using the same forward-DAG topology as the web ceiling test. Requests still
+use the real native transport and decoders; the URLProtocol supplies synthetic
+wire responses. It creates no jobs, identity session or network connection.
+The graph fixture and its environment diagnostic view are excluded from Release.
+
+`GraphCeilingFixtureTests` independently checks the topology, traverses every
+node and dependency through bounded decoded pages, verifies source-qualified
+identity and exact totals/omissions, and rejects incompatible cursor queries and
+oversized bounds. Its fixture source is a test-only symlink to the Debug source,
+so tests do not maintain a second implementation.
+
+`GraphCeilingUITests` exercises node/dependency page replacement, exact source
+counts/predicates, the 200-node/500-edge diagram, selected accessibility traits,
+and list recentering. Run the three standard workflows with Xcode's
+`-only-testing:DashboardUITests/GraphCeilingUITests` filter. The fourth workflow
+is deliberately skipped without its display-profile runner:
+
+```sh
+python3 scripts/test-graph-accessibility.py --device <booted-iPhone-simulator-UUID>
+```
+
+The runner captures the existing simulator's Dynamic Type and Reduce Motion
+values, sets the largest accessibility text size and Reduce Motion, and restores
+both exact values in `finally`, including after test failure. It refuses unknown
+baselines and retains before/after JSON, screenshots and an xcresult in a unique
+temporary directory. The test asserts the actual SwiftUI environment before
+navigation; a settings write or skipped test is not acceptance. No host-wide
+preferences change. Do not run another test/configuration process on the same
+simulator concurrently. This checks rendered simulator behavior, not VoiceOver,
+Voice Control, actual Control authorization or a managed device. Evidence and
+remaining gates are in [graph client acceptance](../docs/GRAPH_CLIENT_ACCEPTANCE.md).
+
 ## Identity and data handling
 
 - `/auth/native/config` supplies the approved AD FS issuer, public client, API audience/scopes and exact `jobman-dashboard-auth://callback` redirect. Discovery and token exchange use verified HTTPS, bounded responses, no redirects and ephemeral sessions; discovered authorization/token endpoints must match the configured issuer origin. Authorization, code exchange and refresh all bind the configured API resource. `ASWebAuthenticationSession` performs authorization-code/S256 PKCE sign-in. The app never collects AD passwords, uses an ID token as an API credential, or trusts a decoded token as account identity. Authorized account identity comes from Dashboard bootstrap.

@@ -123,6 +123,10 @@ private final class FixtureProtocol: URLProtocol, @unchecked Sendable {
                 return
             }
             let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems ?? []
+            if NativeGraphFixtures.enabled, request.httpMethod == "GET",
+               let response = try NativeGraphFixtures.response(path: request.url!.path, query: query) {
+                respond(status: 200, data: try JSONSerialization.data(withJSONObject: response)); return
+            }
             let expired = request.url!.path.hasSuffix("/logs") && query.contains { $0.name == "cursor" }
             let targetChanged = request.url!.path.hasSuffix("/partitions") && query.contains { $0.name == "cursor" && $0.value == "target-generation-changed" }
             let deniedCitation = request.url!.path.hasSuffix("/citations/citation-denied")

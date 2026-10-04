@@ -12,7 +12,7 @@ struct DependencyDiagram: View {
     private var inputs: [GraphLayout.Input] { children.map { node in .init(id: node.id, upstream: neighborhood.edges.filter { $0.toJobId == node.id }.map(\.fromJobId)) } }
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Showing \(children.count) nodes and \(neighborhood.edges.count) edges from the selected neighborhood (limits: 200 nodes, 500 edges).").font(.caption)
+            Text("Showing \(children.count) nodes and \(neighborhood.edges.count) edges from the selected neighborhood (limits: 200 nodes, 500 edges).").font(.caption).accessibilityIdentifier("graphDiagramBounds")
             if let layout {
                 if layout.containsCycle { Label("Unexpected cycle in displayed dependencies", systemImage: "exclamationmark.triangle").font(.caption) }
                 Text("\(layout.omittedNodes) loaded nodes and \(layout.omittedEdges) dependencies outside this diagram").font(.caption)
@@ -45,6 +45,8 @@ struct DependencyDiagram: View {
                                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(.secondary.opacity(0.5)))
                                 }.buttonStyle(.plain).position(point(vertex))
                                     .accessibilityLabel("Node \(child.id), \(child.readiness ?? child.job.phase). Center graph on this node.")
+                                    .accessibilityAddTraits(child.id == neighborhood.centerId ? .isSelected : [])
+                                    .accessibilityIdentifier("diagram-node-\(child.id)")
                             }
                         }
                     }.frame(width: Double((layout.vertices.map(\.column).max() ?? 0) + 1) * (width + 48) + 16,

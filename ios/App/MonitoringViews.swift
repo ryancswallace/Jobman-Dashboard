@@ -245,6 +245,9 @@ struct WorkloadDetailView: View {
                 }
             }
             Section(workload.kind == "graph" ? "Nodes" : "Children") {
+                if !pageHistory.isEmpty { Button("Previous child page") { Task { await previous() } }.disabled(loading) }
+                if let cursor { Button("Next child page") { Task { await next(cursor) } }.disabled(loading) }
+                if let total = page?.total ?? detail?.total { Text("\(children.count) children on this page; \(total) at source").font(.caption).accessibilityIdentifier("childPageTotal") }
                 ForEach(children) { child in
                     DisclosureGroup {
                         WorkloadChildFacts(child: child)
@@ -254,10 +257,7 @@ struct WorkloadDetailView: View {
                         }
                     } label: { Text(child.taskIndex.map { "Task \($0) · \(child.name ?? child.id)" } ?? child.name ?? child.id) }
                 }
-                if !pageHistory.isEmpty { Button("Previous child page") { Task { await previous() } }.disabled(loading) }
-                if let cursor { Button("Next child page") { Task { await next(cursor) } }.disabled(loading) }
                 if children.isEmpty && detail == nil && error == nil { ProgressView() }
-                if let total = page?.total ?? detail?.total { Text("\(children.count) children on this page; \(total) at source").font(.caption) }
             }
             if let page { Section { SourceSummary(completeness: page.completeness, sources: page.sources, fetchedAt: page.fetchedAt) } }
             else if let detail { Section { SourceSummary(completeness: detail.completeness, sources: detail.sources, fetchedAt: detail.fetchedAt) } }

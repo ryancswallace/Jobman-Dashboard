@@ -168,7 +168,9 @@ it("navigates a ceiling graph with bounded tables, omissions, keyboard recenteri
       screen.getByRole("region", { name: "Neighborhood node list" }),
     ).getByRole("button", { name: graphNodeName(1) }),
   ).toHaveAttribute("aria-current", "true");
-  await auditAccessibility();
+  expect(
+    screen.getByText(/Returned 12 of 12 nodes and 66 of 66 edges/),
+  ).toBeVisible();
   expect(
     within(nodesTable()).getByRole("link", { name: "Synthetic job 1" }),
   ).toHaveAttribute(
@@ -178,6 +180,18 @@ it("navigates a ceiling graph with bounded tables, omissions, keyboard recenteri
   expect(fixture.maximumNodes).toBeLessThanOrEqual(50);
   expect(fixture.maximumEdges).toBeLessThanOrEqual(100);
   expect(fixture.maximumResponseBytes).toBeLessThan(2 << 20);
+});
+
+// Keep the full-document axe audit independent of the keyboard workflow. Both
+// retain the ordinary 5s budget; accessibility-tree analysis is test-oracle work.
+it("audits populated ceiling graph exploration with the unchanged accessibility rules", async () => {
+  render(view());
+  await screen.findByRole("heading", { name: "Synthetic ceiling graph" });
+  fireEvent.click(
+    within(nodesTable()).getByRole("button", { name: graphNodeName(1) }),
+  );
+  await screen.findByText(/Returned 12 of 12 nodes and 66 of 66 edges/);
+  await auditAccessibility();
 });
 
 it("replaces pages and resets dependency cursors when the selected direction changes", async () => {
@@ -290,6 +304,70 @@ it("defines exactly 10000 source nodes and 100000 unique forward edges without f
   expect(graphFixtureNode(9999).job.currentRun).toBeUndefined();
   expect(() => graphFixtureNode(10000)).toThrow();
   expect(() => graphFixtureEdge(100000)).toThrow();
+});
+
+it("reports the complete induced one-hop neighborhood independently of whole-graph totals", async () => {
+  // Node 1 sees root 0 and 2...11. Every forward pair among these 12 nodes
+  // exists: 12 choose 2 = 66; this oracle does not use fixture adjacency helpers.
+  for (const [center, expectedNodes, expectedEdges] of [
+    [1, 12, 66],
+    [9999, 2, 1],
+  ]) {
+    const result = decodeGraphNeighborhood(
+      await fixture
+        .respond(
+          `${graphFixturePath}/neighborhood?nodeId=${graphNodeId(center)}&maxNodes=200&maxEdges=500`,
+        )
+        .json(),
+    ).data;
+    expect(result.totalNodes).toBe(String(expectedNodes));
+    expect(result.totalEdges).toBe(String(expectedEdges));
+    expect(result.nodes).toHaveLength(expectedNodes);
+    expect(result.edges).toHaveLength(expectedEdges);
+    expect(result.omittedNodes).toBe("0");
+    expect(result.omittedEdges).toBe("0");
+    expect(result.nodes.map((node) => node.id)).toContain(graphNodeId(center));
+    for (const node of result.nodes) {
+      expect(node.readiness).toBeUndefined();
+      expect(node.disposition).toBeUndefined();
+      expect(node.job.phase).toBe("accepted");
+      expect(node.job.currentRun).toBeUndefined();
+      expect(node.dependencyCounts?.total).toBe(node.dependencyCounts?.waiting);
+      expect(node.dependencyCounts?.satisfied).toBe("0");
+      expect(node.dependencyCounts?.unsatisfied).toBe("0");
+    }
+    for (const edge of result.edges) {
+      expect(edge.predicate).toBe("success");
+      expect(edge.state).toBe("waiting");
+      expect(edge.upstreamPhase).toBe("accepted");
+      expect(edge.outcomes).toEqual([]);
+    }
+    if (center === 1) {
+      const expected = [];
+      for (let from = 0; from < 12; from++)
+        for (let to = from + 1; to < 12; to++)
+          expected.push([graphNodeId(from), graphNodeId(to)]);
+      expect(
+        result.edges.map((edge) => [edge.fromJobId, edge.toJobId]),
+      ).toEqual(expected);
+    }
+  }
+  const truncated = decodeGraphNeighborhood(
+    await fixture
+      .respond(
+        `${graphFixturePath}/neighborhood?nodeId=${graphNodeId(1)}&maxNodes=3&maxEdges=2`,
+      )
+      .json(),
+  ).data;
+  expect(truncated.nodes.map((node) => node.id)).toEqual(
+    [0, 1, 2].map(graphNodeId),
+  );
+  expect([
+    truncated.totalNodes,
+    truncated.totalEdges,
+    truncated.omittedNodes,
+    truncated.omittedEdges,
+  ]).toEqual(["12", "66", "9", "64"]);
 });
 
 async function renderCeilingDiagram() {

@@ -50,7 +50,7 @@ The regular suite checks:
 - Exact 10,000/100,000 totals, bounded 50-row child and 100-row dependency pages,
   and source-qualified job links.
 - Keyboard Enter/Space recentering, programmatic `aria-current` on the diagram
-  and list controls, source-provided readiness, and exact neighborhood omissions.
+  and list controls, source-provided job/dependency states, and exact neighborhood omissions.
 - Next/first child pages, next dependency pages, incoming/outgoing selection and
   cursor reset when the query changes. A new page replaces the previous rows.
 - Account changes abort outstanding reads. A delayed old response cannot restore
@@ -96,6 +96,150 @@ five-second unit-test budget was insufficient for this larger axe audit; its
 separate 60-second budget does not change any product performance target or
 exclude an accessibility rule.
 
+## Native synthetic profile
+
+The DEBUG-only native profile uses `--dashboard-ui-fixtures` and
+`--dashboard-graph-ceiling-fixtures`. `NativeGraphFixtures.swift` generates the
+same complete 10,000-node/100,000-edge topology lazily, with bounded 50-child,
+100-dependency and 200-node/500-edge neighborhood responses. Its base64 fixture
+cursors bind the graph, route, node and direction; they are test protocol values,
+not a claim of production cursor authentication. All counts and job/dependency states come from
+this explicit synthetic source. No executor, real sign-in, source query or APNs
+operation occurs.
+
+The core tests compile that exact DEBUG source through a test-only symlink. They
+independently enumerate unique forward edges and incoming counts, decode all
+10,000 children and all 100,000 dependencies, validate source-qualified models,
+verify maximum neighborhood/layout bounds and exact omissions, and reject
+cross-query cursors/oversized limits. They do not retain the graph in the
+application; retained uniqueness sets belong only to the test oracle.
+
+The simulator tests use the real URLProtocol transport, workload screens,
+detached layout and SwiftUI diagram/list. Pagination appears above long lists so
+50-node/100-edge pages can be replaced without scrolling past every row. Selected
+nodes expose the selected accessibility trait in both diagram and list. Screenshots
+and assertions distinguish complete source totals from loaded page/neighborhood
+counts, source job/dependency states and exact dependency predicates.
+
+Run core tests from `ios/`, then the focused simulator class:
+
+```sh
+./scripts/test-core.sh
+xcodebuild -project JobmanDashboard.xcodeproj -scheme JobmanDashboard \
+  -destination 'platform=iOS Simulator,name=iPhone 18 Pro' \
+  -derivedDataPath /private/tmp/jobman-dashboard-graph-ui \
+  -only-testing:DashboardUITests/GraphCeilingUITests \
+  -collect-test-diagnostics never CODE_SIGNING_ALLOWED=NO test
+python3 scripts/test-graph-accessibility.py --device <booted-iPhone-simulator-UUID>
+```
+
+The opt-in display runner records and restores only that simulator's actual text
+size and Reduce Motion settings, even after failure. A DEBUG-only label reports
+the actual SwiftUI environment; the test requires `accessibility5` and Reduce
+Motion enabled before exercising list recentering/dependency navigation. The
+standard suite skips this one profile rather than silently pretending to test
+large text with default settings. Settings snapshots and result bundles remain
+in the runner's printed temporary directory. No production accessibility setting
+is overridden. No other process should change the same simulator concurrently.
+
+These are native decoder/simulator observations. Full traversal is a core wire
+contract test, not 10,000 UI taps; screenshots do not establish VoiceOver reading
+order, Voice Control, physical-device performance, measured contrast or live
+source/account behavior. Those gates remain separately open.
+
+### Recorded native result (October 4)
+
+Xcode 27.0 (27A266a), iPhone 18 Pro simulator / iOS 27.0:
+
+- All 70 core tests pass, including five ceiling fixture/contract groups. The
+  complete 100,000-edge decoding group takes 1.912 seconds in that run; this is
+  test-harness time, not a live API performance result. Log:
+  `/private/tmp/jobman-dashboard-native-graph-all-core.log`.
+- The three standard UI workflows have passing focused results. Child and
+  dependency navigation are in `jobman-dashboard-native-graph-focused-v1.xcresult`;
+  maximum diagram/recentering is in `jobman-dashboard-native-graph-focused-v2.xcresult`,
+  both under `/private/tmp`. First diagram failure remains in v1: a row-center
+  XCTest tap did not turn the switch off. The corrected test targets the switch
+  and asserts its state before list scrolling.
+- The actual `accessibility5`/Reduce Motion profile passes in 47.579 seconds.
+  Evidence is in the temporary directory ending
+  `jobman-dashboard-graph-accessibility-3lka1sk5`: before/after values match
+  (`large`, Reduce Motion `0`), and `result.json` confirms restoration. Two prior
+  bundles (`...-c87agvk8`, `...-x08krtkd`) retain test-scrolling failures and successful
+  restoration; assertions and display settings were not relaxed. Recenter resets
+  the screen to its top, and virtualized rows must be scrolled into view before
+  querying them at the largest text size.
+- Standard and enlarged-text screenshots were exported and inspected. Source
+  totals/omissions, selected readiness, predicates and wrapped list controls are
+  visible. Long IDs wrap in the list; the diagram remains a bounded scrollable
+  overview with a complete list alternative. This does not measure contrast or
+  establish screen-reader behavior.
+- The unsigned Release simulator build passes; its executable contains none of
+  the graph fixture/diagnostic markers. Log:
+  `/private/tmp/jobman-dashboard-native-graph-release.log`.
+
+### Source-contract correction
+
+A follow-up comparison with Control's `GraphNeighborhood` implementation found
+that both initial ceiling fixtures incorrectly used whole-graph totals after
+recentering. Totals and omissions describe the complete **one-hop induced
+neighborhood**, before node/edge limits. They equal 10,000/100,000 at the star
+root, but node 1 has 12 nodes/66 edges and the last node has 2 nodes/1 edge.
+Independent web/native regressions now enumerate the 12-node forward pairs,
+check exact 66-edge membership and verify truncated 3-node/2-edge results retain
+12/66 totals and 9/64 omissions. The native label now says “Neighborhood totals”
+and omissions say “Not shown in this neighborhood.”
+
+The current source provides four dependency counts (`total`, `satisfied`,
+`waiting`, `unsatisfied`) and no separate node `readiness` value. These synthetic
+unexecuted jobs are `accepted`, their success-predicate dependencies are
+`waiting`, and they have no disposition/current run. Both fixtures now use those
+wire facts. The native fixture also accepts the actual empty-direction “Both”
+query and the source's 500-edge maximum. The earlier screenshots and recentered
+fixture assertions above are preserved but superseded for these semantics;
+whole-root bounds and the prior generic UI workflow evidence remain valid.
+
+Before this correction the full simulator regression completed 28 tests: 27
+passed, and the separate display profile was explicitly skipped; zero failures
+in 620.507 seconds. Evidence is
+`/private/tmp/jobman-dashboard-native-graph-all-ui.xcresult` and the adjacent log.
+No repeated full generic UI run is required for these fixture/label corrections;
+affected core, graph UI and enlarged-text checks are rerun separately.
+
+Two hosted runs of the initial web tests hit their ordinary five-second budgets
+for combined navigation/oracle work. Those logs remain at
+`/private/tmp/jobman-dashboard-output-bound-ci-failed.log` and
+`/private/tmp/jobman-dashboard-output-bound-pr-ci-failed.log`. The corrected wire
+fixture uses integer adjacency rather than constructing 100,000 edge objects on
+every selected-node request. The full-document populated axe audit is now an
+independent test from the keyboard workflow, retaining the same rules and
+ordinary five-second budget for each. Product latency targets are unchanged.
+
+The corrected exact-source checks pass:
+
+- All 71 native core tests (six ceiling groups), 1.795 seconds:
+  `/private/tmp/jobman-dashboard-native-graph-correction-core-final.log`.
+- Three affected standard simulator workflows pass, with one explicit separate
+  profile skip, zero failures in 88.648 seconds:
+  `/private/tmp/jobman-dashboard-native-graph-correction-ui-final.xcresult`.
+  The dependency workflow also selects the actual empty-direction Both option.
+- The actual largest-text/Reduce Motion workflow passes in 53.673 seconds;
+  `jobman-dashboard-graph-accessibility-9sggavt1/result.json` confirms exact
+  restoration with no errors. Corrected standard and enlarged screenshots were
+  exported for visual inspection. A preceding corrected profile also passed in
+  53.758 seconds; the final run additionally includes the policy/default-limit
+  alignment and Both-direction regression.
+- Web default suite: 135 passed, two explicitly skipped opt-in checks, 9.85
+  seconds. All nine graph checks including the complete 1,200-page walk and
+  full SVG axe audit pass together in 61.96 seconds. Logs:
+  `/private/tmp/jobman-dashboard-graph-correction-web-full-v2.log` and
+  `/private/tmp/jobman-dashboard-graph-correction-web-ceiling.log`.
+  The retained local `...-web-full.log` records the combined keyboard/axe budget
+  failure before those checks were separated; neither check lost assertions.
+- Type checking, production web build, formatting, and the unsigned Release
+  simulator build pass. The Release executable contains none of the four
+  graph-fixture/diagnostic markers.
+
 ## Remaining integrated checks
 
 A future live profile must provide a separately reviewed immutable public receipt
@@ -120,7 +264,7 @@ Run and retain these distinct client checks after that profile is available:
 | Web components | Full bounded traversal, cancellation/clear states, keyboard and axe checks above. | Synthetic wire source and jsdom; no browser or live identity claim. |
 | Rendered web | First/middle/final pages; recenter from diagram and equivalent lists; dependency direction; exact omissions; back/forward and focus restoration; 200% zoom, 320px viewport, measured contrast; no increasing retained DOM/heap across page replacement. | Previous browser automation returned `ERR_BLOCKED_BY_CLIENT`. Do not retry another browser, proxy or origin to bypass that block. Use an approved browser environment or user-run manual checks. |
 | Web reader | Landmarks/headings, source context, current-node state, list/table relationships, predicate/readiness announcements, errors, no focus loss/trap. | Requires the supported real browser/screen reader; axe alone is insufficient. |
-| Native simulator | A separate large DEBUG fixture with complete totals and bounded 200/500 neighborhood; paginated node/edge navigation, direction/recenter, accessible list alternative, Dynamic Type and Reduce Motion screenshots. | Existing native graph UI test uses a small graph. A large-fixture simulator result remains separate from real HTTP/device acceptance. |
+| Native simulator | A separate large DEBUG fixture with complete totals and bounded 200/500 neighborhood; paginated node/edge navigation, direction/recenter, accessible list alternative, Dynamic Type and Reduce Motion screenshots. | The large DEBUG profile has focused simulator evidence below; real HTTP, physical-device and VoiceOver acceptance remain separate. |
 | Native live/managed phone | Same verified source graph and account, VoiceOver/Voice Control, supported text/contrast/motion settings, background/foreground cancellation, actual VPN loss/recovery and current authorization clearing. | Requires real device, identity/network prerequisites and an approved internal build. |
 
 Use the detailed [accessibility matrix](ACCESSIBILITY.md) and retain exact source
