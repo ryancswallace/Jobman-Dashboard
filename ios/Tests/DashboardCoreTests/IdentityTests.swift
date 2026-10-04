@@ -27,3 +27,17 @@ import Testing
         #expect(throws: DashboardError.self) { try DashboardConnection(address: address) }
     }
 }
+
+@Test func canonicalHTTPSContentLinksRequireConfiguredOriginAndExactRoute() throws {
+    let connection = try DashboardConnection(address: "https://dashboard.internal:8443")
+    let job = JobRef(deploymentId: "east", namespaceId: "research", jobId: "job-042")
+    #expect(DashboardRoute(canonicalURL: URL(string: "https://dashboard.internal:8443/deployments/east/namespaces/research/jobs/job-042")!, connection: connection) == .job(job))
+    #expect(DashboardRoute(canonicalURL: URL(string: "https://dashboard.internal:8443/inbox/opaque-id")!, connection: connection) == .inbox("opaque-id"))
+    for address in [
+        "https://other.internal:8443/inbox/id", "https://dashboard.internal/inbox/id", "http://dashboard.internal:8443/inbox/id",
+        "https://user@dashboard.internal:8443/inbox/id", "https://dashboard.internal:8443/inbox/id?token=secret",
+        "https://dashboard.internal:8443/inbox/id#secret", "https://dashboard.internal:8443/inbox/", "https://dashboard.internal:8443/inbox/a%2Fb",
+        "https://dashboard.internal:8443/inbox/%69d", "https://dashboard.internal:8443/inbox/..", "https://dashboard.internal:8443/auth/callback",
+        "https://dashboard.internal:8443/deployments/east/namespaces/research/jobs/job-042/logs"
+    ] { #expect(DashboardRoute(canonicalURL: URL(string: address)!, connection: connection) == nil, "Accepted \(address)") }
+}

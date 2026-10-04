@@ -7,9 +7,15 @@ final class DashboardStore {
     var address: String = UserDefaults.standard.string(forKey: "dashboardAddress") ?? ""
     private(set) var bootstrap: Bootstrap?
     private(set) var overview: Overview?
-    private(set) var jobs: Page<Job>?
-    private(set) var jobRows: [Job] = []
-    private(set) var nextJobsCursor: String?
+    private(set) var jobPage = MonitoredPage<Job, JobRef>()
+    var jobs: Page<Job>? { jobPage.page }
+    var jobRows: [Job] { jobPage.items }
+    var nextJobsCursor: String? { jobPage.nextCursor }
+    var canLoadPreviousJobs: Bool { jobPage.canGoBack }
+    var jobsRequireRestart: Bool { jobPage.requiresRestart }
+    var jobsAreFirstPage: Bool { jobPage.isFirstPage }
+    var evictedJobRows: Int { jobPage.history.discardedPages }
+    var overviewWindow: OverviewWindow = .day
     private(set) var loadingMore = false
     private(set) var error: String?
     private(set) var busy = false
@@ -30,13 +36,16 @@ final class DashboardStore {
     private var client: DashboardTransport?
     private var polling: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
+    private var refreshAfterPage = false
     private var freshnessTask: Task<Void, Never>?
     private(set) var contentGeneration = UUID()
+    private(set) var foregroundGeneration = UUID()
+    private var sceneGeneration = UUID()
+    private var resumeReadPending = false
     private var sessionGeneration = UUID()
     private var refreshGeneration = UUID()
     let devices = NativeDeviceController()
     private var listGeneration = UUID()
-    private(set) var evictedJobRows = 0
     private var consecutiveRefreshFailures = 0
     private var lastDataRefresh = Date.distantPast
     private(set) var previewMode = false
@@ -111,7 +120,9 @@ final class DashboardStore {
     func setTab(_ value: Int) { selectedTab = value }
 
     func refresh() {
-        guard signedIn, refreshTask == nil else { return }
+        guard active, signedIn, refreshTask == nil else { return }
+        if loadingMore { refreshAfterPage = true; return }
+        refreshAfterPage = false
         lastDataRefresh = Date()
         let refreshID = UUID(), session = sessionGeneration
         refreshGeneration = refreshID
@@ -128,52 +139,48 @@ final class DashboardStore {
                 ruleNamespaceOptionsInvalidated = false
                 if revoked || grantsChanged { try activate(boot); purgeContent(); path = []; inboxPath = [] }
                 scheduleExpiry()
+                if resumeReadPending { resumeReadPending = false; foregroundGeneration = UUID() }
                 if boot.namespaces.isEmpty { error = "No namespaces are currently authorized for this account."; return }
                 guard let ticket = boundary.ticket() else { return }
                 let query = try scope.queryItems(authorized: boot.namespaces)
-                async let summary: Overview = request(path: "/api/v1/overview", query: query)
-                let jobQuery = query + [.init(name: "limit", value: "50")] + jobFilters()
+                async let summary: Overview = request(path: "/api/v1/overview", query: query + [overviewWindow.query])
+                var jobQuery = query + [.init(name: "limit", value: "50")] + jobFilters()
+                if let cursor = try jobPage.requestCursor(for: .refresh) { jobQuery.append(.init(name: "cursor", value: cursor)) }
                 async let list: Page<Job> = request(path: "/api/v1/jobs", query: jobQuery)
                 let result = try await (summary, list)
                 guard !Task.isCancelled, boundary.canPublish(ticket) else { return }
                 overview = result.0
-                // Refresh preserves row identity in SwiftUI; pagination reload is explicit.
-                if nextJobsCursor == jobs?.nextCursor {
-                    jobRows = result.1.items
-                    nextJobsCursor = result.1.nextCursor
-                } else {
-                    let updates = Dictionary(uniqueKeysWithValues: result.1.items.map { ($0.ref, $0) })
-                    jobRows = jobRows.map { updates[$0.ref] ?? $0 }
-                }
-                jobs = result.1
+                try jobPage.accept(result.1, for: .refresh, identity: \.ref)
                 error = nil
                 consecutiveRefreshFailures = 0
                 lastDataRefresh = Date()
             } catch is CancellationError { }
             catch {
                 guard session == sessionGeneration, refreshGeneration == refreshID else { return }
-                handle(error)
+                jobPage.failed(error); handle(error)
             }
         }
     }
 
     func request<T: Decodable & Sendable>(path: String, query: [URLQueryItem] = [], method: String = "GET", body: Data? = nil,
                                          revision: String? = nil, idempotencyKey: UUID? = nil, bypassFreshness: Bool = false) async throws -> T {
+        guard active else { throw CancellationError() }
         guard let client else { throw DashboardError.authenticationRequired }
-        let generation = sessionGeneration
+        let generation = sessionGeneration, scene = sceneGeneration
         let ticket = boundary.ticket()
         let token = previewMode ? "synthetic-preview" : try await authentication.token()
+        guard active, generation == sessionGeneration, scene == sceneGeneration, !Task.isCancelled else { throw CancellationError() }
         let result: T
         do {
             result = try await client.request(path: path, query: query, token: token, method: method, body: body,
                                               revision: revision, idempotencyKey: idempotencyKey ?? (method == "POST" ? UUID() : nil))
         } catch {
-            if generation == sessionGeneration, let value = error as? DashboardError,
+            if active, generation == sessionGeneration, scene == sceneGeneration, let value = error as? DashboardError,
                [.authenticationRequired, .forbidden, .authorizationUnavailable].contains(value) { handle(value) }
             throw error
         }
         try Task.checkCancellation()
-        guard generation == sessionGeneration else { throw CancellationError() }
+        guard active, generation == sessionGeneration, scene == sceneGeneration else { throw CancellationError() }
         if !bypassFreshness {
             guard let ticket, boundary.canPublish(ticket) else { throw DashboardError.forbidden }
         }
@@ -214,36 +221,51 @@ final class DashboardStore {
 
     private func fetchBootstrap() async throws -> Bootstrap {
         guard let client else { throw DashboardError.authenticationRequired }
-        let generation = sessionGeneration
+        let generation = sessionGeneration, scene = sceneGeneration
+        guard active else { throw CancellationError() }
         let token = previewMode ? "synthetic-preview" : try await authentication.token()
+        try Task.checkCancellation()
+        guard active, scene == sceneGeneration, generation == sessionGeneration else { throw CancellationError() }
         let result = try await client.bootstrap(token: token)
         try Task.checkCancellation()
-        guard generation == sessionGeneration else { throw CancellationError() }
+        guard active, scene == sceneGeneration, generation == sessionGeneration else { throw CancellationError() }
         return result
     }
 
     func resetJobs() {
-        listGeneration = UUID()
+        listGeneration = UUID(); loadingMore = false
         cancelRefresh()
-        jobs = nil; jobRows = []; nextJobsCursor = nil; evictedJobRows = 0
+        jobPage.reset()
         refresh()
     }
 
     func loadMoreJobs() async {
-        guard let cursor = nextJobsCursor, !loadingMore else { return }
+        guard let cursor = nextJobsCursor else { return }
+        await loadJobsPage(.next(cursor))
+    }
+    func loadPreviousJobs() async { await loadJobsPage(.previous) }
+    private func loadJobsPage(_ load: MonitoredPage<Job, JobRef>.Load) async {
+        guard !loadingMore else { return }
+        cancelRefresh()
         let generation = listGeneration
         loadingMore = true
-        defer { loadingMore = false }
+        defer {
+            if generation == listGeneration {
+                loadingMore = false
+                if refreshAfterPage { refresh() }
+            }
+        }
         do {
-            var parameters = try query() + [.init(name: "limit", value: "50"), .init(name: "cursor", value: cursor)]
-            parameters += jobFilters()
+            var parameters = try query() + [.init(name: "limit", value: "50")] + jobFilters()
+            if let cursor = try jobPage.requestCursor(for: load) { parameters.append(.init(name: "cursor", value: cursor)) }
             let page: Page<Job> = try await request(path: "/api/v1/jobs", query: parameters)
             guard generation == listGeneration else { return }
-            let existing = Set(jobRows.map(\.ref))
-            jobRows += page.items.filter { !existing.contains($0.ref) }
-            if jobRows.count > 1_000 { let removed = jobRows.count - 1_000; jobRows.removeFirst(removed); evictedJobRows += removed }
-            nextJobsCursor = page.nextCursor
-        } catch { handle(error) }
+            try jobPage.accept(page, for: load, identity: \.ref)
+            error = nil
+        } catch is CancellationError {} catch { if generation == listGeneration { jobPage.failed(error); handle(error) } }
+    }
+    func selectOverviewWindow(_ value: OverviewWindow) {
+        overviewWindow = value; overview = nil; cancelRefresh(); refresh()
     }
 
     private func jobFilters() -> [URLQueryItem] {
@@ -267,6 +289,10 @@ final class DashboardStore {
     private func cancelRefresh() { refreshGeneration = UUID(); refreshTask?.cancel(); refreshTask = nil }
 
     func setActive(_ value: Bool) {
+        if active != value {
+            sceneGeneration = UUID()
+            if value { resumeReadPending = true }
+        }
         active = value
         if value {
             Task { await DeviceRevocations.flush() }
@@ -275,9 +301,9 @@ final class DashboardStore {
                 if active, signedIn { await refreshDeviceRegistration() }
             }
         }
-        else { devices.clear() }
+        else { devices.clear(); listGeneration = UUID(); loadingMore = false; refreshAfterPage = false }
         polling?.cancel(); polling = nil
-        guard value, signedIn else { refreshTask?.cancel(); return }
+        guard value, signedIn else { cancelRefresh(); return }
         refresh()
         polling = Task { @MainActor in
             while !Task.isCancelled {
@@ -306,6 +332,7 @@ final class DashboardStore {
             ruleNamespaceOptionsInvalidated = false
             if removed || grantsChanged { try activate(boot); purgeContent(); path = []; inboxPath = [] }
             scheduleExpiry()
+            if resumeReadPending { refresh() }
         } catch is CancellationError { }
         catch { if session == sessionGeneration, active { handle(error) } }
     }
@@ -319,6 +346,15 @@ final class DashboardStore {
             purgeContent(); path = []
             error = DashboardError.authorizationUnavailable.localizedDescription
         }
+    }
+
+    var connectedOrigin: String? { client?.origin.absoluteString }
+    @discardableResult func openCanonicalLink(_ text: String) -> Bool {
+        guard let origin = client?.origin,
+              let connection = try? DashboardConnection(address: origin.absoluteString),
+              let url = URL(string: text.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let route = DashboardRoute(canonicalURL: url, connection: connection) else { return false }
+        open(route); return true
     }
 
     func open(_ route: DashboardRoute) {
@@ -358,7 +394,7 @@ final class DashboardStore {
         devices.clear()
     }
 
-    private func purgeContent() { devices.clear(); overview = nil; jobs = nil; jobRows = []; nextJobsCursor = nil; listGeneration = UUID(); evictedJobRows = 0; contentGeneration = UUID() }
+    private func purgeContent() { loadingMore = false; refreshAfterPage = false; devices.clear(); overview = nil; jobPage.reset(); listGeneration = UUID(); contentGeneration = UUID() }
     private func authorizationVersions(_ bootstrap: Bootstrap) -> [NamespaceRef: String] {
         Dictionary(uniqueKeysWithValues: bootstrap.deployments.flatMap { deployment in
             deployment.namespaces.map { (NamespaceRef(deploymentId: deployment.id, namespaceId: $0.id), $0.authorizationVersion) }

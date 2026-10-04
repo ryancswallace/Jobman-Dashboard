@@ -5,7 +5,12 @@ struct OverviewView: View {
     @Environment(DashboardStore.self) private var store
     var body: some View {
         List {
-            Section { ScopeMenu() }
+            Section {
+                ScopeMenu()
+                Picker("Terminal result window", selection: Binding(get: { store.overviewWindow }, set: { store.selectOverviewWindow($0) })) {
+                    ForEach(OverviewWindow.allCases, id: \.self) { Text($0.title).tag($0) }
+                }.accessibilityIdentifier("overviewWindow")
+            }
             if let error = store.error { Section { ErrorMessage(error: error) } }
             if let summary = store.overview {
                 Section("Recorded job state") {
@@ -71,12 +76,17 @@ struct JobsView: View {
                 } else { Text("Select a namespace to open an exact job ID.").font(.footnote).foregroundStyle(.secondary) }
             }
             if let error = store.error { ErrorMessage(error: error) }
+            Section {
+                Button("Restart from first page") { store.resetJobs() }.accessibilityIdentifier("restartJobs")
+                if !store.jobsAreFirstPage { Text("Viewing a later page. Restart to include newly arrived first-page jobs.").font(.caption) }
+                if store.canLoadPreviousJobs { Button("Previous page") { Task { await store.loadPreviousJobs() } }.disabled(store.loadingMore) }
+            }
             if let page = store.jobs {
                 Section {
-                    if store.evictedJobRows > 0 { Text("\(store.evictedJobRows) earlier rows were removed from memory. Pull to refresh to return to the first page.").font(.caption) }
+                    if store.evictedJobRows > 0 { Text("\(store.evictedJobRows) earlier page cursors were discarded. Restart to return to the first page.").font(.caption) }
                     if store.jobRows.isEmpty { ContentUnavailableView("No matching jobs", systemImage: "line.3.horizontal.decrease.circle", description: Text("Change the filters or refresh this scope.")) }
                     ForEach(store.jobRows, id: \.ref) { job in NavigationLink(value: DashboardRoute.job(job.ref)) { JobRow(job: job) } }
-                    if store.nextJobsCursor != nil { Button { Task { await store.loadMoreJobs() } } label: { if store.loadingMore { ProgressView() } else { Text("Load next page") } }.disabled(store.loadingMore) }
+                    if store.nextJobsCursor != nil { Button { Task { await store.loadMoreJobs() } } label: { if store.loadingMore { ProgressView() } else { Text("Next page") } }.disabled(store.loadingMore) }
                 }
                 Section { SourceSummary(completeness: page.completeness, sources: page.sources, fetchedAt: page.fetchedAt) }
             } else if store.error == nil { ProgressView("Loading jobs…") }
@@ -106,6 +116,7 @@ struct JobDetailView: View {
     @State private var detail: JobDetail?
     @State private var error: String?
     @State private var watching = false
+    @State private var selectedRun: DashboardAPI.JobRun?
     var body: some View {
         List {
             Section { Text("\(ref.deploymentId) / \(ref.namespaceId)").font(.caption); Text(ref.jobId).textSelection(.enabled) }
@@ -155,14 +166,16 @@ struct JobDetailView: View {
                     }
                 }
                 Section("Investigate") {
-                    NavigationLink { LogView(ref: ref) } label: { Label("Logs", systemImage: "text.alignleft") }
-                    NavigationLink { ArtifactsView(ref: ref) } label: { Label("Artifact metadata", systemImage: "doc") }
-                    NavigationLink { ReportsView(ref: ref) } label: { Label("Diagnosis", systemImage: "stethoscope") }
+                    NavigationLink(selectedRun.map { "Selected run \($0.number)" } ?? "Choose a recorded run") { RunPickerView(ref: ref, selection: $selectedRun) }
+                    if let run = selectedRun { Text("Run \(run.number) · \(run.id)").font(.caption).accessibilityIdentifier("selectedRun") }
+                    NavigationLink { LogView(ref: ref, run: selectedRun).id(selectedRun?.id ?? "current") } label: { Label("Logs", systemImage: "text.alignleft") }
+                    NavigationLink { ArtifactsView(ref: ref, run: selectedRun).id(selectedRun?.id ?? "all") } label: { Label("Artifact metadata", systemImage: "doc") }
+                    NavigationLink { ReportsView(ref: ref, selectedRunID: selectedRun?.id).id(selectedRun?.id ?? "current") } label: { Label("Diagnosis", systemImage: "stethoscope") }
                     Button { watching = true } label: { Label("Watch this job…", systemImage: "bell.badge") }
                 }
             } else if error == nil { ProgressView("Loading job…") }
         }.navigationTitle(detail?.job.name ?? "Job").navigationBarTitleDisplayMode(.inline)
-            .task(id: ref) {
+            .task(id: store.foregroundGeneration) {
                 await load()
                 while !Task.isCancelled {
                     try? await Task.sleep(for: .seconds(max(5, store.bootstrap?.preferences.refreshSeconds ?? 5)))
@@ -213,7 +226,8 @@ struct WorkloadDetailView: View {
     @State private var page: Page<WorkloadChild>?
     @State private var cursor: String?
     @State private var error: String?
-    @State private var loading = false
+    @State private var requests = ReadRequestGate()
+    private var loading: Bool { requests.busy }
     @State private var currentCursor: String?
     @State private var pageHistory: [String?] = []
     private var summary: Workload { detail?.workload ?? workload }
@@ -261,8 +275,8 @@ struct WorkloadDetailView: View {
             }
             if let page { Section { SourceSummary(completeness: page.completeness, sources: page.sources, fetchedAt: page.fetchedAt) } }
             else if let detail { Section { SourceSummary(completeness: detail.completeness, sources: detail.sources, fetchedAt: detail.fetchedAt) } }
-        }.navigationTitle(workload.name ?? workload.kind.capitalized).task {
-            await load()
+        }.navigationTitle(workload.name ?? workload.kind.capitalized).task(id: store.foregroundGeneration) {
+            await load(cursor: currentCursor, replacing: true)
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(max(5, store.bootstrap?.preferences.refreshSeconds ?? 5)))
                 if !Task.isCancelled, store.active, store.bootstrap?.preferences.refreshSeconds != 0 { await load(cursor: currentCursor) }
@@ -272,22 +286,24 @@ struct WorkloadDetailView: View {
     private func restart() async { if await load() { pageHistory = [] } }
     private func next(_ cursor: String) async { let previous = currentCursor; if await load(cursor: cursor) { pageHistory.append(previous) } }
     private func previous() async { guard let previous = pageHistory.last else { return }; if await load(cursor: previous) { pageHistory.removeLast() } }
-    @discardableResult private func load(cursor: String? = nil) async -> Bool {
-        guard !loading else { return false }; loading = true; defer { loading = false }
+    @discardableResult private func load(cursor: String? = nil, replacing: Bool = false) async -> Bool {
+        guard let token = requests.begin(replacing: replacing) else { return false }; defer { requests.finish(token) }
         do {
             if let cursor {
                 let result: Page<WorkloadChild> = try await store.request(path: workload.path + "/children", query: [.init(name: "cursor", value: cursor), .init(name: "limit", value: "50")])
+                guard requests.accepts(token) else { return false }
                 try workload.validate(children: result.items, sources: result.sources)
                 guard result.total != nil else { throw DashboardError.invalidResponse }
                 children = result.items; self.cursor = result.nextCursor; page = result
             } else {
                 let result: WorkloadDetail = try await store.request(path: workload.path, query: [.init(name: "limit", value: "50")])
+                guard requests.accepts(token) else { return false }
                 guard result.workload.path == workload.path else { throw DashboardError.invalidResponse }
                 try workload.validate(children: result.children, sources: result.sources)
                 detail = result; children = result.children; self.cursor = result.nextCursor; page = nil
             }
             currentCursor = cursor; error = nil; return true
-        } catch is CancellationError { return false } catch { self.error = error.localizedDescription; return false }
+        } catch is CancellationError { return false } catch { if requests.accepts(token) { self.error = error.localizedDescription }; return false }
     }
 }
 
@@ -320,7 +336,7 @@ struct WorkloadReferenceView: View {
             if let workload { WorkloadDetailView(workload: workload) }
             else if let error { List { ErrorMessage(error: error); Button("Retry") { Task { await load() } } } }
             else { ProgressView("Loading authorized workload…") }
-        }.task { await load() }
+        }.task(id: store.foregroundGeneration) { await load() }
     }
     private func load() async {
         do {
@@ -331,25 +347,24 @@ struct WorkloadReferenceView: View {
     }
 }
 
-struct PagedRows<Item: Decodable & Sendable & Identifiable, Row: View>: View {
+struct PagedRows<Item: Decodable & Sendable & Identifiable, Row: View>: View where Item.ID: Sendable {
     @Environment(DashboardStore.self) private var store
     let path: String
     var extraQuery: [URLQueryItem] = []
     var scoped = true
+    var validate: (Page<Item>) throws -> Void = { _ in }
     let row: (Item) -> Row
-    @State private var items: [Item] = []
-    @State private var cursor: String?
-    @State private var loaded = false
-    @State private var busy = false
+    @State private var state = MonitoredPage<Item, Item.ID>()
+    @State private var requests = ReadRequestGate()
+    private var busy: Bool { requests.busy }
     @State private var error: String?
-    @State private var lastPage: Page<Item>?
-    @State private var evictedRows = 0
     var body: some View {
         Section {
-            if !loaded && error == nil { ProgressView("Loading authorized items…") }
-            ForEach(items, content: row)
-            if evictedRows > 0 { Text("\(evictedRows) earlier rows removed from memory; reopen this view to restart.").font(.caption) }
-            if let page = lastPage {
+            if state.page == nil && error == nil { ProgressView("Loading authorized items…") }
+            ForEach(state.items, content: row)
+            if !state.isFirstPage { Text("Viewing a later page. Restart to include newly arrived first-page items.").font(.caption) }
+            if state.history.discardedPages > 0 { Text("Earlier back-page cursors were discarded to bound memory; restart remains available.").font(.caption) }
+            if let page = state.page {
                 if let total = page.total { Text("Source total: \(total)").font(.caption) }
                 if let totals = page.totals {
                     ForEach(Array(totals.enumerated()), id: \.offset) { _, total in
@@ -360,38 +375,32 @@ struct PagedRows<Item: Decodable & Sendable & Identifiable, Row: View>: View {
                     }
                 }
                 SourceSummary(completeness: page.completeness, sources: page.sources, fetchedAt: page.fetchedAt)
+                if page.items.isEmpty { Text("No items on this page").foregroundStyle(.secondary) }
             }
-            if let error { ErrorMessage(error: error); Button("Retry") { Task { await load(cursor: cursor) } } }
+            if let error { ErrorMessage(error: error) }
             if busy { ProgressView() }
-            else if let cursor { Button("Load next page") { Task { await load(cursor: cursor) } } }
-            else if loaded && items.isEmpty && error == nil { Text("No items in this view").foregroundStyle(.secondary) }
-        }.task(id: store.contentGeneration) {
-            await load()
+            Button("Refresh current page") { Task { await load(.refresh) } }.disabled(busy || state.requiresRestart)
+            Button("Restart from first page") { Task { await load(.restart) } }.disabled(busy).accessibilityIdentifier("restartPagedRows")
+            if state.canGoBack { Button("Previous page") { Task { await load(.previous) } }.disabled(busy) }
+            if let cursor = state.nextCursor { Button("Next page") { Task { await load(.next(cursor)) } }.disabled(busy) }
+        }.task(id: store.foregroundGeneration) {
+            await load(.refresh, replacing: true)
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(max(5, store.bootstrap?.preferences.refreshSeconds ?? 5)))
-                if !Task.isCancelled, store.active, store.bootstrap?.preferences.refreshSeconds != 0 { await load(refresh: true) }
+                if !Task.isCancelled, store.active, store.bootstrap?.preferences.refreshSeconds != 0 { await load(.refresh) }
             }
         }
     }
-    private func load(cursor: String? = nil, refresh: Bool = false) async {
-        guard !busy else { return }; busy = true; defer { busy = false }
+    private func load(_ action: MonitoredPage<Item, Item.ID>.Load, replacing: Bool = false) async {
+        guard let token = requests.begin(replacing: replacing) else { return }; defer { requests.finish(token) }
         do {
             var query = try (scoped ? store.query() : []) + extraQuery + [.init(name: "limit", value: "50")]
-            if let cursor { query.append(.init(name: "cursor", value: cursor)) }
+            if let cursor = try state.requestCursor(for: action) { query.append(.init(name: "cursor", value: cursor)) }
             let page: Page<Item> = try await store.request(path: path, query: query)
-            lastPage = page
-            if refresh {
-                let updates = Dictionary(page.items.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
-                items = items.map { updates[$0.id] ?? $0 }
-                if items.isEmpty { items = page.items; self.cursor = page.nextCursor }
-            } else if cursor == nil { items = page.items; self.cursor = page.nextCursor }
-            else {
-                let existing = Set(items.map(\.id))
-                items += page.items.filter { !existing.contains($0.id) }
-                self.cursor = page.nextCursor
-            }
-            if items.count > 1_000 { let count = items.count - 1_000; items.removeFirst(count); evictedRows += count }
-            loaded = true; error = nil
-        } catch is CancellationError {} catch { self.error = error.localizedDescription }
+            guard requests.accepts(token) else { return }
+            try validate(page)
+            try state.accept(page, for: action, identity: \.id)
+            error = nil
+        } catch is CancellationError {} catch { if requests.accepts(token) { state.failed(error); self.error = error.localizedDescription } }
     }
 }

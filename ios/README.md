@@ -20,7 +20,77 @@ Run UI tests on an installed simulator, substituting an available device from `x
 IOS_TEST_DESTINATION='platform=iOS Simulator,name=iPhone 18 Pro' ./scripts/test-ui.sh
 ```
 
-Project source references and the scheme are reproducible with `python3 scripts/generate-project.py`. Run it after adding/removing App or UITests Swift files. The generated OpenAPI client is included through `Sources/DashboardCore/DashboardAPI.generated.swift`, a relative symlink to the single checked-in `contracts/swift/DashboardAPI.generated.swift`. `GeneratedTransport.swift` supplies origin-pinned, authenticated, bounded HTTP behavior; the generated bootstrap result is mapped into application state. Artifact, dependency-edge, target, diagnosis, personal-rule, notification-device and inbox models also use generated types directly. Other application models retain unknown enum values and wide integer wire strings; focused contract tests decode the same workload/neighborhood fixtures with both generated and application types.
+Project source references and the scheme are reproducible with `python3 scripts/generate-project.py`. Run it after adding/removing App or UITests Swift files. The generated OpenAPI client is included through `Sources/DashboardCore/DashboardAPI.generated.swift`, a relative symlink to the single checked-in `contracts/swift/DashboardAPI.generated.swift`. `GeneratedTransport.swift` supplies origin-pinned, authenticated, bounded HTTP behavior; the generated bootstrap result is mapped into application state. Artifact, dependency-edge, target, recorded-run, diagnosis, personal-rule, notification-device and inbox models also use generated types directly. Other application models retain unknown enum values and wide integer wire strings; focused contract tests decode the same workload/neighborhood fixtures with both generated and application types.
+
+## Local iPhone archive and development export
+
+The app icon uses the existing Jobman purple chevron and green Dashboard grid on
+the brand's dark background. `App/Assets.xcassets` supplies the opaque 1024-pixel
+icon. Its deterministic CoreGraphics renderer is `scripts/render-app-icon.swift`;
+the source logos are unchanged. Regenerate from this directory with:
+
+```sh
+xcrun swift -module-cache-path /private/tmp/jobman-dashboard-icon-module-cache scripts/render-app-icon.swift App/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+```
+
+Create a Release **unsigned** device archive without signing credentials:
+
+```sh
+python3 scripts/test-package-app.py
+python3 scripts/package-app.py unsigned --version 0.1.0 --build 1 --output /private/tmp/jobman-dashboard-unsigned-archive
+```
+
+The output must be a new absolute directory. It retains the exact command,
+intent, build log, archive, and completion receipt with executable/Info.plist
+hashes. An unsigned archive verifies compilation/packaging; it cannot be installed
+on a physical iPhone. Failed builds retain their evidence and require a new output
+directory. `--dry-run` checks inputs and prints the local command without building.
+
+Development signing uses an already installed Apple Development certificate and
+provisioning profile. Supply the approved team, certificate SHA-1, profile UUID
+and bundle identifier explicitly:
+
+```sh
+python3 scripts/package-app.py development --version 0.1.0 --build 1 --output /private/tmp/jobman-dashboard-development-archive --team TEAMID1234 --identity CERTIFICATE_SHA1 --profile PROFILE_UUID --bundle-id org.example.jobman.dashboard
+python3 scripts/package-app.py export-development --version 0.1.0 --build 1 --output /private/tmp/jobman-dashboard-development-export --archive /private/tmp/jobman-dashboard-development-archive/JobmanDashboard.xcarchive --team TEAMID1234 --identity CERTIFICATE_SHA1 --profile PROFILE_UUID --bundle-id org.example.jobman.dashboard
+```
+
+These examples contain placeholders. The tool never passes provisioning-update or
+upload options and does not enroll accounts, create identifiers/certificates, or
+change profiles. It verifies iPhone-only archive identity and, for signed builds,
+the selected team/bundle, development APNs and debugging entitlements before a
+completion receipt. Export requires the completed matching signed archive and
+valid code signature. The organization must still select its internal distribution
+mechanism and provide approved signing/profile inputs; development export is not
+managed-distribution or real APNs acceptance.
+
+## Monitoring refresh and run selection
+
+Job, workload and artifact lists retain one bounded displayed page. Refresh
+replaces that page's complete rows and timestamp, so new/removed items cannot be
+hidden behind a fresh timestamp. Next/Previous retain at most 64 page cursors;
+restart returns to the current first page. Later-page refresh stays at its current
+cursor and says that newly arrived first-page items require restart. Expired
+cursors require an explicit restart rather than presenting an empty current list.
+
+The Overview offers 24-hour and seven-day terminal windows; drilldowns use the
+returned exact interval. Foreground resume rechecks authorization and reloads the
+current visible monitoring read even when automatic data refresh is disabled.
+A log resume resets the verified stream, stops following and shows the last
+successful fetch separately from source capture time. Replaced in-flight reads
+cannot overwrite the new request's content or busy state.
+
+Choose a recorded run from job details to pin log/metadata reads to its exact run
+number and new diagnosis requests to its run UUID. The catalog is paged and uses
+source-reported numbers, including values beyond JavaScript's safe integer range.
+A source without the run-catalog capability shows an explicit unsupported error.
+The default remains current logs/all artifact metadata; report history remains
+all runs. Run metadata dates are not presented as observed execution timestamps.
+
+More → Open a Dashboard link accepts canonical HTTPS job/inbox URLs only from the
+connected origin, including its port, without credentials/query/fragment. Existing
+custom-scheme links and opaque push inbox IDs still require current sign-in and
+source authorization; pasted text is cleared when leaving or backgrounding.
 
 ## Synthetic UI mode
 
@@ -114,4 +184,10 @@ On October 3, 2026:
 
 - A fresh full suite on exact rc.2 source `42d153b4672aeb5cdb2d7395f052b8c6a095f5e1` passed **24 tests with zero failures in553.953s**, ending **06:07:34 EDT on October4**. Result bundle `/private/tmp/jobman-dashboard-rc2-ui-42d153b.xcresult` and log `/private/tmp/jobman-dashboard-rc2-ui-42d153b.log` are retained. Rendered overview, graph, report findings, partial inbox, authorization outage, rule editor, delivery preferences and offline sign-out screenshots were inspected. This supersedes the earlier combined-run failure while retaining its diagnostic history. These are synthetic simulator workflows; manual VoiceOver/largest Dynamic Type, physical Keychain/APNs and managed-device acceptance remain separate gates.
 
+
+- Native audit checkpoint on October4: the full iPhone18Pro simulator run completed **32 tests, one intentional accessibility-profile skip, zero failures in733.333s**. It covers the prior workflows plus page replacement, foreground manual reads, pasted connected-origin links and selected historical runs. Subsequent review tightened run ID/Int64/execution/source validation; all **81 core tests** passed. The selected-run UI retest passed, and two new focused regressions passed for a manual7-day overview refresh queued behind a job-page read (**43.415s**) and authorization purge during a page read followed by a successful manual retry (**22.733s**). The first queued-window test queried a standalone numeric label even though SwiftUI exposes the whole button; its failure is retained and the corrected combined-label assertion passed without weakening the expected168 value. This is not claimed as a fresh34-test full-suite run. Rendered page, paused-log freshness, run selection/report prefill,7-day overview and post-authorization job screens were inspected.
+- The final **unsigned Release iPhone archive** passed with explicit version`0.1.0`, build`6`, iPhone-only device family and compiled AppIcon. Five packaging guard tests passed under Python3.9. Signed archive/export commands were not invoked. Existing CI now runs those guards in its iPhone job; manual dispatch with `nativeArchive=true` (or a nonempty candidateVersion) also builds and retains a tarred unsigned `.xcarchive`, build intent, verified metadata receipt and build log. `nativeVersion` and `nativeBuild` are explicit dispatch inputs. The artifact is not an installable or distributable IPA and does not prove physical-device, signing, APNs or managed-device behavior.
+
 These results do not prove real AD FS interoperability, current directory authorization, production log/report APIs, APNs delivery, internal signing/distribution, managed-device behavior, or release readiness. Follow the repository's implementation tracker and T01–T12 acceptance gates for those results.
+
+Packaging requires explicit numeric marketing version and build values. The archive receipt records both and verifies them against the built Info.plist; export rejects a mismatched selection. Version uses three canonical 0–9999 components; build uses a positive 1–9999 component and up to two 0–99 components. Signing and export remain explicit local operations with pre-existing credentials.

@@ -4,6 +4,119 @@ import XCTest
 final class DashboardUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
+
+    func testCurrentPageRefreshIncludesAdditionsAndRemovesMissingRows() {
+        let app = fixtureApp(extra: ["--dashboard-refresh-fixtures", "--dashboard-manual-refresh-fixtures"])
+        app.tabBars.buttons["Workloads"].tap()
+        XCTAssertTrue(app.staticTexts["Refresh row A"].waitForExistence(timeout: 10))
+        let refresh = app.buttons["Refresh current page"]
+        reveal(refresh, app: app); refresh.tap()
+        XCTAssertTrue(app.staticTexts["Refresh row B"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Refresh row A updated"].exists)
+        reveal(refresh, app: app); refresh.tap()
+        XCTAssertTrue(app.staticTexts["Refresh row A updated"].waitForNonExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Refresh row B"].exists)
+        let next = app.buttons["Next page"]
+        reveal(next, app: app); next.tap()
+        XCTAssertTrue(app.staticTexts["Later page row C"].waitForExistence(timeout: 10))
+        reveal(refresh, app: app); refresh.tap()
+        XCTAssertTrue(app.staticTexts["Later page row C"].exists)
+        XCTAssertFalse(app.staticTexts["Refresh row B"].exists)
+        let restart = app.buttons["restartPagedRows"]
+        reveal(restart, app: app); restart.tap()
+        XCTAssertTrue(app.staticTexts["Refresh row B"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Later page row C"].exists)
+        capture("Current page replacement and restart", app: app)
+    }
+
+    func testManualRefreshForegroundRechecksJobAndPausedLog() {
+        let app = fixtureApp(extra: ["--dashboard-refresh-fixtures", "--dashboard-manual-refresh-fixtures"])
+        app.tabBars.buttons["Jobs"].tap()
+        let row = app.staticTexts["Synthetic alignment run"]
+        reveal(row, app: app); row.tap()
+        XCTAssertTrue(app.navigationBars["Foreground job read 1"].waitForExistence(timeout: 10))
+        XCUIDevice.shared.press(.home); app.activate()
+        XCTAssertTrue(app.navigationBars["Foreground job read 2"].waitForExistence(timeout: 10))
+        let logs = app.buttons["Logs"]; reveal(logs, app: app); logs.tap()
+        XCTAssertTrue(app.staticTexts["Manual log read 1\n"].waitForExistence(timeout: 10))
+        XCUIDevice.shared.press(.home); app.activate()
+        XCTAssertTrue(app.staticTexts["Manual log read 2\n"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Manual log read 1\n"].exists)
+        XCTAssertTrue(app.staticTexts["Last successful fetch"].exists)
+        XCTAssertTrue(app.staticTexts["Source capture"].exists)
+        capture("Manual refresh foreground log recheck", app: app)
+    }
+
+    func testPastedConnectedOriginLinkAndOverviewWindow() {
+        let app = fixtureApp(extra: ["--dashboard-manual-refresh-fixtures"])
+        app.buttons["overviewWindow"].tap(); app.buttons["7 days"].tap()
+        XCTAssertTrue(app.buttons["overviewWindow"].label.contains("7 days"))
+        app.tabBars.buttons["More"].tap(); app.buttons["Open a Dashboard link"].tap()
+        let input = app.descendants(matching: .any)["canonicalDashboardLink"]
+        XCTAssertTrue(input.waitForExistence(timeout: 10))
+        input.tap(); input.typeText("https://foreign.example/deployments/east/namespaces/research/jobs/job-042")
+        app.buttons["Open Dashboard link"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "without a query, fragment or sign-in token")).firstMatch.waitForExistence(timeout: 5))
+        app.buttons["Clear link"].tap(); input.tap()
+        input.typeText("https://dashboard-fixtures.example.test/deployments/east/namespaces/research/jobs/job-042")
+        app.buttons["Open Dashboard link"].tap()
+        XCTAssertTrue(app.navigationBars["Synthetic alignment run"].waitForExistence(timeout: 10))
+        capture("Pasted canonical job link", app: app)
+    }
+
+    func testManualOverviewWindowRefreshWaitsForPendingJobPage() {
+        let app = fixtureApp(extra: ["--dashboard-manual-refresh-fixtures", "--dashboard-delayed-job-page"])
+        app.tabBars.buttons["Jobs"].tap()
+        let next = app.buttons["Next page"]; reveal(next, app: app); next.tap()
+        app.tabBars.buttons["Overview"].tap()
+        app.buttons["overviewWindow"].tap(); app.buttons["7 days"].tap()
+        XCTAssertTrue(app.staticTexts["Loading authorized activity…"].waitForExistence(timeout: 3))
+        // The selected window is read after the in-flight page completes even
+        // with background polling disabled; no extra user refresh is required.
+        XCTAssertTrue(app.staticTexts["Recorded job state"].waitForExistence(timeout: 40))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "Active jobs", "168")).firstMatch.exists)
+        capture("Queued manual overview window refresh", app: app)
+    }
+
+    func testAuthorizationPurgeDuringJobPageAllowsManualRetry() {
+        let app = fixtureApp(extra: ["--dashboard-manual-refresh-fixtures", "--dashboard-delayed-job-page", "--dashboard-page-authorization-change"])
+        app.tabBars.buttons["Jobs"].tap()
+        let next = app.buttons["Next page"]; reveal(next, app: app); next.tap()
+        XCTAssertTrue(app.staticTexts["Loading jobs…"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Overview"].tap(); app.buttons["Refresh"].tap()
+        XCTAssertTrue(app.staticTexts["Recorded job state"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Jobs"].tap()
+        let current = app.staticTexts["Authorized refreshed job"]; reveal(current, app: app)
+        XCTAssertTrue(current.exists)
+        capture("Authorization purge releases pending page for retry", app: app)
+    }
+
+    func testRecordedRunSelectionPinsLogArtifactAndDiagnosis() {
+        let app = fixtureApp(extra: ["--dashboard-manual-refresh-fixtures"])
+        app.tabBars.buttons["Jobs"].tap()
+        let job = app.staticTexts["Synthetic alignment run"]; reveal(job, app: app); job.tap()
+        let choose = app.buttons["Choose a recorded run"]; reveal(choose, app: app); choose.tap()
+        XCTAssertTrue(app.buttons["selectRun-9007199254740993"].waitForExistence(timeout: 10))
+        let next = app.buttons["Next run page"]; reveal(next, app: app); next.tap()
+        XCTAssertTrue(app.buttons["selectRun-1"].waitForExistence(timeout: 10))
+        app.buttons["Previous run page"].tap()
+        app.buttons["selectRun-9007199254740993"].tap()
+        let logs = app.buttons["Logs"]; reveal(logs, app: app); logs.tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Synthetic stdout log fixture")).firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Selected run 9007199254740993")).firstMatch.exists)
+        capture("Selected exact run log", app: app)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let artifacts = app.buttons["Artifact metadata"]; reveal(artifacts, app: app); artifacts.tap()
+        app.buttons["synthetic-summary.txt"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["artifactExecutionID"].label.contains("94000000-0000-4000-8000-000000000002"))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let diagnosis = app.buttons["Diagnosis"]; reveal(diagnosis, app: app); diagnosis.tap()
+        let field = app.textFields["Optional run UUID (blank = selected history)"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        XCTAssertEqual(field.value as? String, "93000000-0000-4000-8000-000000000002")
+        capture("Diagnosis selected run prefill", app: app)
+    }
+
     func testConnectionScreenDoesNotOfferFakeAuthentication() {
         let app = XCUIApplication()
         app.launch()

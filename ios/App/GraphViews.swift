@@ -22,7 +22,8 @@ private struct GraphSnapshotView: View {
     @State private var neighborhood: GraphNeighborhood?
     @State private var showDiagram = true
     @State private var error: String?
-    @State private var loading = false
+    @State private var requests = ReadRequestGate()
+    private var loading: Bool { requests.busy }
     var body: some View {
         List {
             Section("Selected node") {
@@ -62,16 +63,17 @@ private struct GraphSnapshotView: View {
                 }
                 Section { SourceSummary(completeness: neighborhood.completeness, sources: neighborhood.sources, fetchedAt: neighborhood.fetchedAt) }
             }
-        }.task { await load() }.refreshable { await load() }
+        }.task(id: store.foregroundGeneration) { await load(replacing: true) }.refreshable { await load() }
     }
-    private func load() async {
-        guard !loading else { return }; loading = true; defer { loading = false }
+    private func load(replacing: Bool = false) async {
+        guard let token = requests.begin(replacing: replacing) else { return }; defer { requests.finish(token) }
         do {
             let result: GraphNeighborhood = try await store.request(path: workload.path + "/neighborhood", query: [
                 .init(name: "nodeId", value: center), .init(name: "maxNodes", value: "200"), .init(name: "maxEdges", value: "500")])
+            guard requests.accepts(token) else { return }
             try result.validate(workload: workload, center: center)
             neighborhood = result; error = nil
-        } catch is CancellationError {} catch { self.error = error.localizedDescription }
+        } catch is CancellationError {} catch { if requests.accepts(token) { self.error = error.localizedDescription } }
     }
 }
 
@@ -102,7 +104,8 @@ private struct GraphEdgeRows: View {
     @State private var currentCursor: String?
     @State private var history: [String?] = []
     @State private var error: String?
-    @State private var loading = false
+    @State private var requests = ReadRequestGate()
+    private var loading: Bool { requests.busy }
     var body: some View {
         Section("\(direction.isEmpty ? "All connected" : direction.capitalized) dependencies") {
             if let page {
@@ -128,21 +131,22 @@ private struct GraphEdgeRows: View {
             if loading { ProgressView("Loading dependencies…") }
             if let error { ErrorMessage(error: error) }
             Button("Refresh dependencies") { Task { if await load() { history = [] } } }.disabled(loading)
-        }.task { await load() }
+        }.task(id: store.foregroundGeneration) { await load(currentCursor, replacing: true) }
     }
     private func reference(_ id: String) -> JobRef { .init(deploymentId: workload.deploymentId, namespaceId: workload.namespaceId, jobId: id) }
     private func next(_ cursor: String) async { let previous = currentCursor; if await load(cursor) { history.append(previous) } }
     private func previous() async { guard let previous = history.last else { return }; if await load(previous) { history.removeLast() } }
-    @discardableResult private func load(_ cursor: String? = nil) async -> Bool {
-        guard !loading else { return false }; loading = true; defer { loading = false }
+    @discardableResult private func load(_ cursor: String? = nil, replacing: Bool = false) async -> Bool {
+        guard let token = requests.begin(replacing: replacing) else { return false }; defer { requests.finish(token) }
         do {
             var query: [URLQueryItem] = [.init(name: "nodeId", value: node), .init(name: "limit", value: "100")]
             if !direction.isEmpty { query.append(.init(name: "direction", value: direction)) }
             if let cursor { query.append(.init(name: "cursor", value: cursor)) }
             let result: Page<GraphEdge> = try await store.request(path: workload.path + "/dependencies", query: query)
+            guard requests.accepts(token) else { return false }
             try workload.validate(edges: result.items, node: node, direction: direction, sources: result.sources)
             guard result.total != nil else { throw DashboardError.invalidResponse }
             page = result; currentCursor = cursor; error = nil; return true
-        } catch is CancellationError { return false } catch { self.error = error.localizedDescription; return false }
+        } catch is CancellationError { return false } catch { if requests.accepts(token) { self.error = error.localizedDescription }; return false }
     }
 }

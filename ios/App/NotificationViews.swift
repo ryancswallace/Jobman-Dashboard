@@ -5,6 +5,7 @@ import UserNotifications
 struct MoreView: View {
     var body: some View {
         List {
+            NavigationLink { ContentLinkView() } label: { Label("Open a Dashboard link", systemImage: "link") }
             NavigationLink { TargetsView() } label: { Label("Targets", systemImage: "server.rack") }
             NavigationLink { AlertRulesView() } label: { Label("Alert rules", systemImage: "bell.badge") }
             NavigationLink { SettingsView() } label: { Label("Settings", systemImage: "gearshape") }

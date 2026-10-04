@@ -10,6 +10,22 @@ on:
         required: false
         type: string
 
+      nativeArchive:
+        description: Also retain an unsigned iPhone Release archive (not installable)
+        required: false
+        type: boolean
+        default: false
+      nativeVersion:
+        description: Native numeric marketing version (three components)
+        required: false
+        type: string
+        default: '0.1.0'
+      nativeBuild:
+        description: Native numeric build identifier (one to three components)
+        required: false
+        type: string
+        default: '1'
+
 permissions:
   contents: read
 
@@ -71,8 +87,30 @@ jobs:
           swift --version
       - name: Test native core
         run: ./ios/scripts/test-core.sh
+      - name: Test explicit native packaging inputs
+        run: python3 ios/scripts/test-package-app.py
       - name: Build unsigned iPhone simulator app
         run: ./ios/scripts/build-simulator.sh
+      - name: Archive unsigned iPhone Release app
+        if: github.event_name == 'workflow_dispatch' && (inputs.nativeArchive || inputs.candidateVersion != '')
+        env:
+          NATIVE_VERSION: ${{ inputs.nativeVersion }}
+          NATIVE_BUILD: ${{ inputs.nativeBuild }}
+        run: |
+          python3 ios/scripts/package-app.py unsigned --version "$NATIVE_VERSION" --build "$NATIVE_BUILD" --output "$RUNNER_TEMP/native-package"
+          tar -czf "$RUNNER_TEMP/native-package/JobmanDashboard-unsigned.xcarchive.tar.gz" -C "$RUNNER_TEMP/native-package" JobmanDashboard.xcarchive
+      - name: Retain unsigned native archive and provenance
+        if: github.event_name == 'workflow_dispatch' && (inputs.nativeArchive || inputs.candidateVersion != '')
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dashboard-iphone-unsigned-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/native-package/JobmanDashboard-unsigned.xcarchive.tar.gz
+            ${{ runner.temp }}/native-package/build-intent.json
+            ${{ runner.temp }}/native-package/build-receipt.json
+            ${{ runner.temp }}/native-package/xcodebuild.log
+          if-no-files-found: error
+          retention-days: 30
 
   candidate:
     if: github.event_name == 'workflow_dispatch' && inputs.candidateVersion != ''
