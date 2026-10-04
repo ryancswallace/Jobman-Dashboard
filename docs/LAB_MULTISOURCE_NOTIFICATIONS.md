@@ -76,8 +76,9 @@ automatically retried after an uncertain response.
 The test verifies:
 
 1. Both members can read each new job, with owner status inverted between sources.
-2. Retrying each cancellation preserves the original source event UUID, job
-   revision and timestamp. An exact source-qualified barrier waits for source
+2. After a first cancellation succeeds and its event is validated, one explicit
+   idempotency check preserves the original source event UUID, job revision and
+   timestamp. An exact source-qualified barrier waits for source
    publication, Dashboard ingestion, completed fanout and no pending evaluations.
 3. Each account has one inbox item per first event. Aggregate and single-source
    lists agree. Only that source's test rule contributes; the my-jobs rule
@@ -112,15 +113,33 @@ root. They are separate from restore and primary-only acceptance host receipts.
 A failed or lost preparation reply may have admitted a partial pair of jobs.
 Preserve its source pending marker and host evidence; inspect before any retry.
 Do not generate another nonce to hide an uncertain preparation. Successful
-preparation/cancellation receipts can be re-read or retried with the identical
-profile, nonce and case, using the helper's existing idempotency behavior.
+preparation/cancellation receipts can be inspected read-only. An uncertain
+cancellation is never retried by this test or its cleanup. The explicit
+idempotency assertion runs only after a successful, validated first cancellation;
+it is distinct from retrying a failed or lost response.
 
 Cleanup uses fresh rule revisions. If it cannot confirm a rule stopped, or rule
 creation had an unknown outcome, it leaves unused jobs accepted and reports the
-receipt for explicit inspection. Otherwise it normally cancels only this run's
-unused jobs. This can trigger unrelated pre-existing rules, which is intentional:
-those rules are never disabled by the harness. A failed private-material cleanup
+receipt for explicit inspection. Otherwise cleanup attempts each never-attempted
+unused job once. Cancellation intent is recorded before invoking the helper, so a
+failed command, lost response or failed event validation leaves that case and its
+receipts for inspection. Successfully completed cases are also skipped during
+cleanup, including when their later explicit idempotency assertion fails. Cancelling
+unused jobs can trigger unrelated pre-existing rules; those rules are never
+disabled by the harness. A failed private-material cleanup
 requires inspection; the next invocation fails closed rather than overwriting it.
+
+The wrapper emits only an allowlisted failure stage and code. The test distinguishes
+helper execution, guest postflight, SSH transport, host result validation and
+immutable receipt retention failures from an event identity mismatch. Subprocess
+errors, stderr and private material are never echoed. Both output streams are
+bounded; malformed diagnostic frames become a fixed generic failure. This
+instrumentation does not establish the cause of a previous live failure.
+
+A fresh run uses two newly generated nonce receipts. It does not reopen the
+original uncertain primary receipt `7ae1782e0d424061e8f056f7d4dde9bf` or secondary
+receipt `ecf5578b777a10c0a997e3a15218fcfb`. Those original jobs and retained evidence
+require separate explicit review; this harness does not repair or cancel them.
 
 Offline tests run without live opt-ins:
 
