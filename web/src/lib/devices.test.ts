@@ -84,7 +84,7 @@ it("uses generated settings and removal operations with body-only settings and c
     enabled: true,
     muted: false,
   });
-  expect(request.signal).toBe(signal);
+  expect(request.signal?.aborted).toBe(false);
   expect(fetch.mock.calls[1][0]).toBe(
     `/api/v1/devices/${device.installationId}`,
   );
@@ -122,4 +122,23 @@ it("refuses mismatched successful identities and unsupported setting labels", as
     "iOS",
   );
   expect(deviceDeliveryState({ ...device, muted: true })).toContain("muted");
+});
+
+it("propagates caller cancellation through the deadline signal during a device mutation", async () => {
+  const fetcher = vi.fn<typeof fetch>(() => new Promise<Response>(() => {}));
+  vi.stubGlobal("fetch", fetcher);
+  const caller = new AbortController();
+  const pending = updateDevice(
+    device,
+    { label: "Test", enabled: true, muted: false },
+    caller.signal,
+  );
+  const checked = expect(pending).rejects.toMatchObject({ name: "AbortError" });
+  const signal = fetcher.mock.calls[0][1]?.signal;
+  expect(signal).toBeDefined();
+  expect(signal?.aborted).toBe(false);
+  caller.abort();
+  await checked;
+  expect(signal?.aborted).toBe(true);
+  expect(fetcher).toHaveBeenCalledTimes(1);
 });

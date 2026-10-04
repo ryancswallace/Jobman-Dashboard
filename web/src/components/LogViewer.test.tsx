@@ -222,3 +222,137 @@ it("accepts factual no-execution runs without inventing an execution", async () 
     screen.getByTitle("Last successful authorized log read"),
   ).toBeVisible();
 });
+
+it.each(["paused", "complete", "error"])(
+  "rechecks %s logs on foreground as a paused fresh tail with separate source capture",
+  async (mode) => {
+    let visibility = "visible";
+    vi.spyOn(document, "visibilityState", "get").mockImplementation(
+      () => visibility as DocumentVisibilityState,
+    );
+    fetcher.mockResolvedValueOnce(
+      mode === "error"
+        ? Response.json(
+            { code: "source_unavailable", message: "Unavailable" },
+            { status: 503 },
+          )
+        : Response.json({
+            ...chunk,
+            state: mode === "complete" ? "complete" : "open",
+            bytesBase64: "QQ==",
+            endOffset: "1",
+            nextCursor: "old-cursor",
+          }),
+    );
+    fetcher.mockResolvedValueOnce(
+      Response.json({
+        ...chunk,
+        state: "complete",
+        executionId: "new-execution",
+        bytesBase64: "Qg==",
+        startOffset: "20",
+        endOffset: "21",
+        capturedAt: "2026-10-03T13:00:00Z",
+      }),
+    );
+    await act(async () => {
+      render(<LogViewer job={job} />);
+    });
+    if (mode === "paused")
+      fireEvent.click(screen.getByRole("button", { name: "Pause following" }));
+    await act(async () => {
+      visibility = "hidden";
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10000);
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      visibility = "visible";
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(String(fetcher.mock.calls[1][0])).not.toContain("cursor=");
+    expect(screen.getByLabelText("stdout log output")).toHaveTextContent("B");
+    expect(screen.getByLabelText("stdout log output")).not.toHaveTextContent(
+      "A",
+    );
+    expect(
+      screen.getByRole("button", { name: "Resume following" }),
+    ).toBeVisible();
+    expect(screen.getByText(/Source capture:/)).toHaveTextContent(
+      "2026-10-03T13:00:00Z",
+    );
+    expect(
+      screen.getByTitle("Last successful authorized log read"),
+    ).not.toHaveAttribute("datetime", "2026-10-03T13:00:00Z");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10000);
+    });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  },
+);
+
+it("discards a pre-hide reply and keeps the selected run on foreground and online recovery", async () => {
+  let visibility = "visible";
+  vi.spyOn(document, "visibilityState", "get").mockImplementation(
+    () => visibility as DocumentVisibilityState,
+  );
+  let late!: (response: Response) => void;
+  const run = {
+    id: "old-run",
+    number: "5",
+    executionId: "old-execution",
+    phase: "terminal",
+    desiredState: "run",
+    createdAt: chunk.capturedAt,
+    updatedAt: chunk.capturedAt,
+  };
+  const selected = {
+    ...chunk,
+    runId: run.id,
+    runNumber: run.number,
+    executionId: run.executionId,
+    endOffset: "1",
+    state: "complete",
+  };
+  fetcher.mockImplementationOnce(
+    () =>
+      new Promise<Response>((resolve) => {
+        late = resolve;
+      }),
+  );
+  fetcher.mockResolvedValueOnce(
+    Response.json({ ...selected, bytesBase64: "Qg==" }),
+  );
+  fetcher.mockResolvedValueOnce(
+    Response.json({ ...selected, bytesBase64: "Qw==" }),
+  );
+  await act(async () => {
+    render(<LogViewer job={job} run={run} />);
+  });
+  await act(async () => {
+    visibility = "hidden";
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  expect(fetcher.mock.calls[0][1].signal.aborted).toBe(true);
+  await act(async () => {
+    visibility = "visible";
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await act(async () => {
+    late(Response.json({ ...selected, bytesBase64: "QQ==" }));
+  });
+  expect(screen.getByLabelText("stdout log output")).toHaveTextContent("B");
+  expect(screen.getByLabelText("stdout log output")).not.toHaveTextContent("A");
+  await act(async () => {
+    window.dispatchEvent(new Event("online"));
+  });
+  expect(screen.getByLabelText("stdout log output")).toHaveTextContent("C");
+  for (const call of fetcher.mock.calls)
+    expect(String(call[0])).toContain("runNumber=5");
+  expect(
+    screen.getByRole("button", { name: "Resume following" }),
+  ).toBeVisible();
+});

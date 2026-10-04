@@ -31,3 +31,20 @@ and a final clean candidate still govern release completion.
 The [final candidate procedure](FINAL_CANDIDATE.md) carries this audit in the
 curated release documentation and keeps upstream, native and external acceptance
 gates explicit. Packaging this audit does not itself close any finding.
+
+## Web recovery follow-up
+
+The follow-up R08/R09/T10/T11 audit found two additional implementation gaps:
+web requests could wait indefinitely for headers/body and buffered JSON without
+a byte ceiling; paused, completed or failed logs did not re-read after returning
+to the foreground, and their source capture time was absent. The repair applies
+a 30-second overall request/body deadline and a 4 MiB streamed JSON ceiling,
+preserves caller cancellation, and never automatically retries mutations. An
+uncertain mutation timeout tells the user to inspect current state before retry.
+
+A resumed or reconnected log view cancels the old scene, obtains a fresh
+source-authorized tail for the exact selected run, rejects late old replies and
+stays paused. Source capture and the last successful fetch are shown separately.
+Regression coverage includes stalled headers/body, oversized responses, exact
+byte/UTF-8 boundaries, paused/terminal/error resume and old-scene reply isolation.
+These tests do not establish the pending browser/device acceptance matrix.
