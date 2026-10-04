@@ -20,7 +20,11 @@ func (s *Service) RunOne(parent context.Context) (err error) {
 	if s.writer == nil {
 		return ErrInvalid
 	}
-	claim, err := s.queue.ClaimReport(parent)
+	// Claiming can wait on a database connection, lock, or stalled transport.
+	// Bound that wait separately from an admitted task's analysis lease.
+	claimContext, cancelClaim := context.WithTimeout(parent, 5*time.Second)
+	claim, err := s.queue.ClaimReport(claimContext)
+	cancelClaim()
 	if err != nil {
 		return err
 	}

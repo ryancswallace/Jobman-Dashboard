@@ -95,8 +95,7 @@ func NewOIDC(ctx context.Context, o OIDCOptions, store IdentityStore) (*OIDC, er
 			scopes = append(scopes, s)
 		}
 	}
-	verificationContext := oidc.ClientContext(context.WithoutCancel(ctx), o.HTTPClient)
-	return &OIDC{options: o, store: store, box: box, webVerifier: p.VerifierContext(verificationContext, &oidc.Config{ClientID: o.WebClientID, SupportedSigningAlgs: []string{"RS256"}}), apiVerifier: p.VerifierContext(verificationContext, &oidc.Config{ClientID: o.Audience, SupportedSigningAlgs: []string{"RS256"}}), oauth: oauth2.Config{ClientID: o.WebClientID, ClientSecret: o.WebClientSecret, Endpoint: endpoint, RedirectURL: o.PublicOrigin + "/auth/callback", Scopes: scopes}, now: time.Now}, nil
+	return &OIDC{options: o, store: store, box: box, webVerifier: newIdentityVerifier(ctx, o, metadata.JWKS, o.WebClientID), apiVerifier: newIdentityVerifier(ctx, o, metadata.JWKS, o.Audience), oauth: oauth2.Config{ClientID: o.WebClientID, ClientSecret: o.WebClientSecret, Endpoint: endpoint, RedirectURL: o.PublicOrigin + "/auth/callback", Scopes: scopes}, now: time.Now}, nil
 }
 
 // PinnedIdentityHTTPClient does not follow redirects or send issuer traffic to
@@ -189,6 +188,9 @@ func (o *OIDC) Authenticate(r *http.Request) (monitoring.Actor, error) {
 		}
 		verified, err := o.apiVerifier.Verify(r.Context(), token)
 		if err != nil {
+			if verifierUnavailable(r.Context(), err) {
+				return monitoring.Actor{}, monitoring.ErrSource
+			}
 			return monitoring.Actor{}, ErrUnauthenticated
 		}
 		identity, err := o.identity(verified, true)
@@ -238,17 +240,17 @@ type loginState struct{ Verifier, Nonce, ReturnTo string }
 
 func (o *OIDC) login(w http.ResponseWriter, r *http.Request) {
 	if r.Host != strings.TrimPrefix(o.options.PublicOrigin, "https://") {
-		authFailure(w)
+		authFailure(w, r)
 		return
 	}
 	query, err := url.ParseQuery(r.URL.RawQuery)
 	if err != nil || len(query) > 1 || len(query["returnTo"]) > 1 {
-		authFailure(w)
+		authFailure(w, r)
 		return
 	}
 	for key := range query {
 		if key != "returnTo" {
-			authFailure(w)
+			authFailure(w, r)
 			return
 		}
 	}
@@ -257,27 +259,27 @@ func (o *OIDC) login(w http.ResponseWriter, r *http.Request) {
 		returnTo = "/"
 	}
 	if !safeReturn(returnTo) {
-		authFailure(w)
+		authFailure(w, r)
 		return
 	}
 	state, err := randomToken()
 	if err != nil {
-		authFailure(w)
+		authFailure(w, r)
 		return
 	}
 	nonce, err := randomToken()
 	if err != nil {
-		authFailure(w)
+		authFailure(w, r)
 		return
 	}
 	payload, _ := json.Marshal(loginState{Verifier: oauth2.GenerateVerifier(), Nonce: nonce, ReturnTo: returnTo})
 	encrypted, err := o.box.seal(payload)
 	if err != nil {
-		authFailure(w)
+		authFailure(w, r)
 		return
 	}
 	if err := o.store.PutLogin(r.Context(), tokenHash(state), encrypted, o.now().Add(5*time.Minute)); err != nil {
-		authFailure(w)
+		authStoreFailure(w, r, err)
 		return
 	}
 	http.SetCookie(w, &http.Cookie{Name: loginCookie, Value: state, Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 300})
@@ -295,64 +297,77 @@ func safeReturn(value string) bool {
 func (o *OIDC) callback(w http.ResponseWriter, r *http.Request) {
 	clearCookie(w, loginCookie)
 	if r.Host != strings.TrimPrefix(o.options.PublicOrigin, "https://") {
-		authFailure(w)
+		authFailure(w, r)
 		return
 	}
 	q, err := url.ParseQuery(r.URL.RawQuery)
 	if err != nil || len(q["state"]) != 1 || len(q["code"]) != 1 || len(q.Get("code")) > 4096 {
-		authFailure(w)
+		authFailure(w, r)
 		return
 	}
 	cookies := r.CookiesNamed(loginCookie)
 	state := q.Get("state")
 	if len(cookies) != 1 || len(r.CookiesNamed(sessionCookie)) > 1 || len(state) != 43 || subtle.ConstantTimeCompare([]byte(cookies[0].Value), []byte(state)) != 1 {
-		authFailure(w)
+		authFailure(w, r)
 		return
 	}
 	encrypted, err := o.store.ConsumeLogin(r.Context(), tokenHash(state))
 	if err != nil {
-		authFailure(w)
+		authStoreFailure(w, r, err)
 		return
 	}
 	payload, err := o.box.open(encrypted)
 	if err != nil {
-		authFailure(w)
+		authFailure(w, r)
 		return
 	}
 	var flow loginState
 	if json.Unmarshal(payload, &flow) != nil || !safeReturn(flow.ReturnTo) {
-		authFailure(w)
+		authFailure(w, r)
 		return
 	}
 	ctx := oidc.ClientContext(r.Context(), o.options.HTTPClient)
 	tokens, err := o.oauth.Exchange(ctx, q.Get("code"), oauth2.VerifierOption(flow.Verifier), oauth2.SetAuthURLParam("resource", o.options.Audience))
 	if err != nil {
-		authFailure(w)
+		var rejected *oauth2.RetrieveError
+		if errors.As(err, &rejected) && rejected.Response != nil && slices.Contains([]int{400, 401, 403}, rejected.Response.StatusCode) {
+			authFailure(w, r)
+		} else {
+			authUnavailable(w)
+		}
 		return
 	}
 	raw, ok := tokens.Extra("id_token").(string)
 	if !ok || len(raw) > 16384 {
-		authFailure(w)
+		authFailure(w, r)
 		return
 	}
 	verified, err := o.webVerifier.Verify(r.Context(), raw)
-	if err != nil || subtle.ConstantTimeCompare([]byte(verified.Nonce), []byte(flow.Nonce)) != 1 {
-		authFailure(w)
+	if err != nil {
+		if verifierUnavailable(r.Context(), err) {
+			authUnavailable(w)
+		} else {
+			authFailure(w, r)
+		}
+		return
+	}
+	if subtle.ConstantTimeCompare([]byte(verified.Nonce), []byte(flow.Nonce)) != 1 {
+		authFailure(w, r)
 		return
 	}
 	identity, err := o.identity(verified, false)
 	if err != nil {
-		authFailure(w)
+		authFailure(w, r)
 		return
 	}
 	actor, err := o.store.ResolveIdentity(r.Context(), identity)
 	if err != nil {
-		authFailure(w)
+		authStoreFailure(w, r, err)
 		return
 	}
 	token, err := randomToken()
 	if err != nil {
-		authFailure(w)
+		authFailure(w, r)
 		return
 	}
 	expires := o.now().Add(8 * time.Hour)
@@ -363,18 +378,18 @@ func (o *OIDC) callback(w http.ResponseWriter, r *http.Request) {
 		expires = tokens.Expiry
 	}
 	if !expires.After(o.now()) {
-		authFailure(w)
+		authFailure(w, r)
 		return
 	}
 	session := Session{TokenHash: tokenHash(token), CSRFHash: tokenHash(o.box.csrf(token)), Actor: actor, CreatedAt: o.now(), ExpiresAt: expires}
 	if old, err := r.Cookie(sessionCookie); err == nil {
 		if err := o.store.RevokeSession(r.Context(), tokenHash(old.Value)); err != nil {
-			authFailure(w)
+			authStoreFailure(w, r, err)
 			return
 		}
 	}
 	if err := o.store.CreateSession(r.Context(), session); err != nil {
-		authFailure(w)
+		authStoreFailure(w, r, err)
 		return
 	}
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: token, Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode, Expires: expires})
@@ -382,12 +397,12 @@ func (o *OIDC) callback(w http.ResponseWriter, r *http.Request) {
 }
 func (o *OIDC) logout(w http.ResponseWriter, r *http.Request) {
 	if _, err := o.Authenticate(r); err != nil {
-		authFailure(w)
+		authStoreFailure(w, r, err)
 		return
 	}
 	if cookie, err := r.Cookie(sessionCookie); err == nil {
 		if err := o.store.RevokeSession(r.Context(), tokenHash(cookie.Value)); err != nil {
-			authFailure(w)
+			authStoreFailure(w, r, err)
 			return
 		}
 	}
@@ -397,8 +412,34 @@ func (o *OIDC) logout(w http.ResponseWriter, r *http.Request) {
 func clearCookie(w http.ResponseWriter, name string) {
 	http.SetCookie(w, &http.Cookie{Name: name, Value: "", Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: -1})
 }
-func authFailure(w http.ResponseWriter) {
+func authFailure(w http.ResponseWriter, r *http.Request) {
+	if r.Context().Err() != nil {
+		authUnavailable(w)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusUnauthorized)
 	_ = json.NewEncoder(w).Encode(ErrUnauthenticated)
+}
+
+// Invalid credentials/state remain an authentication failure. A missing
+// database response or unavailable identity provider does not invalidate them.
+func authStoreFailure(w http.ResponseWriter, r *http.Request, err error) {
+	if errors.Is(err, ErrUnauthenticated) || errors.Is(err, ErrIdentityConflict) {
+		authFailure(w, r)
+		return
+	}
+	authUnavailable(w)
+}
+
+func verifierUnavailable(ctx context.Context, err error) bool {
+	var network net.Error
+	return ctx.Err() != nil || errors.Is(err, errKeyAuthorityUnavailable) || errors.As(err, &network)
+}
+
+func authUnavailable(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusServiceUnavailable)
+	_ = json.NewEncoder(w).Encode(monitoring.ErrSource)
 }
