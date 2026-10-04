@@ -1,8 +1,8 @@
 # Deployed accepted-scale validation
 
-Status: **harness implemented; integrated fixture preparation and execution are
-pending**. The source repository measurements in `IMPLEMENTATION_STATUS.md` are
-separate evidence. Neither those measurements nor this harness establishes web
+Status: **deployed metadata HTTP acceptance passes on rc.3 with both Controls at
+04bd83d**. The earlier rc.2 failure is retained. The source repository measurements
+in `IMPLEMENTATION_STATUS.md` are separate evidence. Neither those measurements nor this harness establishes web
 or iPhone rendering latency, corporate AD FS behavior, or a production capacity
 guarantee.
 
@@ -110,3 +110,33 @@ Additional T11 acceptance still required: simultaneous log follows and group
 drill-downs, terminal-event bursts, slow dependency behavior, memory/queue bounds,
 and actual client rendering/accessibility under load. Keep those results distinct
 from this metadata HTTP slice.
+
+
+## Recorded acceptance — October 4
+
+Exact Dashboard `9b1c65e31db8a849ebe2dfa00caf4474bef8e7d2`, configuration8,
+and both Controls `04bd83db28bc24155c87e0ceea61c047320fca07` pass in44.02s.
+All25 distinct signed viewers bootstrap with current direct viewer grants.
+Each table entry represents200 successful samples, with zero errors:
+
+| Selection | List p95 | Detail p95 | Overview p95 |
+| --- | --- | --- | --- |
+| One Control / ten namespaces | 1199.791ms | 660.947ms | 1457.676ms |
+| Two Controls / ten namespaces | 1069.420ms | 696.632ms | 1186.851ms |
+
+Both full10,050-job traversals pass, including ordering, uniqueness, source
+identity and imported/admitted provenance. The unchanged2s p95 and zero-error
+gates pass for all1,200 timed requests. Private result
+`/private/tmp/jobman-dashboard-rc3-control04bd-scale-v1.json`, SHA256
+`a8d46369c625fd18b3e78e0dfc7d26fb52222a4b1f6c37b0dab1788d756218aa`,
+was produced by the exact `8339b88` integration harness. Source query upgrades
+and preserved authority are independently recorded in
+`/private/tmp/jobman-control-query-upgrade-acceptance-v1.json` (SHA256
+`043893855d6b6e62dfa94701c3ad142e94ed8f4e29e4e15867097533fc47a394`).
+The host has48GiB RAM/18 CPUs; the existing six Lab guests were running and three
+others suspended, with202GiB host disk available. Our simulator/build-heavy work
+was paused during this measurement.
+
+This closes the metadata HTTP slice only. Mixed workload contention, actual
+client rendering, physical-device latency and production identity still require
+their own evidence. The earlier failed82.69s rc.2 result remains unchanged.
