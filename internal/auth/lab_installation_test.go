@@ -436,7 +436,10 @@ func TestLabFreshInstallationAndSupportedRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal("New confidential client BFF failed; protocol details withheld")
 	}
-	body, _ := json.Marshal(map[string]any{"timezone": "America/New_York", "appearance": "dark", "refreshSeconds": 10})
+	body, err := LabInstallationPreferenceBody(before.Preferences)
+	if err != nil {
+		t.Fatal("Fresh preference request unavailable")
+	}
 	// The new origin is a separate port. This test uses its own empty cookie jar;
 	// it never loads a person's browser cookies shared by host across ports.
 	denied, err := labInstallExchange(ctx, web, "PUT", labInstallOrigin+"/api/v1/preferences", http.Header{"Origin": {labInstallOrigin}, "Content-Type": {"application/json"}, "If-Match": {before.Preferences.Revision}}, body)
@@ -446,7 +449,7 @@ func TestLabFreshInstallationAndSupportedRollback(t *testing.T) {
 	changed, err := labInstallExchange(ctx, web, "PUT", labInstallOrigin+"/api/v1/preferences", http.Header{"Origin": {labInstallOrigin}, "X-CSRF-Token": {csrf}, "Content-Type": {"application/json"}, "If-Match": {before.Preferences.Revision}}, body)
 	var preference api.Preferences
 	if err != nil || changed.status != 200 || json.Unmarshal(changed.body, &preference) != nil || preference.Revision == before.Preferences.Revision || preference.Timezone != "America/New_York" {
-		t.Fatal("Fresh preference persistence failed")
+		t.Fatalf("Fresh preference persistence failed (HTTP%d; transportFailure=%t); response contents withheld", changed.status, err != nil)
 	}
 
 	var accepted struct {
@@ -553,6 +556,14 @@ func TestLabFreshInstallationAndSupportedRollback(t *testing.T) {
 	}
 	allVerified = true
 	t.Log("PASS: isolated empty PostgreSQL installation, fresh purpose keys/new confidential web client, actual PKCE/BFF and CSRF, role-scoped source/log/diagnosis, persisted report/citation/preferences/disabled-rule state across reviewed same-schema upgrade and rollback; Lab HTTP acceptance only")
+}
+
+// LabInstallationPreferenceBody is shared with the offline HTTP-contract regression.
+func LabInstallationPreferenceBody(current api.Preferences) ([]byte, error) {
+	current.Timezone = "America/New_York"
+	current.Appearance = "dark"
+	current.RefreshSeconds = 10
+	return json.Marshal(current)
 }
 
 // These tests exercise the live harness' transport and phase admission guards
