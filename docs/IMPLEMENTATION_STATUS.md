@@ -1,6 +1,6 @@
 # Initial release implementation status
 
-Updated: 2026-10-04. Release state: **implementation in progress; no release candidate yet**.
+Updated: 2026-10-04. Release state: **engineering prerelease v0.1.0-rc.1 published; integrated and external release acceptance remains in progress**.
 
 The adopted [implementation prompt](IMPLEMENTATION_PROMPT.md), [requirements](REQUIREMENTS.md), and [design](DESIGN.md) govern this work. The persistent goal remains active through implementation, GitHub delivery, and acceptance. A passing local slice is not release acceptance.
 
@@ -44,28 +44,28 @@ All requirements remain open until their implementation and required verificatio
 
 | Requirement | State | Primary implementation |
 | --- | --- | --- |
-| R01 | Open | Authentication and private connectivity |
+| R01 | In progress | Web/native OIDC and private TLS are implemented; actual Keycloak/LDAPS passes, corporate AD FS remains external. |
 | R02 | In progress | Authorized discovery and capability union |
 | R03 | In progress | Web/iPhone navigation and source-qualified routes |
-| R04 | Open | Complete scoped summaries |
-| R05 | Open | Bounded job inventory/filtering |
-| R06 | Open | Factual job details |
+| R04 | In progress | Complete authorized scoped summaries; second-source and accepted-scale checks remain. |
+| R05 | In progress | Bounded inventory/filtering and durable cursors; accepted-scale checks remain. |
+| R06 | In progress | Actual subprocess run/lifecycle/outcome detail verified; full source/client matrix remains. |
 | R07 | In progress | Separate phase/outcome/intent/confidence DTOs |
 | R08 | In progress | Cancellable foreground refresh and authorization expiry |
-| R09 | Open | Safe incremental logs |
+| R09 | In progress | Actual new producer NFS chunks, exact bytes/checksums, empty streams and cross-user denial pass; failure/load matrix remains. |
 | R10 | In progress | Bounded authorized artifact metadata, actual run identity, web pagination/filtering and explicit unverified bytes; native/live-source acceptance remains. |
 | R11 | In progress | Complete web/native target configuration and bounded partition views merged; live Lab Alice/Bob target acceptance passes. |
-| R12 | Open | All agreed alert scopes and outcomes |
-| R13 | Open | Durable deduplicated inbox and delivery |
-| R14 | Open | Notification disclosure and revocation |
-| R15 | Open | Personal settings |
+| R12 | In progress | All agreed rule scopes/outcomes implemented; actual terminal-event matching passes, two-source acceptance remains. |
+| R13 | In progress | Durable deduplicated inbox/sender/device lifecycle implemented and tested; actual APNs remains external. |
+| R14 | In progress | Generic push payload, current-access fencing, offline revocation and safe private routes implemented; physical-device checks remain. |
+| R15 | In progress | Web/native personal preferences and rule/device settings implemented; complete client matrix remains. |
 | R16 | In progress | Direct AD grants, union, removal and freshness |
-| R17 | Open | Multi-Control namespace aggregation |
+| R17 | In progress | Source-qualified aggregation/cursors implemented; second actual Control deployment is being prepared. |
 | R18 | In progress | Native app; internal delivery unverified |
-| R19 | Open | Collections and Slurm arrays |
-| R20 | Open | Dependency graphs |
-| R21 | In progress | Actual deterministic collector/engine/private-pair/worker and current-authorization report/citation API implemented and tested; client/live integration underway. |
-| R22 | Open | Independent authorized source connections |
+| R19 | In progress | Actual three-child collection passes; real Slurm array acceptance is being prepared. |
+| R20 | In progress | Actual predicates, skipped branch, child/edge paging and bounded neighborhood counts pass; scale/client matrix remains. |
+| R21 | In progress | Actual failed subprocess yields deterministic sealed metadata/redacted-log reports and exact citations; source bytes stay unchanged. Failed Slurm and full client matrix remain. |
+| R22 | In progress | Independent pinned source trust/authorization implemented and tested; actual second-source and failure acceptance remain. |
 
 ## Acceptance evidence
 
@@ -254,3 +254,16 @@ Diagnose [PR10](https://github.com/ryancswallace/Jobman-Diagnose/pull/10): `2eab
 - Explicit PostgreSQL role plans and additive migration18 pass independent review. Root's actual TLS Lab test with seven separate temporary password logins passes3.027s: normal API/ingestion/evaluation/delivery/report/retention/status operations, protected-write denial, generated-lock safety, populated forward upgrade and transactional rejection of unsafe grant targets. Wildcard read grants were removed; a future-column regression proves new sensitive columns stay unreadable. Author's final operator report-pressure integration rerun passes3.070s. No live grants or schema have changed; full normal PostgreSQL regression with migration18 passes26.493s.
 - Dedicated operator status configuration is independently reviewed and tested. It needs only a private read-only database credential and bounded deployment IDs/names; no browser, source or signing material. Live process health/metrics implementation is in progress and remains a separate gate.
 - Linux candidate packager, version metadata, hardened systemd templates and manual CI artifact workflow are independently reviewed. Ambient Go/Node/npm overrides were removed after review; packages derive only from committed source with exact toolchains, explicit ISA, unchanged locks, per-binary dependency digests and normalized archive metadata. Six package tests and workflow lint pass. Actual twice-built artifacts, installability and CI dispatch are still pending; no candidate/tag/release has been published.
+
+## Packaged process-isolation checkpoint
+
+- Commit `b8f25afdd90f83b4602f32440a89e74dfa866b6c`, reviewed tree `f8e6b6f9003e8a79380a5b7dee63190c821b0835`, is pushed in [PR6](https://github.com/ryancswallace/Jobman-Dashboard/pull/6). Frozen-source full `make check`,14 contract tests,7 packaging tests, Go vet/race/shuffle,104 web tests, both binaries and the production web build pass. Full actual TLS PostgreSQL migrations1–18/store tests pass **30.668s**; the separate administrator-driven temporary password-login role/upgrade/denial tests pass **3.140s**.
+- Private process observability is implemented and independently reviewed: per-process Unix socket, bounded liveness/readiness, fixed-label metrics, optional separate read-only status sampling and no browser listener exposure. Regressions distinguish panicked requests from success and completed ledger incompatibility from database outages. Schema/pressure tests pass in the actual PostgreSQL suite. Live socket acceptance belongs to the next split deployment.
+- The exact committed source builds both Linux architectures twice with **identical archive hashes**. Internal checksums, metadata and all35 regular files per bundle also verify. The native source's internal generated-contract link is materialized from its exact regular archive entry; external/escaping links and link chains are rejected. This integration repair is independently reviewed and tested.
+- Candidate `v0.1.0-rc.1` archive SHA256: amd64 `87aeb54fc4a38a8f2bf8aaafb51ea492479d6838790285ebbbb96f45781ccae5`; arm64 `bf25fb55c84e33cef09de22378ddb154b45e68b3e16c60153f7087c007939f2b`. Local output is `/private/tmp/jobman-dashboard-candidate-b8f25af-first`; the independent second build is the sibling `-second` directory. No release/tag is published. [PR CI](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37181479598) and [manual candidate CI](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37181521007) are running. The manual run superseded/cancelled the duplicate push run through the existing concurrency policy.
+- Actual normal-API executor preparation passes **1.610s** using clean Core `21701b191cd4e4e063d26cad7dae31c35db6bc8c`, binary SHA256 `e955472e6174a03503548137397328a4570e8e257372ac4409ed75a8130dfa72`. Only the new Alice subprocess agent is enrolled/started. Its source-qualified generation is `3ae8ed72-6d05-4af6-9fce-2f1c54df4b02`. Reviewed additive mappings were applied with exact SHA/revision checks: combined API revision4 and broker revision3. Role config checks, runtime/TLS/unauthenticated-denial/feed health checks pass; original Control, Keycloak and agents remain intact. No actual workload completion is claimed yet.
+- The Lab split plan/stager is independently reviewed and preserves the newly added mapping, exact candidate, private backups, purpose keys, source identity, sessions and reports. Its apply driver is being implemented for separate review. No live migration18, database-role cutover or report ownership conversion has occurred. Actual workload, second-Control, restore/load and external release gates remain open.
+
+- Both exact-head CI runs are **green**: [PR](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37181479598), [candidate](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37181521007). Downloaded CI artifact11294504236 matches both local builds byte-for-byte on both architectures. Linux arm64 `version` smoke tests pass for both packaged binaries; no service changed. [Engineering prerelease v0.1.0-rc.1](https://github.com/ryancswallace/Jobman-Dashboard/releases/tag/v0.1.0-rc.1) is now published with the exact two archives and checksums. GitHub tag target and asset digests verify against b8f25af. Notes explicitly list unmet integrated/external gates; no signed iPhone package or production acceptance is claimed.
+- The actual subprocess acceptance scenario passes **29.38s** (race package30.714s) using11 fixed-idempotency jobs, real process execution, a three-child collection and four-node graph. It verifies success/failure/timeout/running cancellation, original run/time provenance, skipped branch without a run, Dashboard source/owner detail, bounded child/edge/neighborhood navigation, new NFS log checksums and exact empty/nonempty bytes, both deterministic report profiles and redacted sealed citations, unchanged original output after diagnosis, and Bob denial. Source instance/epoch remains unchanged. See [actual execution evidence and commands](LAB_EXECUTION.md). This verifies deployed6aa32eb behavior; split candidate acceptance follows separately.
+- Root independently reran18 offline Lab groups across the new execution, split and second-source scripts:4/9/5 pass. Second-source preparation remains non-applying; the fixture helper's narrowly scoped secondary profile is being implemented. Slurm preflight records48GiB host RAM,68% free memory and216GiB free disk. Resuming only scheduler/submit/compute01 adds7GiB for16GiB total configured running guest memory; compute02 and workstations remain suspended.
