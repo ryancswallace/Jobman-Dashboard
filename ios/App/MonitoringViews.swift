@@ -169,7 +169,7 @@ struct JobDetailView: View {
                     if !Task.isCancelled, store.active, store.bootstrap?.preferences.refreshSeconds != 0 { await load() }
                 }
             }.refreshable { await load() }
-            .sheet(isPresented: $watching) { AlertEditor(initial: AlertRule(name: "Watched job", scope: "watched_jobs", namespaces: [ref.namespace], jobs: [ref])) }
+            .sheet(isPresented: $watching) { AlertEditor(watching: ref) }
     }
     private func load() async {
         do {

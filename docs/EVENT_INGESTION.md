@@ -55,7 +55,8 @@ replay with different positions, identity conflicts, cross-source equal IDs,
 scope changes during a lease, source epochs, explicit gaps, capacity, pending
 work retention, increased/decreased replay retention and source outages.
 
-This checkpoint implements ingestion and pause semantics. Explicit operator
-reconciliation/resume, notification rule evaluation, inbox and APNs delivery are
-still being implemented; paused feeds must not be manually reset in SQL to
-pretend complete delivery. No release-readiness claim follows from these tests.
+Explicit operator replay, reconciliation, restore holds and resume are described
+in [EVENT_RECOVERY.md](EVENT_RECOVERY.md). Notification evaluation, inbox and APNs
+integration are still being completed. Paused feeds must not be manually reset in
+SQL to pretend complete delivery. No release-readiness claim follows from these
+tests.

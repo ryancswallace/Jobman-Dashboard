@@ -35,10 +35,12 @@ type Config struct {
 	LogMappings           []RemoteLogMapping `json:"logMappings"`
 	Reports               Reports            `json:"reports"`
 	Events                Events             `json:"events"`
+	Notifications         Notifications      `json:"notifications"`
 }
 
 type Events struct {
-	Enabled bool `json:"enabled"`
+	Enabled      bool `json:"enabled"`
+	DeliveryHold bool `json:"deliveryHold"`
 }
 
 type Reports struct {
@@ -154,7 +156,8 @@ func checkKeys(decoder *json.Decoder, schema reflect.Type, path string) error {
 		fields := map[string]reflect.Type{}
 		for i := 0; i < schema.NumField(); i++ {
 			field := schema.Field(i)
-			fields[field.Tag.Get("json")] = field.Type
+			name := strings.SplitN(field.Tag.Get("json"), ",", 2)[0]
+			fields[name] = field.Type
 		}
 		seen := map[string]bool{}
 		for decoder.More() {
@@ -279,6 +282,9 @@ func (c Config) Validate() error {
 		return err
 	}
 	if err := validateRemoteLogs(c.Controls, c.LogBrokers, c.LogMappings); err != nil {
+		return err
+	}
+	if err := validateNotifications(c.Notifications, c.Encryption, c.Events); err != nil {
 		return err
 	}
 	return c.validatePrivatePaths()

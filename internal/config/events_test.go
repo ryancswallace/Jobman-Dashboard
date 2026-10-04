@@ -2,6 +2,7 @@ package config
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -20,7 +21,11 @@ func TestEventIngestionRequiresExplicitBooleanConfiguration(t *testing.T) {
 			t.Fatal("ambiguous event enablement accepted", value)
 		}
 	}
-	without := strings.Replace(string(data), `"events":{"enabled":true}`, `"events":{}`, 1)
+	eventConfig, err := json.Marshal(c.Events)
+	if err != nil {
+		t.Fatal(err)
+	}
+	without := strings.Replace(string(data), `"events":`+string(eventConfig), `"events":{}`, 1)
 	got, err = Decode(strings.NewReader(without))
 	if err != nil || got.Events.Enabled {
 		t.Fatal("absent enablement starts workers", err)

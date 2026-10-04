@@ -227,6 +227,49 @@ describe("web monitoring workflows", () => {
     );
   });
   it("creates an opt-in namespace rule across two sources with all terminal outcomes", async () => {
+    const nsID = "71000000-0000-4000-8000-000000000001";
+    const deployments = [
+      "71000000-0000-4000-8000-000000000002",
+      "71000000-0000-4000-8000-000000000003",
+    ];
+    const originalFetch = fetcher.getMockImplementation()!;
+    fetcher.mockImplementation(async (input: string, options?: RequestInit) => {
+      if (input === "/api/v1/bootstrap")
+        return Response.json({
+          ...bootstrap,
+          deployments: bootstrap.deployments.map((source, index) => ({
+            ...source,
+            id: deployments[index],
+            namespaces: [
+              {
+                ...ns,
+                id: nsID,
+                capabilities: ["namespace.read", "jobs.read"],
+              },
+            ],
+          })),
+        });
+      if (input === "/api/v1/rules" && options?.method === "POST") {
+        const request = JSON.parse(String(options.body));
+        return Response.json(
+          {
+            ...request,
+            id: "71000000-0000-4000-8000-000000000004",
+            revision: "1",
+            scopes: request.namespaces.map((ref: object) => ({
+              ...ref,
+              status: "pending",
+            })),
+            inaccessibleScopes: 0,
+            unavailableScopes: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          { status: 201 },
+        );
+      }
+      return originalFetch(input, options);
+    });
     history.replaceState(null, "", "/alerts");
     render(<App />);
     await screen.findByRole("button", { name: "+ New alert rule" });
@@ -263,8 +306,8 @@ describe("web monitoring workflows", () => {
       scope: "namespace_jobs",
       outcomeMode: "all_terminal",
       namespaces: [
-        { deploymentId: "east", namespaceId: "ns" },
-        { deploymentId: "west", namespaceId: "ns" },
+        { deploymentId: deployments[0], namespaceId: nsID },
+        { deploymentId: deployments[1], namespaceId: nsID },
       ],
     });
     expect(mutation[1].headers.get("X-CSRF-Token")).toBe("fixture-csrf");

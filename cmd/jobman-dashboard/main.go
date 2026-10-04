@@ -26,6 +26,9 @@ func main() {
 	}
 }
 func run() error {
+	if len(os.Args) > 1 && os.Args[1] == "events" {
+		return runEventOperator(os.Args[2:], os.Stdout)
+	}
 	fs := flag.NewFlagSet("jobman-dashboard", flag.ContinueOnError)
 	fixture := fs.Bool("fixture", false, "serve synthetic development data, loopback only")
 	configPath := fs.String("config", "", "absolute production JSON configuration path")

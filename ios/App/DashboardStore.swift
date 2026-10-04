@@ -40,6 +40,7 @@ final class DashboardStore {
     private var consecutiveRefreshFailures = 0
     private var lastDataRefresh = Date.distantPast
     private(set) var previewMode = false
+    private var ruleNamespaceOptionsInvalidated = false
 
     init() {
         #if DEBUG
@@ -124,9 +125,10 @@ final class DashboardStore {
                                                             maximumAge: (boot.authorizationDeadline ?? Date()).timeIntervalSince(boot.authorizationCheckedAt ?? Date()))
                 let grantsChanged = authorizationVersions(boot) != bootstrap.map(authorizationVersions)
                 bootstrap = boot
+                ruleNamespaceOptionsInvalidated = false
                 if revoked || grantsChanged { try activate(boot); purgeContent(); path = []; inboxPath = [] }
                 scheduleExpiry()
-                if boot.namespaces.isEmpty { purgeContent(); error = "No namespaces are currently authorized for this account."; return }
+                if boot.namespaces.isEmpty { error = "No namespaces are currently authorized for this account."; return }
                 guard let ticket = boundary.ticket() else { return }
                 let query = try scope.queryItems(authorized: boot.namespaces)
                 async let summary: Overview = request(path: "/api/v1/overview", query: query)
@@ -178,6 +180,29 @@ final class DashboardStore {
     }
 
     func query() throws -> [URLQueryItem] { try scope.queryItems(authorized: bootstrap?.namespaces ?? []) }
+
+    /// Account-owned rules return their own current authorization projection.
+    /// Stop/delete remain usable when namespace freshness is unavailable; all
+    /// namespace data paths retain the separate SessionBoundary freshness gate.
+    func generatedRuleRequest<T: Sendable>(_ operation: @Sendable (DashboardClient) async throws -> T) async throws -> T {
+        guard active, signedIn, let client else { throw DashboardError.authenticationRequired }
+        let generation = sessionGeneration, content = contentGeneration, account = bootstrap?.account.id
+        do {
+            let token = previewMode ? "synthetic-preview" : try await authentication.token()
+            try Task.checkCancellation()
+            guard active, generation == sessionGeneration, content == contentGeneration, account == bootstrap?.account.id else { throw CancellationError() }
+            let result = try await operation(DashboardClient(transport: AuthenticatedTransport(transport: client, token: token)))
+            try Task.checkCancellation()
+            guard active, generation == sessionGeneration, content == contentGeneration, account == bootstrap?.account.id else { throw CancellationError() }
+            return result
+        } catch {
+            if active, generation == sessionGeneration, content == contentGeneration, account == bootstrap?.account.id, let value = error as? DashboardError,
+               [.authenticationRequired, .forbidden, .authorizationUnavailable].contains(value) { handle(value) }
+            throw error
+        }
+    }
+
+    var hasFreshNamespaceOptions: Bool { !ruleNamespaceOptionsInvalidated && (boundary.authorizationValidUntil.map { $0 > Date() } ?? false) }
 
     private func fetchBootstrap() async throws -> Bootstrap {
         guard let client else { throw DashboardError.authenticationRequired }
@@ -262,6 +287,7 @@ final class DashboardStore {
                                                          maximumAge: (boot.authorizationDeadline ?? Date()).timeIntervalSince(boot.authorizationCheckedAt ?? Date()))
             let grantsChanged = authorizationVersions(boot) != bootstrap.map(authorizationVersions)
             bootstrap = boot
+            ruleNamespaceOptionsInvalidated = false
             if removed || grantsChanged { try activate(boot); purgeContent(); path = []; inboxPath = [] }
             scheduleExpiry()
         } catch { handle(error) }
@@ -269,7 +295,7 @@ final class DashboardStore {
 
     private func scheduleExpiry() {
         freshnessTask?.cancel()
-        guard let expiry = boundary.authorizationValidUntil else { return }
+        guard !boundary.authorizedNamespaces.isEmpty, let expiry = boundary.authorizationValidUntil else { return }
         freshnessTask = Task { @MainActor in
             try? await Task.sleep(for: .seconds(max(0, expiry.timeIntervalSinceNow)))
             guard !Task.isCancelled else { return }
@@ -343,7 +369,7 @@ final class DashboardStore {
     private func handle(_ error: Error) {
         consecutiveRefreshFailures = min(consecutiveRefreshFailures + 1, 4)
         if error as? DashboardError == .authenticationRequired { signOut() }
-        if let value = error as? DashboardError, [.forbidden, .authorizationUnavailable].contains(value) { purgeContent(); path = [] }
+        if let value = error as? DashboardError, [.forbidden, .authorizationUnavailable].contains(value) { ruleNamespaceOptionsInvalidated = true; purgeContent(); path = [] }
         self.error = error.localizedDescription
     }
 }

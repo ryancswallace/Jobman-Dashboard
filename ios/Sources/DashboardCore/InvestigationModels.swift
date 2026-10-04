@@ -71,22 +71,6 @@ public struct LogChunk: Decodable, Sendable {
     public let startOffset: String; public let endOffset: String; public let nextCursor: String?
     public let state: String; public let truncated: Bool?; public let capturedAt: String?
 }
-public struct AlertRule: Codable, Sendable, Identifiable {
-    public struct Activation: Codable, Sendable { public let deploymentId: String; public let status: String }
-    public var id: String; public var revision: String; public var name: String; public var enabled: Bool
-    public var scope: String; public var namespaces: [NamespaceRef]; public var jobs: [JobRef]
-    public var outcomeMode: String; public var outcomes: [String]; public var activation: [Activation]?
-    public init(name: String = "", scope: String = "namespace_jobs", namespaces: [NamespaceRef] = [], jobs: [JobRef] = []) {
-        id = ""; revision = ""; self.name = name; enabled = true; self.scope = scope; self.namespaces = namespaces; self.jobs = jobs
-        outcomeMode = "selected"; outcomes = ["failure", "timed_out", "aborted", "lost"]
-    }
-    public var input: Input { Input(name: name, enabled: enabled, scope: scope, namespaces: namespaces, jobs: jobs, outcomeMode: outcomeMode, outcomes: outcomes) }
-    public struct Input: Encodable, Sendable {
-        public let name: String; public let enabled: Bool; public let scope: String
-        public let namespaces: [NamespaceRef]; public let jobs: [JobRef]
-        public let outcomeMode: String; public let outcomes: [String]
-    }
-}
 public struct InboxItem: Decodable, Sendable, Identifiable {
     public let id: String; public let job: JobRef; public let outcome: String; public let eventAt: String; public let createdAt: String
     public let read: Bool; public let matchedRules: [String]; public let deliveryStatus: String?

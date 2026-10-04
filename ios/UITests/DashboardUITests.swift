@@ -188,6 +188,183 @@ final class DashboardUITests: XCTestCase {
         capture("Native report access revoked and cached content removed", app: app)
     }
 
+    func testRuleCatalogPagingCreateAllTerminalRevalidateAndDelete() {
+        let app = ruleFixtureApp()
+        openRules(app)
+        let next = app.buttons["Next rule page"]
+        reveal(next, app: app); next.tap()
+        XCTAssertTrue(app.staticTexts["Page two rule"].waitForExistence(timeout: 10))
+        app.buttons["Previous rule page"].tap()
+        app.buttons["newRule"].tap()
+        let name = app.textFields["ruleName"]
+        XCTAssertTrue(name.waitForExistence(timeout: 10)); name.tap(); name.typeText("Every future outcome"); app.buttons["ruleKeyboardDone"].tap()
+        XCTAssertFalse(app.buttons["saveRule"].isEnabled)
+        app.buttons["ruleScope"].tap(); app.buttons["Namespace jobs"].tap()
+        XCTAssertTrue(app.staticTexts["Follow every member’s eligible jobs in the selected namespaces."].exists)
+        tapRuleSwitch(app.switches["ruleScope-10000000-0000-4000-8000-000000000001-20000000-0000-4000-8000-000000000001"], app: app)
+        let every = app.switches["Every terminal outcome"]
+        tapRuleSwitch(every, app: app)
+        XCTAssertTrue(app.staticTexts["Includes success, unsuccessful outcomes, cancellation, and future unknown terminal outcomes."].exists)
+        capture("Native explicit alert rule editor", app: app)
+        app.buttons["saveRule"].tap()
+        let created = app.staticTexts["Every future outcome"]
+        XCTAssertTrue(created.waitForExistence(timeout: 10)); created.tap()
+        XCTAssertTrue(app.staticTexts["Status: pending"].waitForExistence(timeout: 10))
+        app.buttons["Revalidate selected scopes"].tap()
+        XCTAssertTrue(app.staticTexts["Status: active"].waitForExistence(timeout: 10))
+        capture("Native rule activation status", app: app)
+        let delete = app.buttons["Delete alert rule"]
+        reveal(delete, app: app); delete.tap()
+        app.buttons["Delete rule"].tap()
+        XCTAssertTrue(app.buttons["newRule"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Every future outcome"].exists)
+    }
+
+    func testRuleHiddenReferencesAllowStopAndConflictRequiresExplicitReview() {
+        let app = ruleFixtureApp()
+        openRules(app)
+        app.staticTexts["Synthetic unavailable scope"].tap()
+        XCTAssertTrue(app.buttons["ruleEnabled"].waitForExistence(timeout: 10))
+        let edit = app.buttons["editRule"]
+        reveal(edit, app: app); XCTAssertFalse(edit.isEnabled)
+        capture("Native hidden rule scope and safe controls", app: app)
+        for _ in 0..<5 { if app.buttons["ruleEnabled"].isHittable { break }; app.swipeDown() }
+        app.buttons["ruleEnabled"].tap()
+        XCTAssertTrue(app.buttons["Enable monitoring"].waitForExistence(timeout: 10))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let conflict = app.staticTexts["Synthetic conflict rule"]
+        XCTAssertTrue(conflict.waitForExistence(timeout: 10)); conflict.tap()
+        reveal(app.buttons["editRule"], app: app); app.buttons["editRule"].tap()
+        XCTAssertTrue(app.textFields["ruleName"].waitForExistence(timeout: 10))
+        app.buttons["saveRule"].tap()
+        let reload = app.buttons["Discard edits and reload"]
+        XCTAssertTrue(reload.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["saveRule"].isEnabled)
+        capture("Native rule revision conflict", app: app)
+        reload.tap()
+        XCTAssertTrue(app.textFields["ruleName"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.textFields["ruleName"].value as? String, "Updated elsewhere")
+        XCTAssertTrue(app.buttons["saveRule"].isEnabled)
+        app.buttons["saveRule"].tap()
+        XCTAssertTrue(app.staticTexts["Updated elsewhere"].waitForExistence(timeout: 10))
+    }
+
+    func testWatchJobShortcutPreservesExactScopeAndRequiresSave() {
+        let app = ruleFixtureApp()
+        app.tabBars.buttons["Jobs"].tap()
+        let job = app.staticTexts["Synthetic watched job"]
+        XCTAssertTrue(job.waitForExistence(timeout: 10)); job.tap()
+        let watch = app.buttons["Watch this job…"]
+        reveal(watch, app: app); watch.tap()
+        XCTAssertTrue(app.textFields["ruleName"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.textFields["ruleName"].value as? String, "Watched job")
+        let uuid = app.staticTexts["40000000-0000-4000-8000-000000000001"]
+        reveal(uuid, app: app)
+        XCTAssertTrue(app.buttons["saveRule"].isEnabled)
+        capture("Native watched job explicit draft", app: app)
+        app.buttons["saveRule"].tap()
+        openRules(app)
+        let created = app.staticTexts["Watched job"]
+        XCTAssertTrue(created.waitForExistence(timeout: 10)); created.tap()
+        XCTAssertTrue(app.staticTexts["Status: pending"].waitForExistence(timeout: 10))
+        reveal(uuid, app: app)
+        XCTAssertTrue(uuid.exists)
+    }
+
+    func testUncertainRuleCreationCannotDuplicateAndSceneClearsDraft() {
+        let app = ruleFixtureApp()
+        openRules(app)
+        app.buttons["newRule"].tap()
+        let name = app.textFields["ruleName"]
+        XCTAssertTrue(name.waitForExistence(timeout: 10)); name.tap(); name.typeText("Uncertain create"); app.buttons["ruleKeyboardDone"].tap()
+        tapRuleSwitch(app.switches["ruleScope-10000000-0000-4000-8000-000000000001-20000000-0000-4000-8000-000000000001"], app: app)
+        app.buttons["saveRule"].tap()
+        XCTAssertTrue(app.staticTexts["uncertainRuleCreation"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["saveRule"].isEnabled)
+        capture("Native uncertain rule creation requires catalog check", app: app)
+        app.buttons["Close and check rules"].tap()
+        XCTAssertTrue(app.staticTexts["Uncertain create"].waitForExistence(timeout: 10))
+        app.buttons["newRule"].tap()
+        XCTAssertTrue(name.waitForExistence(timeout: 10)); name.tap(); name.typeText("Private unsaved draft")
+        XCUIDevice.shared.press(.home); app.activate()
+        XCTAssertTrue(app.buttons["newRule"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.textFields["ruleName"].exists)
+        XCTAssertFalse(app.staticTexts["Private unsaved draft"].exists)
+        capture("Native background clears rule draft", app: app)
+    }
+
+    func testPendingRuleCreateCannotDismissAndBackgroundNeverRetries() {
+        let app = ruleFixtureApp()
+        openRules(app); app.buttons["newRule"].tap()
+        let name = app.textFields["ruleName"]
+        XCTAssertTrue(name.waitForExistence(timeout: 10)); name.tap(); name.typeText("Deferred create"); app.buttons["ruleKeyboardDone"].tap()
+        tapRuleSwitch(app.switches["ruleScope-10000000-0000-4000-8000-000000000001-20000000-0000-4000-8000-000000000001"], app: app)
+        app.buttons["saveRule"].tap()
+        XCTAssertFalse(app.buttons["Cancel"].isEnabled)
+        XCTAssertTrue(app.descendants(matching: .any)["savingRule"].exists)
+        XCTAssertFalse(app.buttons["saveRule"].isEnabled)
+        let header = app.navigationBars["New alert rule"]
+        header.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85)))
+        XCTAssertTrue(name.exists)
+        XCTAssertFalse(app.buttons["Cancel"].isEnabled)
+        capture("Native pending create prevents accidental dismissal", app: app)
+        XCUIDevice.shared.press(.home); app.activate()
+        XCTAssertTrue(app.buttons["newRule"].waitForExistence(timeout: 10))
+        XCTAssertFalse(name.exists)
+        XCTAssertTrue(app.staticTexts["Deferred create"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.staticTexts.matching(identifier: "Deferred create").count, 1)
+        capture("Native interrupted create checked once in catalog", app: app)
+    }
+
+    func testRuleControlsRemainUsableWithoutNamespaceAccess() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--dashboard-ui-fixtures", "--dashboard-rule-fixtures", "--dashboard-rule-no-namespaces"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["fixtureBanner"].waitForExistence(timeout: 10))
+        openRules(app)
+        app.staticTexts["Synthetic unavailable scope"].tap()
+        XCTAssertTrue(app.buttons["ruleEnabled"].waitForExistence(timeout: 10))
+        app.buttons["ruleEnabled"].tap()
+        XCTAssertTrue(app.buttons["Enable monitoring"].waitForExistence(timeout: 10))
+        let edit = app.buttons["editRule"]
+        reveal(edit, app: app); XCTAssertFalse(edit.isEnabled)
+        capture("Native account-owned rule controls without namespaces", app: app)
+        let delete = app.buttons["Delete alert rule"]
+        reveal(delete, app: app); delete.tap(); app.buttons["Delete rule"].tap()
+        XCTAssertTrue(app.buttons["newRule"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Synthetic unavailable scope"].exists)
+    }
+
+    func testRuleAuthorityFailureClearsCurrentDetails() {
+        let app = ruleFixtureApp()
+        openRules(app)
+        app.staticTexts["Synthetic access revoked"].tap()
+        // A global authority rejection purges the entire navigation generation.
+        XCTAssertTrue(app.buttons["Settings"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Synthetic access revoked"].exists)
+        XCTAssertFalse(app.buttons["ruleEnabled"].exists)
+        XCTAssertFalse(app.buttons["editRule"].exists)
+        capture("Native revoked rule detail removed", app: app)
+    }
+
+    private func tapRuleSwitch(_ element: XCUIElement, app: XCUIApplication) {
+        reveal(element, app: app)
+        element.coordinate(withNormalizedOffset: CGVector(dx: 0.90, dy: 0.5)).tap()
+    }
+
+    private func ruleFixtureApp() -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["--dashboard-ui-fixtures", "--dashboard-rule-fixtures"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["fixtureBanner"].waitForExistence(timeout: 10))
+        return app
+    }
+    private func openRules(_ app: XCUIApplication) {
+        app.tabBars.buttons["More"].tap()
+        app.buttons["Alert rules"].tap()
+        XCTAssertTrue(app.buttons["newRule"].waitForExistence(timeout: 10))
+    }
+
     private func fixtureApp() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--dashboard-ui-fixtures"]

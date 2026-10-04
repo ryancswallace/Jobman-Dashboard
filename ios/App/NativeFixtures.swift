@@ -14,6 +14,7 @@ enum NativeFixtures {
 
     static func data(path: String, query: [URLQueryItem] = []) throws -> Data { try JSONSerialization.data(withJSONObject: response(path: path, query: query)) }
     static func response(path: String, query: [URLQueryItem] = []) -> [String: Any] {
+        if NativeRuleFixtures.enabled, path == "/api/v1/bootstrap" { return NativeRuleFixtures.bootstrap() }
         func value(_ name: String) -> String? { query.first { $0.name == name }?.value }
         let stream = value("stream") ?? "stdout"
         let now = Date()
@@ -98,7 +99,7 @@ enum NativeFixtures {
             else { result["workload"] = workload; result["children"] = visible }
             return result
         }
-        if path == "/api/v1/rules" { return page([["id":"rule-fixture","revision":"1","name":"Synthetic failures","enabled":true,"scope":"namespace_jobs","namespaces":[["deploymentId":"east","namespaceId":"research"]],"jobs":[],"outcomeMode":"selected","outcomes":["failure","timed_out","aborted","lost"],"activation":[["deploymentId":"east","status":"active"]]]]) }
+        if path == "/api/v1/rules" { return ["items": []] }
         let inbox: [String: Any] = ["id":"inbox-fixture","job":jobRef,"outcome":"failure","eventAt":date(now),"createdAt":date(now),"read":false,"matchedRules":["Synthetic failures"],"deliveryStatus":"fixture only"]
         if path == "/api/v1/inbox" { return page([inbox]) }
         if path.hasPrefix("/api/v1/inbox/") { return inbox }
@@ -108,10 +109,22 @@ enum NativeFixtures {
 }
 
 private final class FixtureProtocol: URLProtocol, @unchecked Sendable {
+    private let responseLock = NSRecursiveLock()
+    private var delayedResponse: DispatchWorkItem?
+    private var stopped = false
     override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "dashboard-fixtures.example.test" }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
         do {
+            if let (status, data) = try NativeRuleFixtures.server.response(request) {
+                let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                if payload?["fixtureDelay"] as? Bool == true {
+                    let work = DispatchWorkItem { [weak self] in self?.respond(status: status, data: data) }
+                    responseLock.withLock { delayedResponse = work }
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 20, execute: work)
+                } else { respond(status: status, data: data) }
+                return
+            }
             let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems ?? []
             let expired = request.url!.path.hasSuffix("/logs") && query.contains { $0.name == "cursor" }
             let targetChanged = request.url!.path.hasSuffix("/partitions") && query.contains { $0.name == "cursor" && $0.value == "target-generation-changed" }
@@ -128,6 +141,15 @@ private final class FixtureProtocol: URLProtocol, @unchecked Sendable {
             client?.urlProtocolDidFinishLoading(self)
         } catch { client?.urlProtocol(self, didFailWithError: error) }
     }
-    override func stopLoading() {}
+    private func respond(status: Int, data: Data) {
+        responseLock.withLock {
+            guard !stopped else { return }
+            client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1", headerFields: ["Content-Type":"application/json"])!, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+            delayedResponse = nil
+        }
+    }
+    override func stopLoading() { responseLock.withLock { stopped = true; delayedResponse?.cancel(); delayedResponse = nil } }
 }
 #endif

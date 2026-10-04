@@ -64,7 +64,10 @@ func (s *Store) ClaimFeed(ctx context.Context, deployment string, namespaces []s
 			return feed, events.ErrCapacity
 		}
 	}
-	if _, err = tx.Exec(ctx, `INSERT INTO dashboard_event_feeds(deployment_id,namespace_ids,status) VALUES($1::uuid,$2::uuid[],'initializing') ON CONFLICT DO NOTHING`, deployment, namespaces); err != nil {
+	// Admission shares the restore operation's advisory lock, so a new source
+	// either inherits its durable floor or is included in that operation's
+	// subsequent feed update. No source admitted after a restore loses the floor.
+	if _, err = tx.Exec(ctx, `INSERT INTO dashboard_event_feeds(deployment_id,namespace_ids,status,suppress_recorded_through) VALUES($1::uuid,$2::uuid[],'initializing',(SELECT restore_recorded_through FROM dashboard_notification_delivery_control WHERE singleton)) ON CONFLICT DO NOTHING`, deployment, namespaces); err != nil {
 		return feed, err
 	}
 	var encoded []byte
@@ -196,13 +199,21 @@ func (s *Store) AppendFeed(ctx context.Context, feed events.Feed, page events.Pa
 	if err != nil {
 		return err
 	}
+	// A source can publish an old outbox record after recovery reached its
+	// observed head. Apply the durable restore cutoff on ordinary ingestion as
+	// well as retained replay; the held feed lock prevents an apply/prune race.
+	var suppressThrough *time.Time
+	if err = tx.QueryRow(ctx, `SELECT suppress_recorded_through FROM dashboard_event_feeds WHERE deployment_id=$1::uuid`, feed.DeploymentID).Scan(&suppressThrough); err != nil {
+		return err
+	}
 	added := int64(0)
 	for _, item := range page.Items {
 		payload, digest, err := eventDigest(item)
 		if err != nil {
 			return err
 		}
-		tag, err := tx.Exec(ctx, `INSERT INTO dashboard_source_events(deployment_id,control_instance_id,event_id,namespace_id,job_id,recorded_at,payload,fact_digest,expires_at) VALUES($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6,$7,$8,clock_timestamp()+$9*interval '1 second') ON CONFLICT DO NOTHING`, item.DeploymentID, item.ControlInstanceID, item.EventID, item.NamespaceID, item.JobID, item.RecordedAt, payload, digest, retention+86400)
+		suppressed := suppressThrough != nil && !item.RecordedAt.After(*suppressThrough)
+		tag, err := tx.Exec(ctx, `INSERT INTO dashboard_source_events(deployment_id,control_instance_id,event_id,namespace_id,job_id,recorded_at,payload,fact_digest,expires_at,notification_suppressed) VALUES($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6,$7,$8,clock_timestamp()+$9*interval '1 second',$10) ON CONFLICT DO NOTHING`, item.DeploymentID, item.ControlInstanceID, item.EventID, item.NamespaceID, item.JobID, item.RecordedAt, payload, digest, retention+86400, suppressed)
 		if err != nil {
 			return err
 		}
@@ -217,7 +228,7 @@ func (s *Store) AppendFeed(ctx context.Context, feed events.Feed, page events.Pa
 		if !bytes.Equal(existing, digest) {
 			return events.ErrConflict
 		}
-		if _, err = tx.Exec(ctx, `UPDATE dashboard_source_events SET last_seen_at=clock_timestamp(),expires_at=GREATEST(expires_at,clock_timestamp()+$4*interval '1 second') WHERE deployment_id=$1::uuid AND control_instance_id=$2::uuid AND event_id=$3::uuid`, item.DeploymentID, item.ControlInstanceID, item.EventID, retention+86400); err != nil {
+		if _, err = tx.Exec(ctx, `UPDATE dashboard_source_events SET last_seen_at=clock_timestamp(),expires_at=GREATEST(expires_at,clock_timestamp()+$4*interval '1 second'),notification_suppressed=notification_suppressed OR $5 WHERE deployment_id=$1::uuid AND control_instance_id=$2::uuid AND event_id=$3::uuid`, item.DeploymentID, item.ControlInstanceID, item.EventID, retention+86400, suppressed); err != nil {
 			return err
 		}
 	}
@@ -291,12 +302,17 @@ func (s *Store) PruneSourceEvents(ctx context.Context, deployment string) (int64
 	} else if err != nil {
 		return 0, err
 	}
-	tag, err := tx.Exec(ctx, `DELETE FROM dashboard_source_events WHERE (deployment_id,control_instance_id,event_id) IN (SELECT deployment_id,control_instance_id,event_id FROM dashboard_source_events WHERE deployment_id=$1::uuid AND processed_at IS NOT NULL AND expires_at<=statement_timestamp() AND last_seen_at<=statement_timestamp()-$2*interval '1 second' ORDER BY last_seen_at LIMIT 500)`, deployment, retention+86400)
+	var removed int64
+	var recordedThrough *time.Time
+	err = tx.QueryRow(ctx, `WITH removed AS (
+ DELETE FROM dashboard_source_events WHERE (deployment_id,control_instance_id,event_id) IN (SELECT deployment_id,control_instance_id,event_id FROM dashboard_source_events WHERE deployment_id=$1::uuid AND processed_at IS NOT NULL AND expires_at<=statement_timestamp() AND last_seen_at<=statement_timestamp()-$2*interval '1 second' ORDER BY last_seen_at LIMIT 500)
+ RETURNING recorded_at)
+ SELECT count(*),max(recorded_at) FROM removed`, deployment, retention+86400).Scan(&removed, &recordedThrough)
 	if err != nil {
 		return 0, err
 	}
-	if _, err = tx.Exec(ctx, `UPDATE dashboard_event_feeds SET retained_count=retained_count-$2 WHERE deployment_id=$1::uuid`, deployment, tag.RowsAffected()); err != nil {
+	if _, err = tx.Exec(ctx, `UPDATE dashboard_event_feeds SET retained_count=retained_count-$2,pruned_recorded_through=GREATEST(pruned_recorded_through,$3::timestamptz) WHERE deployment_id=$1::uuid`, deployment, removed, recordedThrough); err != nil {
 		return 0, err
 	}
-	return tag.RowsAffected(), tx.Commit(ctx)
+	return removed, tx.Commit(ctx)
 }

@@ -33,6 +33,12 @@ func (c Config) PrivateFilePaths() map[string]string {
 		paths[fmt.Sprintf("logBrokers[%d].clientKeyFile", index)] = broker.ClientKeyFile
 		paths[fmt.Sprintf("logBrokers[%d].delegationKeyFile", index)] = broker.DelegationKeyFile
 	}
+	for index, key := range c.Notifications.PreviousTokenKeys {
+		paths[fmt.Sprintf("notifications.previousTokenKeys[%d].keyFile", index)] = key.KeyFile
+	}
+	for index, provider := range c.Notifications.APNs {
+		paths[fmt.Sprintf("notifications.apns[%d].privateKeyFile", index)] = provider.PrivateKeyFile
+	}
 	return paths
 }
 

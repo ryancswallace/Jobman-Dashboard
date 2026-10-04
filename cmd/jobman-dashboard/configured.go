@@ -26,6 +26,7 @@ import (
 	"github.com/ryancswallace/jobman-dashboard/internal/httpapi"
 	"github.com/ryancswallace/jobman-dashboard/internal/logs"
 	"github.com/ryancswallace/jobman-dashboard/internal/monitoring"
+	"github.com/ryancswallace/jobman-dashboard/internal/notifications"
 	"github.com/ryancswallace/jobman-dashboard/internal/reports"
 	"github.com/ryancswallace/jobman-dashboard/internal/runtimeconfig"
 	"github.com/ryancswallace/jobman-dashboard/internal/store"
@@ -41,6 +42,7 @@ type runtimeSecrets struct {
 	redaction        *reports.RedactionPolicy
 	companionVersion string
 	static           *os.Root
+	notifications    *notificationRuntime
 }
 
 func textSecret(path string) (string, error) {
@@ -101,6 +103,10 @@ func loadRuntime(c config.Config) (runtimeSecrets, error) {
 		return result, errors.New("encryption key file must contain exactly 32 private raw bytes")
 	}
 	result.identity = auth.OIDCOptions{Issuer: c.OIDC.Issuer, Audience: c.OIDC.APIAudience, WebClientID: c.OIDC.WebClientID, WebClientSecret: secret, NativeClientID: c.OIDC.NativeClientID, NativeRedirectURI: c.OIDC.NativeRedirectURI, DirectoryIDClaim: c.OIDC.DirectoryIDClaim, ClientIDClaim: c.OIDC.ClientIDClaim, PublicOrigin: c.PublicOrigin, Scopes: c.OIDC.Scopes, EncryptionKey: key, EncryptionKeyID: c.Encryption.KeyID, HTTPClient: result.identityClient}
+	result.notifications, err = loadNotificationRuntime(c, key)
+	if err != nil {
+		return result, err
+	}
 	if c.Reports.ObjectRoot != "" {
 		build, ok := debug.ReadBuildInfo()
 		if !ok {
@@ -189,6 +195,7 @@ func runConfigured(path, mode, migrationURLFile string) error {
 		return err
 	}
 	defer loaded.static.Close()
+	defer loaded.notifications.Close()
 	if mode == "check-config" {
 		slog.Info("configuration and local key material validated; network and source authorization not tested")
 		return nil
@@ -201,6 +208,17 @@ func runConfigured(path, mode, migrationURLFile string) error {
 	if err := db.CheckSchema(ctx); err != nil {
 		return err
 	}
+	if c.Events.DeliveryHold {
+		state, err := db.NotificationDeliveryControl(ctx)
+		if err != nil {
+			return errors.New("cannot inspect notification delivery hold")
+		}
+		if !state.Held {
+			if _, err = db.HoldNotifications(ctx, state.Generation, nil); err != nil {
+				return errors.New("cannot establish notification delivery hold")
+			}
+		}
+	}
 	identity, err := auth.NewOIDC(ctx, loaded.identity, db)
 	if err != nil {
 		return err
@@ -209,6 +227,7 @@ func runConfigured(path, mode, migrationURLFile string) error {
 	logSources := make(map[string]logs.ManifestSource)
 	reportSources := make([]reports.Source, 0, len(loaded.sources))
 	eventSources := make([]events.Source, 0, len(loaded.sources))
+	ruleSources := make([]notifications.RuleSource, 0, len(loaded.sources))
 	for _, entry := range loaded.sources {
 		entry.VerifyIdentity = func(ctx context.Context, instance, epoch string) error {
 			return db.VerifySourceIdentity(ctx, entry.DeploymentID, instance, epoch, c.ConfigurationRevision)
@@ -221,6 +240,7 @@ func runConfigured(path, mode, migrationURLFile string) error {
 		sources = append(sources, client)
 		logSources[entry.DeploymentID] = client
 		reportSources = append(reportSources, client)
+		ruleSources = append(ruleSources, client)
 		if c.Events.Enabled {
 			entry.VerifyIdentity = func(ctx context.Context, instance, epoch string) error {
 				err := db.VerifySourceIdentity(ctx, entry.DeploymentID, instance, epoch, c.ConfigurationRevision)
@@ -238,6 +258,10 @@ func runConfigured(path, mode, migrationURLFile string) error {
 		}
 	}
 	engine, err := monitoring.New(sources, db)
+	if err != nil {
+		return err
+	}
+	ruleService, err := notifications.NewRuleService(db, ruleSources, eventSources, db)
 	if err != nil {
 		return err
 	}
@@ -328,6 +352,14 @@ func runConfigured(path, mode, migrationURLFile string) error {
 		}
 	}()
 	app := &httpapi.Server{Engine: engine, Auth: identity, AuthRoutes: identity, Preferences: db, Static: loaded.static.FS()}
+	app.Rules = ruleService
+	if loaded.notifications != nil {
+		devices, err := store.NewNotificationDeviceStore(db, loaded.notifications.policy, loaded.notifications.cipher)
+		if err != nil {
+			return err
+		}
+		app.Devices = devices
+	}
 	if logService != nil {
 		app.Logs = logService
 	}

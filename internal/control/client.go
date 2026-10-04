@@ -245,6 +245,7 @@ func (c *Client) discover(ctx context.Context, actor monitoring.Actor) (discover
 			return discovery{}, monitoring.ErrAuthority
 		}
 		d.principalID = p.Principal.ID
+		d.PrincipalID = p.Principal.ID
 		for _, ns := range p.Namespaces {
 			if !uuid(ns.ID) || !selector(ns.Name) || seen[ns.ID] || !slices.Contains(c.config.NamespaceIDs, ns.ID) {
 				return discovery{}, monitoring.ErrSource

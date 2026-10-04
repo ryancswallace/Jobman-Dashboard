@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   Link,
   useLocation,
@@ -6,7 +5,7 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { useSession } from "../lib/session";
-import { APIError, request, resourcePath } from "../lib/transport";
+import { resourcePath } from "../lib/transport";
 import { useResource } from "../lib/useResource";
 import { decodeJobDetail } from "../lib/api";
 import { ArtifactList } from "../components/ArtifactList";
@@ -35,34 +34,6 @@ export function JobDetailPage() {
       decodeJobDetail,
     ),
     job = result.data?.data;
-  const [watchState, setWatchState] = useState(""),
-    [watchError, setWatchError] = useState<APIError>();
-  const watch = async () => {
-    setWatchState("Saving…");
-    try {
-      await request("/api/v1/rules", {
-        method: "POST",
-        body: {
-          name: `Watch ${job?.name || jobId}`,
-          enabled: true,
-          scope: "watched_jobs",
-          namespaces: [{ deploymentId, namespaceId }],
-          jobs: [ref],
-          outcomeMode: "selected",
-          outcomes: ["failure", "timed_out", "aborted", "lost"],
-        },
-        idempotencyKey: crypto.randomUUID(),
-      });
-      setWatchState("Watching unsuccessful results");
-    } catch (e) {
-      setWatchError(
-        e instanceof APIError
-          ? e
-          : new APIError("request_failed", "The alert could not be saved."),
-      );
-      setWatchState("");
-    }
-  };
   return (
     <>
       <Link
@@ -78,17 +49,16 @@ export function JobDetailPage() {
         description={job?.name ? jobId : undefined}
         actions={
           job && (
-            <button
+            <Link
               className="button secondary"
-              disabled={!!watchState}
-              onClick={() => void watch()}
+              to="/alerts"
+              state={{ watchJob: ref }}
             >
-              {watchState || "☆ Watch this job"}
-            </button>
+              ☆ Watch this job
+            </Link>
           )
         }
       />
-      {watchError && <ErrorNotice error={watchError} />}
       <div className="page-meta">
         <Freshness
           fetchedAt={result.fetchedAt}

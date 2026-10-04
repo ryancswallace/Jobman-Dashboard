@@ -18,6 +18,8 @@ public enum DashboardError: Error, Equatable, Sendable, LocalizedError {
     case snapshotChanged
     case revisionConflict
     case rateLimited
+    case ruleCapacity
+    case unsupportedOutcome
     case invalidResponse
     case responseTooLarge
     case network
@@ -42,6 +44,8 @@ public enum DashboardError: Error, Equatable, Sendable, LocalizedError {
         case .snapshotChanged: "The source snapshot changed. Request a new report."
         case .revisionConflict: "This request conflicts with the current revision or an earlier request. Refresh and try again."
         case .rateLimited: "Too many requests. Wait briefly before retrying."
+        case .ruleCapacity: "The alert rule or history capacity has been reached. Stop or remove unused rules, or contact your operator."
+        case .unsupportedOutcome: "An outcome in this rule is not supported by the service. Review the selected outcomes."
         case .invalidResponse: "The service returned an unexpected response."
         case .responseTooLarge: "The service response exceeded the app's safe size limit."
         case .network: "Dashboard cannot be reached. Check your private network or VPN connection."
@@ -67,6 +71,8 @@ public enum DashboardError: Error, Equatable, Sendable, LocalizedError {
         case "snapshot_changed": .snapshotChanged
         case "revision_conflict": .revisionConflict
         case "rate_limited": .rateLimited
+        case "rule_capacity": .ruleCapacity
+        case "unsupported_outcome": .unsupportedOutcome
         default:
             switch status {
             case 401: .authenticationRequired

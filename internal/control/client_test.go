@@ -204,9 +204,9 @@ func TestDiscoveryBindsDirectoryIdentityWhileAllowingCanonicalAliases(t *testing
 				}
 				respond(w, v)
 			}))
-			_, err := c.Discover(context.Background(), testActor)
+			discovered, err := c.Discover(context.Background(), testActor)
 			if mode == "canonical-alias" {
-				if err != nil {
+				if err != nil || discovered.PrincipalID != principalID {
 					t.Fatalf("verified alias rejected: %v", err)
 				}
 			} else if !errors.Is(err, monitoring.ErrAuthority) {

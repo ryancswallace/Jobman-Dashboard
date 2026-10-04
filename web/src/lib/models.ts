@@ -210,18 +210,6 @@ export interface LogChunk {
   truncated?: boolean;
   capturedAt?: string;
 }
-export interface AlertRule {
-  id: string;
-  revision: string;
-  name: string;
-  enabled: boolean;
-  scope: "watched_jobs" | "my_jobs" | "namespace_jobs";
-  namespaces: NamespaceRef[];
-  jobs: JobRef[];
-  outcomeMode: "selected" | "all_terminal";
-  outcomes: string[];
-  activation?: { deploymentId: string; status: string }[];
-}
 export interface InboxItem {
   id: string;
   job: JobRef;

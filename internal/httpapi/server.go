@@ -34,6 +34,8 @@ type Server struct {
 	Preferences PreferenceStore
 	Logs        LogService
 	Reports     ReportService
+	Rules       RuleService
+	Devices     DeviceService
 }
 type actorKey struct{}
 
@@ -42,6 +44,8 @@ func (s *Server) Handler() http.Handler {
 	s.registerGroupRoutes(mux)
 	s.registerTargetRoutes(mux)
 	s.registerReportRoutes(mux)
+	s.registerRuleRoutes(mux)
+	s.registerDeviceRoutes(mux)
 	if s.AuthRoutes != nil {
 		s.AuthRoutes.RegisterRoutes(mux)
 	}
@@ -148,8 +152,10 @@ func writeError(w http.ResponseWriter, _ *http.Request, err error) {
 		status = 409
 	case "invalid_request":
 		status = 400
-	case "invalid_settings":
+	case "invalid_settings", "unsupported_outcome":
 		status = 422
+	case "rule_capacity", "device_capacity":
+		status = 429
 	case "rate_limited":
 		status = 429
 		w.Header().Set("Retry-After", "5")

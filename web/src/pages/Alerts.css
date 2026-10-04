@@ -1,0 +1,85 @@
+.rule-state-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+  margin: 1rem 0;
+}
+.rule-state-summary dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.rule-state-summary dd {
+  margin: 0.2rem 0 0;
+}
+.rule-activation-list,
+.rule-watched-jobs,
+.rule-visible-jobs ul {
+  padding: 0;
+  list-style: none;
+}
+.rule-activation-list li,
+.rule-watched-jobs li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  border-top: 1px solid var(--line);
+  padding: 0.65rem 0;
+}
+.rule-activation-list small,
+.rule-watched-jobs code,
+.rule-visible-jobs code {
+  display: block;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.rule-visible-jobs {
+  margin: 1rem 0;
+}
+.rule-visible-jobs summary {
+  cursor: pointer;
+}
+.rule-visible-jobs li {
+  margin-top: 0.6rem;
+}
+.rule-editor-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+.rule-editor-fields > fieldset {
+  min-width: 0;
+}
+.rule-editor-fields label:not(.choice):not(.checkbox-label) {
+  display: grid;
+  gap: 0.45rem;
+}
+.rule-namespace-options {
+  max-height: 18rem;
+  overflow: auto;
+  margin-top: 0.7rem;
+  padding: 0.2rem;
+}
+.rule-job-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.75rem;
+}
+.rule-validation {
+  color: var(--bad);
+}
+.rule-actions {
+  flex-wrap: wrap;
+}
+@media (max-width: 680px) {
+  .rule-job-input {
+    grid-template-columns: 1fr;
+  }
+  .rule-activation-list li {
+    align-items: start;
+  }
+}

@@ -42,6 +42,7 @@ npm run format:check
 - `src/pages/`: Overview, Jobs/detail, workloads, Targets, Inbox, alert rules, Settings.
 - `src/components/LogViewer.tsx`: authorized bounded base64 reads, incremental UTF-8 decoding, plain-text rendering, offset/gap/execution checks, pause/resume and loaded-text search.
 - `src/components/Reports.tsx` and `src/lib/reports.ts`: generated report DTOs, bounded history and task polling, strict profile/run requests, retry-safe idempotency, source-qualified sealed citation identities, exact JSON/byte rendering, provenance and disclosure. Request cancellation and read-generation changes prevent account/job or failed-authority content from reappearing. Report suggestions remain text-only; no provider or job-control action is invoked.
+- `src/pages/Alerts.tsx`, `src/components/RuleEditor.tsx` and `src/lib/rules.ts`: generated rule DTOs, bounded source-qualified selections and pagination, all outcome presets, exact revision updates, explicit revalidation and source-independent stop. Hidden references cannot become partial replacements; uncertain creates require checking the list. Watch links open a prefilled editor without writing a subscription.
 - `src/lib/workloads.ts`: generated workload/dependency/neighborhood DTO normalization; source counts and decimal values remain intact.
 - `src/components/GraphView.tsx` and `GraphInspector.tsx`: bounded selected-node neighborhoods, worker layout with obsolete-result rejection, complete incoming dependency counts, paginated incoming/outgoing edge inspection and equivalent accessible lists.
 - `api-contract-notes.md`: secondary endpoint field sets; `../api/openapi.json` is the authoritative contract and `make contracts-check` checks deterministic generation.
@@ -59,3 +60,10 @@ Implemented frontend workflows call the actual API, including secondary surfaces
 Initial browser verification against the explicit two-source fixture backend covered overview counts, distinct links for duplicate job IDs, running-phase filtering, and job detail showing unavailable lifecycle facts separately from cancellation intent/confidence. Dark-theme rendering was inspected and repaired. This is development evidence, not release acceptance. Full browser matrix, keyboard/VoiceOver/WCAG review, large-graph and NFS integration, real sessions/revocation, and all secondary end-to-end workflows remain integration gates.
 
 The group slice also passed Chrome inspection against the built web assets served by the explicit loopback fixture API: two-source graph catalog, source-scoped summary, selected-node worker layout, bounded neighborhood lists, and source predicate states. Fixture HTTP tests cover catalog and child continuations, array task index zero, incoming edges and exact neighborhood omissions. Real delegated Control/LDAP and the full large-workload acceptance matrix remain outstanding.
+
+Rule tests cover all-terminal empty arrays, namespace/job qualification across
+deployments, selected-namespace removal, UTF-8 byte limits, redacted views,
+revision-conflict review, explicit revalidation, stopping during source outages,
+uncertain create responses, account-change cancellation, deletion and bounded
+pagination. These rendered component tests do not establish durable inbox/APNs
+delivery or browser authentication acceptance.
