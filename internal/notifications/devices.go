@@ -204,14 +204,40 @@ func NewDeviceCipher(current string, keys map[string][]byte) (*DeviceCipher, err
 	if len(keys) < 1 || len(keys) > 8 {
 		return nil, ErrDeviceInvalid
 	}
+	derived := make(map[string][]byte, len(keys))
+	for id, key := range keys {
+		var err error
+		derived[id], err = DeriveDeviceTokenKey(key)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return NewDeviceCipherFromPurposeKeys(current, derived)
+}
+
+// DeriveDeviceTokenKey preserves the original key derivation for explicit offline
+// export to an isolated delivery process. It cannot recover the master key.
+func DeriveDeviceTokenKey(master []byte) ([]byte, error) {
+	if len(master) != 32 {
+		return nil, ErrDeviceInvalid
+	}
+	mac := hmac.New(sha256.New, master)
+	mac.Write([]byte("jobman-dashboard/apns-encryption-key/v1"))
+	return mac.Sum(nil), nil
+}
+
+// NewDeviceCipherFromPurposeKeys accepts already-separated AES keys. Keeping IDs
+// and derived bytes unchanged preserves all existing authenticated ciphertext.
+func NewDeviceCipherFromPurposeKeys(current string, keys map[string][]byte) (*DeviceCipher, error) {
+	if len(keys) < 1 || len(keys) > 8 {
+		return nil, ErrDeviceInvalid
+	}
 	c := &DeviceCipher{current: current, keys: map[string]cipher.AEAD{}}
 	for id, key := range keys {
 		if id == "" || len(id) > 64 || !utf8.ValidString(id) || strings.ContainsFunc(id, unicode.IsControl) || len(key) != 32 {
 			return nil, ErrDeviceInvalid
 		}
-		mac := hmac.New(sha256.New, key)
-		mac.Write([]byte("jobman-dashboard/apns-encryption-key/v1"))
-		block, err := aes.NewCipher(mac.Sum(nil))
+		block, err := aes.NewCipher(key)
 		if err != nil {
 			return nil, ErrDeviceInvalid
 		}

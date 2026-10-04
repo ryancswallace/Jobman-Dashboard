@@ -1,0 +1,2001 @@
+{
+  "format": 1,
+  "schemaMigration": "000018_runtime_lock_privileges.sql",
+  "roles": {
+    "api": {
+      "dashboard_schema_migrations": {
+        "select": [
+          "name",
+          "sha256"
+        ]
+      },
+      "dashboard_source_identities": {
+        "select": [
+          "deployment_id",
+          "control_instance_id",
+          "recovery_epoch",
+          "configuration_revision",
+          "verified_at"
+        ],
+        "insert": [
+          "deployment_id",
+          "control_instance_id",
+          "recovery_epoch",
+          "configuration_revision",
+          "verified_at"
+        ],
+        "update": [
+          "recovery_epoch",
+          "configuration_revision",
+          "verified_at"
+        ]
+      },
+      "dashboard_accounts": {
+        "select": [
+          "id",
+          "directory_id",
+          "display_name",
+          "disabled_at",
+          "created_at"
+        ],
+        "insert": [
+          "id",
+          "directory_id",
+          "display_name"
+        ],
+        "update": [
+          "display_name"
+        ]
+      },
+      "dashboard_identity_aliases": {
+        "select": [
+          "issuer",
+          "subject",
+          "account_id",
+          "verified_at"
+        ],
+        "update": [
+          "runtime_lock"
+        ],
+        "insert": [
+          "issuer",
+          "subject",
+          "account_id"
+        ]
+      },
+      "dashboard_login_attempts": {
+        "select": [
+          "state_hash",
+          "encrypted_payload",
+          "expires_at"
+        ],
+        "insert": [
+          "state_hash",
+          "encrypted_payload",
+          "expires_at"
+        ],
+        "delete": true
+      },
+      "dashboard_sessions": {
+        "select": [
+          "token_hash",
+          "account_id",
+          "csrf_hash",
+          "encrypted_refresh_token",
+          "encryption_key_id",
+          "created_at",
+          "touched_at",
+          "expires_at",
+          "revoked_at",
+          "issuer",
+          "subject"
+        ],
+        "insert": [
+          "token_hash",
+          "account_id",
+          "csrf_hash",
+          "created_at",
+          "touched_at",
+          "expires_at",
+          "issuer",
+          "subject"
+        ],
+        "update": [
+          "touched_at",
+          "revoked_at"
+        ]
+      },
+      "dashboard_preferences": {
+        "select": [
+          "account_id",
+          "revision",
+          "timezone",
+          "appearance",
+          "refresh_seconds",
+          "updated_at"
+        ],
+        "insert": [
+          "account_id"
+        ],
+        "update": [
+          "revision",
+          "timezone",
+          "appearance",
+          "refresh_seconds",
+          "updated_at"
+        ]
+      },
+      "dashboard_browse_sessions": {
+        "select": [
+          "id",
+          "version",
+          "payload",
+          "expires_at",
+          "account_id",
+          "query_hash",
+          "initial_page",
+          "created_at"
+        ],
+        "insert": [
+          "id",
+          "payload",
+          "expires_at",
+          "account_id",
+          "query_hash",
+          "initial_page"
+        ],
+        "update": [
+          "payload",
+          "version"
+        ],
+        "delete": true
+      },
+      "dashboard_audit": {
+        "insert": [
+          "account_id",
+          "action",
+          "resource_kind",
+          "resource_id"
+        ]
+      },
+      "dashboard_event_feeds": {
+        "select": [
+          "deployment_id",
+          "namespace_ids",
+          "status",
+          "generation",
+          "checkpoint",
+          "cursor",
+          "last_position",
+          "lease_token",
+          "lease_expires_at",
+          "last_success_at",
+          "last_error",
+          "retained_count",
+          "retention_seconds",
+          "updated_at",
+          "pruned_recorded_through",
+          "suppress_recorded_through"
+        ],
+        "update": [
+          "runtime_lock"
+        ]
+      },
+      "dashboard_notification_delivery_control": {
+        "select": [
+          "singleton",
+          "generation",
+          "held",
+          "restore_recorded_through",
+          "updated_at"
+        ]
+      },
+      "dashboard_notification_rules": {
+        "select": [
+          "id",
+          "account_id",
+          "revision",
+          "enabled",
+          "payload",
+          "created_at",
+          "updated_at",
+          "deleted_at"
+        ],
+        "insert": [
+          "id",
+          "account_id",
+          "revision",
+          "enabled",
+          "payload",
+          "created_at",
+          "updated_at",
+          "deleted_at"
+        ],
+        "update": [
+          "revision",
+          "enabled",
+          "payload",
+          "updated_at",
+          "deleted_at"
+        ]
+      },
+      "dashboard_notification_rule_versions": {
+        "select": [
+          "rule_id",
+          "revision",
+          "account_id",
+          "payload",
+          "regular_mutation",
+          "recorded_at"
+        ],
+        "insert": [
+          "rule_id",
+          "revision",
+          "account_id",
+          "payload",
+          "regular_mutation"
+        ]
+      },
+      "dashboard_notification_activations": {
+        "select": [
+          "id",
+          "rule_id",
+          "created_revision",
+          "deployment_id",
+          "namespace_id",
+          "payload",
+          "account_id",
+          "origin_recorded_at",
+          "retired_at"
+        ],
+        "insert": [
+          "id",
+          "rule_id",
+          "created_revision",
+          "deployment_id",
+          "namespace_id",
+          "payload"
+        ]
+      },
+      "dashboard_notification_rule_scopes": {
+        "select": [
+          "rule_id",
+          "account_id",
+          "deployment_id",
+          "namespace_id",
+          "activation_id"
+        ],
+        "insert": [
+          "rule_id",
+          "account_id",
+          "deployment_id",
+          "namespace_id",
+          "activation_id"
+        ],
+        "update": [
+          "activation_id"
+        ],
+        "delete": true
+      },
+      "dashboard_notification_scope_revocations": {
+        "select": [
+          "deployment_id",
+          "namespace_id",
+          "revoked_through"
+        ]
+      },
+      "dashboard_notification_activation_revocations": {
+        "select": [
+          "activation_id",
+          "revoked_at"
+        ],
+        "insert": [
+          "activation_id"
+        ]
+      },
+      "dashboard_notification_version_activations": {
+        "select": [
+          "rule_id",
+          "revision",
+          "activation_id"
+        ],
+        "insert": [
+          "rule_id",
+          "revision",
+          "activation_id"
+        ]
+      },
+      "dashboard_notification_activation_work": {
+        "select": [
+          "rule_id",
+          "account_id",
+          "rule_revision",
+          "attempts",
+          "next_attempt_at",
+          "lease_token",
+          "lease_expires_at"
+        ],
+        "insert": [
+          "rule_id",
+          "account_id",
+          "rule_revision"
+        ],
+        "update": [
+          "rule_revision",
+          "attempts",
+          "next_attempt_at",
+          "lease_token",
+          "lease_expires_at"
+        ],
+        "delete": true
+      },
+      "dashboard_notification_installations": {
+        "select": [
+          "id",
+          "creator_account_id",
+          "secret_hash",
+          "revision",
+          "current_binding_id",
+          "mutation_window_started_at",
+          "mutation_count",
+          "created_at",
+          "updated_at"
+        ],
+        "insert": [
+          "id",
+          "creator_account_id",
+          "secret_hash"
+        ],
+        "update": [
+          "revision",
+          "current_binding_id",
+          "mutation_window_started_at",
+          "mutation_count",
+          "updated_at"
+        ]
+      },
+      "dashboard_notification_device_bindings": {
+        "select": [
+          "id",
+          "installation_id",
+          "account_id",
+          "label",
+          "topic",
+          "environment",
+          "state",
+          "enabled",
+          "muted",
+          "permission",
+          "token_version",
+          "token_ciphertext",
+          "token_key_id",
+          "token_digest",
+          "token_registered_at",
+          "token_invalidated_at",
+          "created_at",
+          "updated_at",
+          "last_seen_at",
+          "closed_at"
+        ],
+        "insert": [
+          "id",
+          "installation_id",
+          "account_id",
+          "label",
+          "topic",
+          "environment",
+          "state",
+          "enabled",
+          "muted",
+          "permission",
+          "token_version",
+          "token_ciphertext",
+          "token_key_id",
+          "token_digest",
+          "token_registered_at"
+        ],
+        "update": [
+          "label",
+          "state",
+          "enabled",
+          "muted",
+          "permission",
+          "token_version",
+          "token_ciphertext",
+          "token_key_id",
+          "token_digest",
+          "token_registered_at",
+          "token_invalidated_at",
+          "updated_at",
+          "last_seen_at",
+          "closed_at"
+        ]
+      },
+      "dashboard_notification_device_revocations": {
+        "select": [
+          "id",
+          "installation_id",
+          "account_id",
+          "origin_binding_id",
+          "target_binding_id",
+          "intent",
+          "state",
+          "secret_hash",
+          "created_at",
+          "activated_at",
+          "revoked_at"
+        ],
+        "insert": [
+          "id",
+          "installation_id",
+          "account_id",
+          "origin_binding_id",
+          "target_binding_id",
+          "intent",
+          "state",
+          "secret_hash"
+        ],
+        "update": [
+          "state",
+          "secret_hash",
+          "activated_at",
+          "revoked_at"
+        ]
+      },
+      "dashboard_notification_inbox": {
+        "select": [
+          "id",
+          "account_id",
+          "deployment_id",
+          "control_instance_id",
+          "event_id",
+          "namespace_id",
+          "job_id",
+          "recorded_at",
+          "event_payload",
+          "created_at",
+          "expires_at",
+          "read_at"
+        ],
+        "update": [
+          "read_at"
+        ]
+      },
+      "dashboard_notification_inbox_matches": {
+        "select": [
+          "inbox_id",
+          "rule_id",
+          "rule_revision",
+          "activation_id"
+        ]
+      },
+      "dashboard_notification_deliveries": {
+        "select": [
+          "inbox_id",
+          "state",
+          "account_id"
+        ]
+      },
+      "dashboard_report_tasks": {
+        "select": [
+          "id",
+          "deployment_id",
+          "namespace_id",
+          "job_id",
+          "equivalent_key",
+          "subject",
+          "state",
+          "created_at",
+          "updated_at",
+          "expires_at",
+          "next_attempt_at",
+          "attempts",
+          "lease_token",
+          "lease_expires_at",
+          "failure_code",
+          "object"
+        ],
+        "insert": [
+          "id",
+          "deployment_id",
+          "namespace_id",
+          "job_id",
+          "equivalent_key",
+          "subject",
+          "state"
+        ]
+      },
+      "dashboard_report_requesters": {
+        "select": [
+          "task_id",
+          "account_id",
+          "issuer",
+          "subject",
+          "requested_at"
+        ],
+        "insert": [
+          "task_id",
+          "account_id",
+          "issuer",
+          "subject"
+        ],
+        "update": [
+          "issuer",
+          "subject"
+        ]
+      },
+      "dashboard_report_idempotency": {
+        "select": [
+          "account_id",
+          "key_hash",
+          "request_key",
+          "task_id",
+          "created_at"
+        ],
+        "insert": [
+          "account_id",
+          "key_hash",
+          "request_key",
+          "task_id"
+        ]
+      }
+    },
+    "ingestion": {
+      "dashboard_schema_migrations": {
+        "select": [
+          "name",
+          "sha256"
+        ]
+      },
+      "dashboard_source_identities": {
+        "select": [
+          "deployment_id",
+          "control_instance_id",
+          "recovery_epoch",
+          "configuration_revision",
+          "verified_at"
+        ],
+        "insert": [
+          "deployment_id",
+          "control_instance_id",
+          "recovery_epoch",
+          "configuration_revision",
+          "verified_at"
+        ],
+        "update": [
+          "recovery_epoch",
+          "configuration_revision",
+          "verified_at"
+        ]
+      },
+      "dashboard_notification_delivery_control": {
+        "select": [
+          "singleton",
+          "generation",
+          "held",
+          "restore_recorded_through",
+          "updated_at"
+        ]
+      },
+      "dashboard_event_feeds": {
+        "select": [
+          "deployment_id",
+          "namespace_ids",
+          "status",
+          "generation",
+          "checkpoint",
+          "cursor",
+          "last_position",
+          "lease_token",
+          "lease_expires_at",
+          "last_success_at",
+          "last_error",
+          "retained_count",
+          "retention_seconds",
+          "updated_at",
+          "pruned_recorded_through",
+          "suppress_recorded_through"
+        ],
+        "insert": [
+          "deployment_id",
+          "namespace_ids",
+          "status",
+          "suppress_recorded_through"
+        ],
+        "update": [
+          "lease_token",
+          "lease_expires_at",
+          "updated_at",
+          "checkpoint",
+          "cursor",
+          "retention_seconds",
+          "status",
+          "generation",
+          "last_success_at",
+          "last_error",
+          "retained_count",
+          "last_position"
+        ]
+      },
+      "dashboard_event_gaps": {
+        "select": [
+          "id",
+          "deployment_id",
+          "reason",
+          "prior_checkpoint",
+          "prior_cursor",
+          "detected_at",
+          "resolved_at",
+          "recovery_receipt"
+        ],
+        "insert": [
+          "id",
+          "deployment_id",
+          "reason",
+          "prior_checkpoint",
+          "prior_cursor"
+        ]
+      },
+      "dashboard_source_events": {
+        "select": [
+          "deployment_id",
+          "control_instance_id",
+          "event_id",
+          "namespace_id",
+          "job_id",
+          "recorded_at",
+          "payload",
+          "fact_digest",
+          "first_seen_at",
+          "last_seen_at",
+          "expires_at",
+          "processed_at",
+          "notification_suppressed"
+        ],
+        "insert": [
+          "deployment_id",
+          "control_instance_id",
+          "event_id",
+          "namespace_id",
+          "job_id",
+          "recorded_at",
+          "payload",
+          "fact_digest",
+          "expires_at",
+          "notification_suppressed"
+        ],
+        "update": [
+          "last_seen_at",
+          "expires_at",
+          "notification_suppressed"
+        ]
+      }
+    },
+    "notifications": {
+      "dashboard_schema_migrations": {
+        "select": [
+          "name",
+          "sha256"
+        ]
+      },
+      "dashboard_source_identities": {
+        "select": [
+          "deployment_id",
+          "control_instance_id",
+          "recovery_epoch",
+          "configuration_revision",
+          "verified_at"
+        ],
+        "insert": [
+          "deployment_id",
+          "control_instance_id",
+          "recovery_epoch",
+          "configuration_revision",
+          "verified_at"
+        ],
+        "update": [
+          "recovery_epoch",
+          "configuration_revision",
+          "verified_at"
+        ]
+      },
+      "dashboard_accounts": {
+        "select": [
+          "id",
+          "directory_id",
+          "display_name",
+          "disabled_at"
+        ],
+        "update": [
+          "runtime_lock"
+        ]
+      },
+      "dashboard_identity_aliases": {
+        "select": [
+          "issuer",
+          "subject",
+          "account_id",
+          "verified_at"
+        ],
+        "update": [
+          "runtime_lock"
+        ]
+      },
+      "dashboard_audit": {
+        "insert": [
+          "account_id",
+          "action",
+          "resource_kind",
+          "resource_id"
+        ]
+      },
+      "dashboard_event_feeds": {
+        "select": [
+          "deployment_id",
+          "namespace_ids",
+          "status",
+          "generation",
+          "checkpoint",
+          "cursor",
+          "last_position",
+          "lease_token",
+          "lease_expires_at",
+          "last_success_at",
+          "last_error",
+          "retained_count",
+          "retention_seconds",
+          "updated_at",
+          "pruned_recorded_through",
+          "suppress_recorded_through"
+        ],
+        "update": [
+          "runtime_lock"
+        ]
+      },
+      "dashboard_notification_delivery_control": {
+        "select": [
+          "singleton",
+          "generation",
+          "held",
+          "restore_recorded_through",
+          "updated_at"
+        ],
+        "update": [
+          "runtime_lock"
+        ]
+      },
+      "dashboard_notification_rules": {
+        "select": [
+          "id",
+          "account_id",
+          "revision",
+          "enabled",
+          "payload",
+          "created_at",
+          "updated_at",
+          "deleted_at"
+        ],
+        "update": [
+          "revision",
+          "enabled",
+          "payload",
+          "updated_at",
+          "deleted_at"
+        ]
+      },
+      "dashboard_notification_rule_versions": {
+        "select": [
+          "rule_id",
+          "revision",
+          "account_id",
+          "payload",
+          "regular_mutation",
+          "recorded_at"
+        ],
+        "insert": [
+          "rule_id",
+          "revision",
+          "account_id",
+          "payload",
+          "regular_mutation"
+        ]
+      },
+      "dashboard_notification_activations": {
+        "select": [
+          "id",
+          "rule_id",
+          "created_revision",
+          "deployment_id",
+          "namespace_id",
+          "payload",
+          "account_id",
+          "origin_recorded_at",
+          "retired_at"
+        ],
+        "insert": [
+          "id",
+          "rule_id",
+          "created_revision",
+          "deployment_id",
+          "namespace_id",
+          "payload"
+        ]
+      },
+      "dashboard_notification_rule_scopes": {
+        "select": [
+          "rule_id",
+          "account_id",
+          "deployment_id",
+          "namespace_id",
+          "activation_id"
+        ],
+        "insert": [
+          "rule_id",
+          "account_id",
+          "deployment_id",
+          "namespace_id",
+          "activation_id"
+        ],
+        "update": [
+          "activation_id"
+        ],
+        "delete": true
+      },
+      "dashboard_notification_scope_revocations": {
+        "select": [
+          "deployment_id",
+          "namespace_id",
+          "revoked_through"
+        ]
+      },
+      "dashboard_notification_activation_revocations": {
+        "select": [
+          "activation_id",
+          "revoked_at"
+        ],
+        "insert": [
+          "activation_id"
+        ]
+      },
+      "dashboard_notification_version_activations": {
+        "select": [
+          "rule_id",
+          "revision",
+          "activation_id"
+        ],
+        "insert": [
+          "rule_id",
+          "revision",
+          "activation_id"
+        ]
+      },
+      "dashboard_notification_activation_work": {
+        "select": [
+          "rule_id",
+          "account_id",
+          "rule_revision",
+          "attempts",
+          "next_attempt_at",
+          "lease_token",
+          "lease_expires_at"
+        ],
+        "insert": [
+          "rule_id",
+          "account_id",
+          "rule_revision"
+        ],
+        "update": [
+          "rule_revision",
+          "attempts",
+          "next_attempt_at",
+          "lease_token",
+          "lease_expires_at"
+        ],
+        "delete": true
+      },
+      "dashboard_event_gaps": {
+        "select": [
+          "deployment_id",
+          "resolved_at",
+          "reason"
+        ]
+      },
+      "dashboard_event_recoveries": {
+        "select": [
+          "deployment_id",
+          "status"
+        ]
+      },
+      "dashboard_notification_work_quota": {
+        "select": [
+          "singleton",
+          "pending_evaluations",
+          "pending_deliveries"
+        ],
+        "update": [
+          "pending_evaluations",
+          "pending_deliveries"
+        ]
+      },
+      "dashboard_source_events": {
+        "select": [
+          "deployment_id",
+          "control_instance_id",
+          "event_id",
+          "namespace_id",
+          "job_id",
+          "recorded_at",
+          "payload",
+          "fact_digest",
+          "first_seen_at",
+          "last_seen_at",
+          "expires_at",
+          "processed_at",
+          "notification_suppressed"
+        ],
+        "update": [
+          "processed_at"
+        ]
+      },
+      "dashboard_notification_fanout": {
+        "select": [
+          "deployment_id",
+          "control_instance_id",
+          "event_id",
+          "after_rule_id",
+          "done",
+          "account_count",
+          "revision",
+          "lease_token",
+          "lease_expires_at",
+          "lease_hold_generation",
+          "lease_fence"
+        ],
+        "insert": [
+          "deployment_id",
+          "control_instance_id",
+          "event_id",
+          "lease_token",
+          "lease_expires_at",
+          "lease_hold_generation",
+          "lease_fence"
+        ],
+        "update": [
+          "after_rule_id",
+          "account_count",
+          "done",
+          "revision",
+          "lease_token",
+          "lease_expires_at",
+          "lease_hold_generation",
+          "lease_fence"
+        ]
+      },
+      "dashboard_notification_evaluations": {
+        "select": [
+          "id",
+          "account_id",
+          "deployment_id",
+          "control_instance_id",
+          "event_id",
+          "state",
+          "revision",
+          "attempts",
+          "next_attempt_at",
+          "lease_token",
+          "lease_expires_at",
+          "lease_hold_generation",
+          "lease_fence",
+          "inbox_id",
+          "created_at",
+          "resolved_at"
+        ],
+        "insert": [
+          "id",
+          "account_id",
+          "deployment_id",
+          "control_instance_id",
+          "event_id"
+        ],
+        "update": [
+          "state",
+          "inbox_id",
+          "resolved_at",
+          "revision",
+          "lease_token",
+          "lease_expires_at",
+          "lease_hold_generation",
+          "lease_fence",
+          "next_attempt_at",
+          "attempts"
+        ]
+      },
+      "dashboard_notification_evaluation_matches": {
+        "select": [
+          "evaluation_id",
+          "rule_id",
+          "rule_revision",
+          "activation_id"
+        ],
+        "insert": [
+          "evaluation_id",
+          "rule_id",
+          "rule_revision",
+          "activation_id"
+        ]
+      },
+      "dashboard_notification_inbox": {
+        "select": [
+          "id",
+          "account_id",
+          "deployment_id",
+          "control_instance_id",
+          "event_id",
+          "namespace_id",
+          "job_id",
+          "recorded_at",
+          "event_payload",
+          "created_at",
+          "expires_at",
+          "read_at"
+        ],
+        "insert": [
+          "id",
+          "account_id",
+          "deployment_id",
+          "control_instance_id",
+          "event_id",
+          "namespace_id",
+          "job_id",
+          "recorded_at",
+          "event_payload"
+        ]
+      },
+      "dashboard_notification_inbox_matches": {
+        "select": [
+          "inbox_id",
+          "rule_id",
+          "rule_revision",
+          "activation_id"
+        ],
+        "insert": [
+          "inbox_id",
+          "rule_id",
+          "rule_revision",
+          "activation_id"
+        ]
+      },
+      "dashboard_notification_deliveries": {
+        "select": [
+          "id",
+          "inbox_id",
+          "account_id",
+          "installation_id",
+          "binding_id",
+          "token_version",
+          "state",
+          "attempts",
+          "next_attempt_at",
+          "lease_token",
+          "lease_expires_at",
+          "expires_at",
+          "created_at",
+          "resolved_at",
+          "deployment_id",
+          "revision",
+          "claims",
+          "lease_hold_generation",
+          "lease_fence",
+          "original_inbox_id"
+        ],
+        "insert": [
+          "id",
+          "inbox_id",
+          "account_id",
+          "installation_id",
+          "binding_id",
+          "token_version",
+          "expires_at",
+          "deployment_id"
+        ]
+      },
+      "dashboard_notification_installations": {
+        "select": [
+          "id",
+          "current_binding_id"
+        ],
+        "update": [
+          "runtime_lock"
+        ]
+      },
+      "dashboard_notification_device_bindings": {
+        "select": [
+          "id",
+          "installation_id",
+          "account_id",
+          "state",
+          "enabled",
+          "muted",
+          "permission",
+          "token_ciphertext",
+          "token_invalidated_at",
+          "topic",
+          "environment",
+          "token_version"
+        ],
+        "update": [
+          "runtime_lock"
+        ]
+      },
+      "dashboard_notification_device_revocations": {
+        "select": [
+          "target_binding_id",
+          "state",
+          "intent"
+        ]
+      }
+    },
+    "delivery": {
+      "dashboard_schema_migrations": {
+        "select": [
+          "name",
+          "sha256"
+        ]
+      },
+      "dashboard_source_identities": {
+        "select": [
+          "deployment_id",
+          "control_instance_id",
+          "recovery_epoch",
+          "configuration_revision",
+          "verified_at"
+        ],
+        "insert": [
+          "deployment_id",
+          "control_instance_id",
+          "recovery_epoch",
+          "configuration_revision",
+          "verified_at"
+        ],
+        "update": [
+          "recovery_epoch",
+          "configuration_revision",
+          "verified_at"
+        ]
+      },
+      "dashboard_accounts": {
+        "select": [
+          "id",
+          "directory_id",
+          "display_name",
+          "disabled_at"
+        ],
+        "update": [
+          "runtime_lock"
+        ]
+      },
+      "dashboard_identity_aliases": {
+        "select": [
+          "issuer",
+          "subject",
+          "account_id",
+          "verified_at"
+        ],
+        "update": [
+          "runtime_lock"
+        ]
+      },
+      "dashboard_audit": {
+        "insert": [
+          "account_id",
+          "action",
+          "resource_kind",
+          "resource_id"
+        ]
+      },
+      "dashboard_event_feeds": {
+        "select": [
+          "deployment_id",
+          "namespace_ids",
+          "status",
+          "generation",
+          "checkpoint",
+          "cursor",
+          "last_position",
+          "lease_token",
+          "lease_expires_at",
+          "last_success_at",
+          "last_error",
+          "retained_count",
+          "retention_seconds",
+          "updated_at",
+          "pruned_recorded_through",
+          "suppress_recorded_through"
+        ],
+        "update": [
+          "runtime_lock"
+        ]
+      },
+      "dashboard_notification_delivery_control": {
+        "select": [
+          "singleton",
+          "generation",
+          "held",
+          "restore_recorded_through",
+          "updated_at"
+        ],
+        "update": [
+          "runtime_lock"
+        ]
+      },
+      "dashboard_notification_rules": {
+        "select": [
+          "id",
+          "account_id",
+          "revision",
+          "enabled",
+          "payload",
+          "created_at",
+          "updated_at",
+          "deleted_at"
+        ]
+      },
+      "dashboard_notification_rule_versions": {
+        "select": [
+          "rule_id",
+          "revision",
+          "account_id",
+          "payload",
+          "regular_mutation",
+          "recorded_at"
+        ]
+      },
+      "dashboard_notification_activations": {
+        "select": [
+          "id",
+          "rule_id",
+          "created_revision",
+          "deployment_id",
+          "namespace_id",
+          "payload",
+          "account_id",
+          "origin_recorded_at",
+          "retired_at"
+        ]
+      },
+      "dashboard_notification_rule_scopes": {
+        "select": [
+          "rule_id",
+          "account_id",
+          "deployment_id",
+          "namespace_id",
+          "activation_id"
+        ]
+      },
+      "dashboard_notification_scope_revocations": {
+        "select": [
+          "deployment_id",
+          "namespace_id",
+          "revoked_through"
+        ]
+      },
+      "dashboard_notification_activation_revocations": {
+        "select": [
+          "activation_id",
+          "revoked_at"
+        ],
+        "insert": [
+          "activation_id"
+        ]
+      },
+      "dashboard_event_gaps": {
+        "select": [
+          "deployment_id",
+          "resolved_at",
+          "reason"
+        ]
+      },
+      "dashboard_event_recoveries": {
+        "select": [
+          "deployment_id",
+          "status"
+        ]
+      },
+      "dashboard_notification_work_quota": {
+        "select": [
+          "singleton",
+          "pending_evaluations",
+          "pending_deliveries"
+        ],
+        "update": [
+          "pending_deliveries"
+        ]
+      },
+      "dashboard_notification_inbox": {
+        "select": [
+          "id",
+          "account_id",
+          "deployment_id",
+          "control_instance_id",
+          "event_id",
+          "namespace_id",
+          "job_id",
+          "recorded_at",
+          "event_payload",
+          "created_at",
+          "expires_at",
+          "read_at"
+        ],
+        "update": [
+          "runtime_lock"
+        ]
+      },
+      "dashboard_notification_inbox_matches": {
+        "select": [
+          "inbox_id",
+          "rule_id",
+          "rule_revision",
+          "activation_id"
+        ]
+      },
+      "dashboard_notification_installations": {
+        "select": [
+          "id",
+          "creator_account_id",
+          "revision",
+          "current_binding_id",
+          "updated_at"
+        ],
+        "update": [
+          "revision",
+          "updated_at"
+        ]
+      },
+      "dashboard_notification_device_bindings": {
+        "select": [
+          "id",
+          "installation_id",
+          "account_id",
+          "label",
+          "topic",
+          "environment",
+          "state",
+          "enabled",
+          "muted",
+          "permission",
+          "token_version",
+          "token_ciphertext",
+          "token_key_id",
+          "token_digest",
+          "token_registered_at",
+          "token_invalidated_at",
+          "created_at",
+          "updated_at",
+          "last_seen_at",
+          "closed_at"
+        ],
+        "update": [
+          "token_invalidated_at",
+          "updated_at"
+        ]
+      },
+      "dashboard_notification_device_revocations": {
+        "select": [
+          "target_binding_id",
+          "state",
+          "intent"
+        ]
+      },
+      "dashboard_notification_deliveries": {
+        "select": [
+          "id",
+          "inbox_id",
+          "account_id",
+          "installation_id",
+          "binding_id",
+          "token_version",
+          "state",
+          "attempts",
+          "next_attempt_at",
+          "lease_token",
+          "lease_expires_at",
+          "expires_at",
+          "created_at",
+          "resolved_at",
+          "deployment_id",
+          "revision",
+          "claims",
+          "lease_hold_generation",
+          "lease_fence",
+          "original_inbox_id"
+        ],
+        "update": [
+          "state",
+          "resolved_at",
+          "revision",
+          "lease_token",
+          "lease_expires_at",
+          "lease_hold_generation",
+          "lease_fence",
+          "next_attempt_at",
+          "claims",
+          "token_version",
+          "attempts"
+        ]
+      },
+      "dashboard_notification_delivery_attempts": {
+        "select": [
+          "delivery_id",
+          "number",
+          "token_version",
+          "started_at",
+          "completed_at",
+          "outcome",
+          "reason",
+          "provider_id",
+          "ambiguous"
+        ],
+        "insert": [
+          "delivery_id",
+          "number",
+          "token_version"
+        ],
+        "update": [
+          "completed_at",
+          "outcome",
+          "reason",
+          "provider_id",
+          "ambiguous"
+        ]
+      },
+      "dashboard_notification_provider_health": {
+        "select": [
+          "topic",
+          "environment",
+          "retry_not_before",
+          "last_failure_at",
+          "last_reason",
+          "failures"
+        ],
+        "insert": [
+          "topic",
+          "environment",
+          "retry_not_before",
+          "last_failure_at",
+          "last_reason",
+          "failures"
+        ],
+        "update": [
+          "retry_not_before",
+          "last_failure_at",
+          "last_reason",
+          "failures"
+        ]
+      }
+    },
+    "reports": {
+      "dashboard_schema_migrations": {
+        "select": [
+          "name",
+          "sha256"
+        ]
+      },
+      "dashboard_source_identities": {
+        "select": [
+          "deployment_id",
+          "control_instance_id",
+          "recovery_epoch",
+          "configuration_revision",
+          "verified_at"
+        ],
+        "insert": [
+          "deployment_id",
+          "control_instance_id",
+          "recovery_epoch",
+          "configuration_revision",
+          "verified_at"
+        ],
+        "update": [
+          "recovery_epoch",
+          "configuration_revision",
+          "verified_at"
+        ]
+      },
+      "dashboard_accounts": {
+        "select": [
+          "id",
+          "directory_id",
+          "display_name",
+          "disabled_at"
+        ]
+      },
+      "dashboard_identity_aliases": {
+        "select": [
+          "issuer",
+          "subject",
+          "account_id",
+          "verified_at"
+        ]
+      },
+      "dashboard_report_tasks": {
+        "select": [
+          "id",
+          "deployment_id",
+          "namespace_id",
+          "job_id",
+          "equivalent_key",
+          "subject",
+          "state",
+          "created_at",
+          "updated_at",
+          "expires_at",
+          "next_attempt_at",
+          "attempts",
+          "lease_token",
+          "lease_expires_at",
+          "failure_code",
+          "object"
+        ],
+        "update": [
+          "state",
+          "attempts",
+          "lease_token",
+          "lease_expires_at",
+          "updated_at",
+          "failure_code",
+          "object",
+          "next_attempt_at"
+        ]
+      },
+      "dashboard_report_requesters": {
+        "select": [
+          "task_id",
+          "account_id",
+          "issuer",
+          "subject",
+          "requested_at"
+        ]
+      }
+    },
+    "retention": {
+      "dashboard_schema_migrations": {
+        "select": [
+          "name",
+          "sha256"
+        ]
+      },
+      "dashboard_accounts": {
+        "select": [
+          "id"
+        ],
+        "update": [
+          "runtime_lock"
+        ]
+      },
+      "dashboard_event_feeds": {
+        "select": [
+          "deployment_id",
+          "namespace_ids",
+          "status",
+          "generation",
+          "checkpoint",
+          "cursor",
+          "last_position",
+          "lease_token",
+          "lease_expires_at",
+          "last_success_at",
+          "last_error",
+          "retained_count",
+          "retention_seconds",
+          "updated_at",
+          "pruned_recorded_through",
+          "suppress_recorded_through"
+        ],
+        "update": [
+          "pruned_recorded_through",
+          "retained_count",
+          "runtime_lock"
+        ]
+      },
+      "dashboard_notification_delivery_control": {
+        "select": [
+          "singleton",
+          "generation",
+          "held",
+          "restore_recorded_through",
+          "updated_at"
+        ],
+        "update": [
+          "runtime_lock"
+        ]
+      },
+      "dashboard_login_attempts": {
+        "select": [
+          "state_hash",
+          "expires_at"
+        ],
+        "update": [
+          "runtime_lock"
+        ],
+        "delete": true
+      },
+      "dashboard_sessions": {
+        "select": [
+          "token_hash",
+          "revoked_at",
+          "expires_at",
+          "touched_at"
+        ],
+        "update": [
+          "runtime_lock"
+        ],
+        "delete": true
+      },
+      "dashboard_audit": {
+        "select": [
+          "id",
+          "recorded_at"
+        ],
+        "update": [
+          "runtime_lock"
+        ],
+        "delete": true
+      },
+      "dashboard_browse_sessions": {
+        "select": [
+          "id",
+          "expires_at"
+        ],
+        "update": [
+          "runtime_lock"
+        ],
+        "delete": true
+      },
+      "dashboard_report_tasks": {
+        "select": [
+          "id",
+          "expires_at",
+          "object"
+        ],
+        "update": [
+          "runtime_lock"
+        ],
+        "delete": true
+      },
+      "dashboard_notification_inbox": {
+        "select": [
+          "id",
+          "account_id",
+          "deployment_id",
+          "control_instance_id",
+          "event_id",
+          "namespace_id",
+          "job_id",
+          "recorded_at",
+          "event_payload",
+          "created_at",
+          "expires_at",
+          "read_at"
+        ],
+        "update": [
+          "runtime_lock"
+        ],
+        "delete": true
+      },
+      "dashboard_notification_rules": {
+        "select": [
+          "id",
+          "account_id",
+          "revision",
+          "enabled",
+          "payload",
+          "created_at",
+          "updated_at",
+          "deleted_at"
+        ],
+        "update": [
+          "runtime_lock"
+        ],
+        "delete": true
+      },
+      "dashboard_notification_rule_versions": {
+        "select": [
+          "rule_id",
+          "revision",
+          "account_id",
+          "payload",
+          "regular_mutation",
+          "recorded_at"
+        ],
+        "update": [
+          "runtime_lock"
+        ],
+        "delete": true
+      },
+      "dashboard_notification_delivery_attempts": {
+        "select": [
+          "delivery_id",
+          "number",
+          "token_version",
+          "started_at",
+          "completed_at",
+          "outcome",
+          "reason",
+          "provider_id",
+          "ambiguous"
+        ],
+        "update": [
+          "runtime_lock"
+        ],
+        "delete": true
+      },
+      "dashboard_source_events": {
+        "select": [
+          "deployment_id",
+          "control_instance_id",
+          "event_id",
+          "namespace_id",
+          "job_id",
+          "recorded_at",
+          "payload",
+          "fact_digest",
+          "first_seen_at",
+          "last_seen_at",
+          "expires_at",
+          "processed_at",
+          "notification_suppressed"
+        ],
+        "delete": true
+      },
+      "dashboard_notification_deliveries": {
+        "select": [
+          "id",
+          "inbox_id",
+          "account_id",
+          "installation_id",
+          "binding_id",
+          "token_version",
+          "state",
+          "attempts",
+          "next_attempt_at",
+          "lease_token",
+          "lease_expires_at",
+          "expires_at",
+          "created_at",
+          "resolved_at",
+          "deployment_id",
+          "revision",
+          "claims",
+          "lease_hold_generation",
+          "lease_fence",
+          "original_inbox_id"
+        ],
+        "delete": true,
+        "update": [
+          "state",
+          "resolved_at",
+          "revision",
+          "lease_token",
+          "lease_expires_at",
+          "lease_hold_generation",
+          "lease_fence"
+        ]
+      },
+      "dashboard_notification_activation_revocations": {
+        "select": [
+          "activation_id",
+          "revoked_at"
+        ],
+        "delete": true
+      },
+      "dashboard_notification_fanout": {
+        "select": [
+          "deployment_id",
+          "control_instance_id",
+          "event_id",
+          "after_rule_id",
+          "done",
+          "account_count",
+          "revision",
+          "lease_token",
+          "lease_expires_at",
+          "lease_hold_generation",
+          "lease_fence"
+        ]
+      },
+      "dashboard_notification_evaluations": {
+        "select": [
+          "id",
+          "account_id",
+          "deployment_id",
+          "control_instance_id",
+          "event_id",
+          "state",
+          "revision",
+          "attempts",
+          "next_attempt_at",
+          "lease_token",
+          "lease_expires_at",
+          "lease_hold_generation",
+          "lease_fence",
+          "inbox_id",
+          "created_at",
+          "resolved_at"
+        ]
+      },
+      "dashboard_notification_evaluation_matches": {
+        "select": [
+          "evaluation_id",
+          "rule_id",
+          "rule_revision",
+          "activation_id"
+        ]
+      },
+      "dashboard_notification_inbox_matches": {
+        "select": [
+          "inbox_id",
+          "rule_id",
+          "rule_revision",
+          "activation_id"
+        ]
+      },
+      "dashboard_notification_version_activations": {
+        "select": [
+          "rule_id",
+          "revision",
+          "activation_id"
+        ]
+      },
+      "dashboard_notification_rule_scopes": {
+        "select": [
+          "rule_id",
+          "account_id",
+          "deployment_id",
+          "namespace_id",
+          "activation_id"
+        ]
+      },
+      "dashboard_notification_activation_work": {
+        "select": [
+          "rule_id",
+          "account_id",
+          "rule_revision",
+          "attempts",
+          "next_attempt_at",
+          "lease_token",
+          "lease_expires_at"
+        ]
+      },
+      "dashboard_notification_activations": {
+        "select": [
+          "id",
+          "rule_id",
+          "created_revision",
+          "deployment_id",
+          "namespace_id",
+          "payload",
+          "account_id",
+          "origin_recorded_at",
+          "retired_at"
+        ],
+        "update": [
+          "payload",
+          "retired_at"
+        ]
+      },
+      "dashboard_notification_work_quota": {
+        "select": [
+          "singleton",
+          "pending_evaluations",
+          "pending_deliveries"
+        ],
+        "update": [
+          "pending_deliveries"
+        ]
+      },
+      "dashboard_notification_retention_progress": {
+        "select": [
+          "singleton",
+          "after_account_id"
+        ],
+        "update": [
+          "after_account_id"
+        ]
+      }
+    },
+    "operator": {
+      "dashboard_schema_migrations": {
+        "select": [
+          "name",
+          "sha256"
+        ]
+      },
+      "dashboard_notification_delivery_control": {
+        "select": [
+          "singleton",
+          "generation",
+          "held",
+          "restore_recorded_through",
+          "updated_at"
+        ]
+      },
+      "dashboard_event_feeds": {
+        "select": [
+          "deployment_id",
+          "namespace_ids",
+          "status",
+          "last_error",
+          "last_success_at",
+          "retained_count",
+          "retention_seconds",
+          "pruned_recorded_through",
+          "suppress_recorded_through",
+          "checkpoint"
+        ]
+      },
+      "dashboard_source_events": {
+        "select": [
+          "deployment_id",
+          "control_instance_id",
+          "event_id",
+          "processed_at",
+          "first_seen_at"
+        ]
+      },
+      "dashboard_notification_fanout": {
+        "select": [
+          "deployment_id",
+          "control_instance_id",
+          "event_id",
+          "done"
+        ]
+      },
+      "dashboard_notification_evaluations": {
+        "select": [
+          "deployment_id",
+          "state",
+          "next_attempt_at",
+          "lease_expires_at",
+          "created_at"
+        ]
+      },
+      "dashboard_notification_deliveries": {
+        "select": [
+          "deployment_id",
+          "state",
+          "next_attempt_at",
+          "lease_expires_at",
+          "created_at"
+        ]
+      },
+      "dashboard_notification_activation_work": {
+        "select": [
+          "rule_id",
+          "next_attempt_at",
+          "lease_expires_at"
+        ]
+      },
+      "dashboard_notification_rules": {
+        "select": [
+          "id",
+          "updated_at"
+        ]
+      },
+      "dashboard_notification_provider_health": {
+        "select": [
+          "failures",
+          "retry_not_before",
+          "last_failure_at"
+        ]
+      },
+      "dashboard_report_tasks": {
+        "select": [
+          "deployment_id",
+          "state",
+          "lease_expires_at",
+          "created_at"
+        ]
+      }
+    }
+  }
+}

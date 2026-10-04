@@ -13,8 +13,10 @@ import (
 // between passes. Active/pending task IDs are references too, so publication
 // between filesystem and database commits is never removed. A one-hour grace
 // exceeds task deadlines/leases and protects recent temporary writes.
-func (s *ObjectStore) Sweep(ctx context.Context, referenced func(context.Context, string) (bool, error)) error {
-	if referenced == nil {
+func (s *ObjectStore) Sweep(ctx context.Context, referenced func(context.Context, string) (bool, error)) (resultErr error) {
+	start := time.Now()
+	defer func() { s.observer.Observe("object", "sweep", "", "", reportObservation(resultErr), time.Since(start)) }()
+	if referenced == nil || s.validateRoot(true) != nil {
 		return ErrInvalid
 	}
 	s.sweepMu.Lock()
@@ -79,4 +81,33 @@ func hexName(value string) bool {
 		}
 	}
 	return true
+}
+
+// RetentionQueue deliberately excludes source reads, interactive identity,
+// analysis/lease claims and redaction policy. Cleanup uses durable references.
+type RetentionQueue interface {
+	DeleteExpiredReports(context.Context) ([]Object, error)
+	ReportObjectReferenced(context.Context, string) (bool, error)
+}
+
+func PruneObjects(ctx context.Context, queue RetentionQueue, objects ObjectMaintenance) error {
+	if queue == nil || objects == nil {
+		return ErrInvalid
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	expired, err := queue.DeleteExpiredReports(ctx)
+	if err != nil {
+		return err
+	}
+	for _, object := range expired {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := objects.Remove(object.ID); err != nil {
+			return err
+		}
+	}
+	return objects.Sweep(ctx, queue.ReportObjectReferenced)
 }

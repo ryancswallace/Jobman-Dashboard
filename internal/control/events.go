@@ -145,10 +145,14 @@ func (s *EventSource) capabilities(ctx context.Context) (string, error) {
 		return "", err
 	}
 	c := caps.Capabilities
+	if caps.APIVersion != contract || !slices.Contains(c.ContractVersions, contract) || !slices.Contains(c.Features, "durable-monitoring-events") {
+		s.client.config.Observer.Mismatch("source_contract")
+	}
 	if caps.APIVersion != contract || caps.Kind != "ControlCapabilities" || !uuid(c.InstanceID) || !decimal(c.RecoveryEpoch) || c.RecoveryEpoch == "0" || c.ServiceTime.IsZero() || c.ServiceTime.After(s.client.now().Add(5*time.Second)) || len(c.ContractVersions) > 32 || len(c.Features) > 128 || !slices.Contains(c.ContractVersions, contract) || !slices.Contains(c.Features, "durable-monitoring-events") || c.MaximumPageSize < 200 {
 		return "", events.ErrUnavailable
 	}
 	if c.InstanceID != s.client.config.InstanceID {
+		s.client.config.Observer.Mismatch("source_identity")
 		return "", &events.RecoveryError{Reason: events.SourceChanged}
 	}
 	if verify := s.client.config.VerifyIdentity; verify != nil {

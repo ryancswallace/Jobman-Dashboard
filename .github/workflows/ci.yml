@@ -4,6 +4,11 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      candidateVersion:
+        description: Optional vX.Y.Z-rc.N to build candidate bundles after all checks
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -36,9 +41,11 @@ jobs:
           go-version-file: go.version
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: 26.5.1
+          node-version-file: node.version
           cache: npm
           cache-dependency-path: web/package-lock.json
+      - name: Select the pinned npm version
+        run: npm install --global "npm@$(cat npm.version)" --ignore-scripts --no-audit --fund=false
       - run: npm ci --prefix web
       - run: make check
         env:
@@ -66,3 +73,35 @@ jobs:
         run: ./ios/scripts/test-core.sh
       - name: Build unsigned iPhone simulator app
         run: ./ios/scripts/build-simulator.sh
+
+  candidate:
+    if: github.event_name == 'workflow_dispatch' && inputs.candidateVersion != ''
+    needs: [backend-web, iphone]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.version
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: node.version
+      - name: Select the pinned npm version
+        run: npm install --global "npm@$(cat npm.version)" --ignore-scripts --no-audit --fund=false
+      - name: Build twice and compare both architecture archives
+        env:
+          CANDIDATE_VERSION: ${{ inputs.candidateVersion }}
+        run: |
+          python3 scripts/build-release.py --version "$CANDIDATE_VERSION" --output-directory "$RUNNER_TEMP/candidate-first"
+          python3 scripts/build-release.py --version "$CANDIDATE_VERSION" --output-directory "$RUNNER_TEMP/candidate-second"
+          cmp "$RUNNER_TEMP/candidate-first/SHA256SUMS" "$RUNNER_TEMP/candidate-second/SHA256SUMS"
+      - name: Retain verified candidate packages
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dashboard-${{ inputs.candidateVersion }}-${{ github.sha }}
+          path: ${{ runner.temp }}/candidate-first/*
+          if-no-files-found: error
+          retention-days: 30

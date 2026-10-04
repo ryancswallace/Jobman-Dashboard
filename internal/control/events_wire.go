@@ -50,7 +50,11 @@ type eventItem struct {
 	Reconciliation      *bool      `json:"reconciliation"`
 }
 
-func (s *EventSource) get(ctx context.Context, path string, query url.Values, dest any, delegated bool) error {
+func (s *EventSource) get(ctx context.Context, path string, query url.Values, dest any, delegated bool) (resultErr error) {
+	start := time.Now()
+	defer func() {
+		s.client.config.Observer.Observe("source", "events", s.client.config.DeploymentID, "service", observationOutcome(resultErr), time.Since(start))
+	}()
 	u := *s.client.base
 	u.Path, u.RawQuery = path, query.Encode()
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)

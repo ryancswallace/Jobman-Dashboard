@@ -89,6 +89,15 @@ func (d *NotificationDeviceStore) begin(ctx context.Context, actor monitoring.Ac
 	return tx, nil
 }
 func installation(ctx context.Context, tx pgx.Tx, id string, write bool) (deviceInstallation, error) {
+	return readInstallation(ctx, tx, id, write, true)
+}
+
+// Delivery has no possession-proof authority and never reads the installation
+// secret hash. It shares the same row lock and generation fields with API reads.
+func deliveryInstallation(ctx context.Context, tx pgx.Tx, id string, write bool) (deviceInstallation, error) {
+	return readInstallation(ctx, tx, id, write, false)
+}
+func readInstallation(ctx context.Context, tx pgx.Tx, id string, write, proof bool) (deviceInstallation, error) {
 	var i deviceInstallation
 	if !eventUUID(id) {
 		return i, notifications.ErrDeviceNotFound
@@ -97,7 +106,11 @@ func installation(ctx context.Context, tx pgx.Tx, id string, write bool) (device
 	if write {
 		lock = " FOR UPDATE"
 	}
-	err := tx.QueryRow(ctx, `SELECT id::text,creator_account_id::text,secret_hash,revision,COALESCE(current_binding_id::text,'') FROM dashboard_notification_installations WHERE id=$1::uuid`+lock, id).Scan(&i.id, &i.creator, &i.secret, &i.revision, &i.binding)
+	hashColumn := "NULL::bytea"
+	if proof {
+		hashColumn = "secret_hash"
+	}
+	err := tx.QueryRow(ctx, `SELECT id::text,creator_account_id::text,`+hashColumn+`,revision,COALESCE(current_binding_id::text,'') FROM dashboard_notification_installations WHERE id=$1::uuid`+lock, id).Scan(&i.id, &i.creator, &i.secret, &i.revision, &i.binding)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return i, notifications.ErrDeviceNotFound
 	}
@@ -529,7 +542,7 @@ func (d *NotificationDeviceStore) Handoff(ctx context.Context, actor monitoring.
 		return empty, err
 	}
 	defer tx.Rollback(ctx)
-	i, err := installation(ctx, tx, candidate.InstallationID, false)
+	i, err := deliveryInstallation(ctx, tx, candidate.InstallationID, false)
 	if err != nil {
 		return empty, err
 	}
@@ -576,7 +589,7 @@ func (d *NotificationDeviceStore) invalidateTx(ctx context.Context, tx pgx.Tx, c
 	if !eventUUID(candidate.InstallationID) || !eventUUID(candidate.BindingID) || !eventUUID(candidate.AccountID) || candidate.TokenVersion <= 0 || invalidAt != nil && (invalidAt.IsZero() || invalidAt.Year() < 1 || invalidAt.Year() > 9999) {
 		return false, notifications.ErrDeviceInvalid
 	}
-	i, err := installation(ctx, tx, candidate.InstallationID, true)
+	i, err := deliveryInstallation(ctx, tx, candidate.InstallationID, true)
 	if errors.Is(err, notifications.ErrDeviceNotFound) {
 		return false, nil
 	}

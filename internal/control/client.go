@@ -20,12 +20,14 @@ import (
 	"github.com/ryancswallace/jobman-dashboard/internal/api"
 	"github.com/ryancswallace/jobman-dashboard/internal/auth"
 	"github.com/ryancswallace/jobman-dashboard/internal/monitoring"
+	"github.com/ryancswallace/jobman-dashboard/internal/observability"
 )
 
 const contract = "jobman.control/v1alpha1"
 const maxBody = 4 << 20
 
 type Config struct {
+	Observer       *observability.Registry
 	DeploymentID   string
 	Name           string
 	Endpoint       string
@@ -34,6 +36,7 @@ type Config struct {
 	Roots          *x509.CertPool
 	Certificate    tls.Certificate
 	Signer         *auth.DelegationSigner
+	ActorMode      auth.DelegationMode
 	VerifyIdentity func(context.Context, string, string) error
 }
 
@@ -45,6 +48,11 @@ type Client struct {
 }
 
 func New(config Config) (*Client, error) {
+	mode, modeErr := config.ActorMode.Canonical()
+	if modeErr != nil {
+		return nil, modeErr
+	}
+	config.ActorMode = mode
 	u, err := url.Parse(config.Endpoint)
 	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") || u.Opaque != "" {
 		return nil, errors.New("Control endpoint must be an HTTPS origin without credentials, query, or path")
@@ -75,7 +83,11 @@ func (c *Client) Close()     { c.client.CloseIdleConnections() }
 
 // get never accepts an absolute caller-controlled URL, method, or header map.
 // Source error bodies may contain private diagnostics and are not propagated.
-func (c *Client) get(ctx context.Context, actor monitoring.Actor, operation, namespace, path string, query url.Values, dest any) error {
+func (c *Client) get(ctx context.Context, actor monitoring.Actor, operation, namespace, path string, query url.Values, dest any) (resultErr error) {
+	start := time.Now()
+	defer func() {
+		c.config.Observer.Observe("source", observationOperation(operation), c.ID(), string(c.config.ActorMode), observationOutcome(resultErr), time.Since(start))
+	}()
 	if !strings.HasPrefix(path, "/v1/") || strings.ContainsAny(path, "?#\\") {
 		return monitoring.ErrSource
 	}
@@ -88,7 +100,7 @@ func (c *Client) get(ctx context.Context, actor monitoring.Actor, operation, nam
 	}
 	r.Header.Set("Accept", "application/json")
 	if operation != "" {
-		authorization, err := c.config.Signer.Authorize(actor, operation, namespace, "interactive")
+		authorization, err := c.config.Signer.Authorize(actor, operation, namespace, string(c.config.ActorMode))
 		if err != nil {
 			return monitoring.ErrAuthority
 		}
@@ -217,6 +229,12 @@ func (c *Client) discover(ctx context.Context, actor monitoring.Actor) (discover
 		return discovery{}, err
 	}
 	v := caps.Capabilities
+	if v.InstanceID != c.config.InstanceID {
+		c.config.Observer.Mismatch("source_identity")
+	}
+	if caps.APIVersion != contract || !slices.Contains(v.ContractVersions, contract) {
+		c.config.Observer.Mismatch("source_contract")
+	}
 	if caps.APIVersion != contract || caps.Kind != "ControlCapabilities" || v.InstanceID != c.config.InstanceID || !decimal(v.RecoveryEpoch) || v.ServiceTime.IsZero() || !slices.Contains(v.ContractVersions, contract) || v.MaximumPageSize < 200 {
 		return discovery{}, monitoring.ErrSource
 	}
@@ -232,6 +250,7 @@ func (c *Client) discover(ctx context.Context, actor monitoring.Actor) (discover
 	}
 	d := discovery{features: slices.Clone(v.Features), Discovery: monitoring.Discovery{InstanceID: v.InstanceID, RecoveryEpoch: v.RecoveryEpoch, ServiceTime: v.ServiceTime, Deployment: api.Deployment{ID: c.ID(), Name: c.config.Name, Status: "available", Namespaces: []api.Namespace{}}}}
 	cursor := ""
+	var oldestProof, earliestExpiry time.Time
 	seen := map[string]bool{}
 	for page := 0; page < 3; page++ {
 		q := url.Values{"limit": {"200"}}
@@ -267,9 +286,16 @@ func (c *Client) discover(ctx context.Context, actor monitoring.Actor) (discover
 			if !slices.Contains(ns.Capabilities, "namespace.read") {
 				return discovery{}, monitoring.ErrAuthority
 			}
+			if oldestProof.IsZero() || ns.LastDirectoryVerifiedAt.Before(oldestProof) {
+				oldestProof = ns.LastDirectoryVerifiedAt
+			}
+			if earliestExpiry.IsZero() || ns.AuthorizationExpiresAt.Before(earliestExpiry) {
+				earliestExpiry = ns.AuthorizationExpiresAt
+			}
 			d.Deployment.Namespaces = append(d.Deployment.Namespaces, ns.Namespace)
 		}
 		if p.NextPageToken == "" {
+			c.config.Observer.ObserveAuthority(c.ID(), oldestProof, earliestExpiry)
 			return d, nil
 		}
 		if p.NextPageToken == cursor || len(p.NextPageToken) > 8192 {

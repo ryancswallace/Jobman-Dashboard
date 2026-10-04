@@ -76,6 +76,18 @@ Everything except APNs runs on the private network. APNs requires approved outbo
 | iPhone | Swift + SwiftUI, structured concurrency, system authentication, URLSession, Keychain, and UserNotifications. No web-view application shell. |
 | Durable storage | PostgreSQL for Dashboard state and queues; private filesystem/NFS for sealed evidence and reports. No Redis, message broker, Kubernetes, or external object service is required for the initial topology. |
 
+Implementation decision: the separated runtime uses `api` and explicitly selected
+`worker` components, with a combined `serve` mode retained for compatibility.
+Purpose-specific keys preserve existing encrypted tokens and report fingerprints
+without giving workers the browser session key. PostgreSQL roles use explicit
+column grants, including generated constant columns solely where row locking
+otherwise requires permission to alter protected data. Report sharing between
+different service UIDs uses a pinned reader group on verified local Linux storage;
+NFS remains the log-storage path and is not accepted for that shared report profile.
+The API opens report storage through a read-only interface and read-only service
+mount. See [process boundaries](PROCESS_MODES.md), [purpose keys](PURPOSE_KEYS.md)
+and [runtime grants](../deploy/postgres/README.md) for migration and validation.
+
 Go matches the existing services and allows reuse of public protocol/validation packages. A client-rendered web app suits a private authenticated application with a separately defined API; routing, query caching, accessibility, and error recovery are explicit work, since a build tool does not supply them. React documents this [build-tool approach and its tradeoffs](https://react.dev/learn/build-a-react-app-from-scratch). Pin exact supported compiler and dependency versions during scaffolding and commit lockfiles; this document does not select an unverified “latest” version.
 
 Use a checked-in OpenAPI contract for Dashboard and generate transport models/clients for TypeScript and Swift. Keep application models separate so unknown status values, partial results, and authentication recovery are handled deliberately. Swift's [OpenAPI Generator](https://www.swift.org/blog/introducing-swift-openapi-generator/) supports generated clients and URLSession integration. Go server validation and domain authorization remain handwritten and tested.

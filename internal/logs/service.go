@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/ryancswallace/jobman-dashboard/internal/api"
-	"github.com/ryancswallace/jobman-dashboard/internal/monitoring"
+	"github.com/ryancswallace/jobman-dashboard/internal/auth"
 )
 
 type ServiceAuthenticator interface {
-	Authenticate(*http.Request, api.Scope) (monitoring.Actor, error)
+	AuthenticateDelegation(*http.Request, api.Scope) (auth.VerifiedDelegation, error)
 }
 
 type ChunkRequest struct {
@@ -27,26 +27,40 @@ type ChunkRequest struct {
 }
 
 type Service struct {
-	sources map[string]ManifestSource
+	sources map[auth.DelegationMode]map[string]ManifestSource
 	local   *LocalChunks
 	auth    ServiceAuthenticator
 	gate    chan struct{}
 	now     func() time.Time
 }
 
-func NewService(sources map[string]ManifestSource, local *LocalChunks, auth ServiceAuthenticator) (*Service, error) {
-	if len(sources) == 0 || len(sources) > 32 || local == nil || auth == nil {
+// NewService retains the single interactive pool for embedded callers. A
+// verified worker request is rejected unless a worker pool is supplied explicitly.
+func NewService(sources map[string]ManifestSource, local *LocalChunks, verifier ServiceAuthenticator) (*Service, error) {
+	return NewServiceWithModes(sources, nil, local, verifier)
+}
+
+func NewServiceWithModes(interactive, worker map[string]ManifestSource, local *LocalChunks, verifier ServiceAuthenticator) (*Service, error) {
+	if len(interactive)+len(worker) == 0 || len(interactive) > 32 || len(worker) > 32 || local == nil || verifier == nil {
 		return nil, errors.New("incomplete storage broker configuration")
 	}
-	s := &Service{sources: make(map[string]ManifestSource), local: local, auth: auth, gate: make(chan struct{}, 32), now: time.Now}
-	for id, source := range sources {
-		if !uuid(id) || source == nil {
-			return nil, errors.New("invalid broker source")
+	s := &Service{sources: map[auth.DelegationMode]map[string]ManifestSource{}, local: local, auth: verifier, gate: make(chan struct{}, 32), now: time.Now}
+	union := map[string]bool{}
+	for mode, pool := range map[auth.DelegationMode]map[string]ManifestSource{auth.DelegationInteractive: interactive, auth.DelegationWorker: worker} {
+		s.sources[mode] = make(map[string]ManifestSource, len(pool))
+		for id, source := range pool {
+			if !uuid(id) || source == nil {
+				return nil, errors.New("invalid broker source")
+			}
+			s.sources[mode][id] = source
+			union[id] = true
 		}
-		s.sources[id] = source
+	}
+	if len(union) > 32 {
+		return nil, errors.New("too many broker sources")
 	}
 	for key := range local.roots {
-		if s.sources[key.deployment] == nil {
+		if !union[key.deployment] {
 			return nil, errors.New("log root refers to an unconfigured source")
 		}
 	}
@@ -88,12 +102,16 @@ func (s *Service) read(w http.ResponseWriter, r *http.Request) {
 		serviceError(w, http.StatusBadRequest, "invalid_request")
 		return
 	}
-	actor, err := s.auth.Authenticate(r, request.Scope)
+	verified, err := s.auth.AuthenticateDelegation(r, request.Scope)
 	if err != nil {
 		serviceError(w, http.StatusUnauthorized, "authorization_unavailable")
 		return
 	}
-	source := s.sources[request.Scope.DeploymentID]
+	// Never canonicalize a zero/unknown verified mode to interactive here.
+	// Only the signed, fully verified claim selects a constructor-fixed pool.
+	pool := s.sources[verified.Mode]
+	source := pool[request.Scope.DeploymentID]
+	actor := verified.Actor
 	if source == nil {
 		serviceError(w, http.StatusNotFound, "not_found_or_inaccessible")
 		return

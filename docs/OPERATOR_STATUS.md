@@ -4,17 +4,37 @@ The local `status` command produces JSON or Prometheus text from a bounded
 database snapshot, using `operations.WriteStatus` and `Store.OperationalStatus`:
 
 ```sh
-jobman-dashboard status --config /etc/jobman-dashboard/config.json
-jobman-dashboard status --config /etc/jobman-dashboard/config.json --format prometheus
+jobman-dashboard status --operator-config /etc/jobman-dashboard-operator/config.json
+jobman-dashboard status --operator-config /etc/jobman-dashboard-operator/config.json --format prometheus
 ```
 
-Run it as an authorized operator with access to the private configuration and
-runtime database credential. It reads no identity, source, signing, encryption
-or server TLS key material, performs no network dependency probes, and makes no
-registry or data changes. The command has an eight-second total deadline; failures
-return a nonzero exit status without credential-bearing error details. Restrict
-saved output to operators. There is no application API route or metrics listener
-in this command; do not place its output on a public health endpoint.
+The dedicated [operator configuration](../deploy/operator.example.json) has only
+`schemaVersion: 1`, an absolute `databaseURLFile` and `deployments`, each with a
+canonical UUID and optional display name. It rejects runtime/source/identity/
+listener/key fields, unknown or duplicate JSON fields, unsupported schema versions
+and oversized documents. Its schema version does not update a Control source's
+configuration revision. An empty deployment array selects no sources; global
+activation/provider/hold aggregates remain operator-only observations.
+
+Provision a separate read-only database role and its private TLS `verify-full`
+URL file. The operator needs SELECT access to the migration ledger and the exact
+stored-status projections, not runtime DML authority or access to session/token
+contents. An unavailable table or schema fails closed; do not broaden an API role
+merely to run this command. The new flag and legacy `--config` are mutually
+exclusive. Existing callers may still use:
+
+```sh
+jobman-dashboard status --config /etc/jobman-dashboard/config.json --format json
+```
+
+Legacy configuration keeps its existing shape and database URL; it does not
+silently switch identities. Prefer the dedicated shape for separate process roles.
+Both paths read no identity, source, signing, encryption or server TLS key material,
+perform no network dependency probes, and make no registry or data changes. The
+command has an eight-second total deadline; failures return a nonzero exit status
+without credential-bearing error details or partial stdout. Restrict saved output
+to operators. There is no application API route or metrics listener in this command;
+do not place its output on a public health endpoint.
 
 Only the configured deployment set is selected, with at most 32 canonical UUIDs.
 An empty set means no sources. Metric labels contain those stable deployment
@@ -64,7 +84,10 @@ failure instrumentation and cumulative retention-deletion counters remain separa
 instrumentation work. Retention routines currently return per-pass counts, not
 durable totals; this snapshot does not fabricate cumulative counters from them.
 
-Unit tests cover exact counts, escaped display text, bounded labels, invalid
+Configuration/CLI tests cover minimal operator material, both output formats,
+mutually exclusive legacy/dedicated flags, unsupported runtime fields, bounded
+source sets and zero output on validation/credential failure. Unit tests cover
+exact counts, escaped display text, bounded labels, invalid
 snapshot rejection, missing feeds, cancellation and writer errors. Opt-in real
 PostgreSQL tests cover source isolation, pending/fanout/lease counts, hold and
 provider state, activation age, malformed checkpoints and bounded table-lock

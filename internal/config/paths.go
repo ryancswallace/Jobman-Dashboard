@@ -22,8 +22,23 @@ func (c Config) PrivateFilePaths() map[string]string {
 		"oidc.webClientSecretFile": c.OIDC.WebClientSecretFile,
 		"encryption.keyFile":       c.Encryption.KeyFile,
 	}
+	if c.Observability != nil && c.Observability.OperatorConfigFile != "" {
+		paths["observability.operatorConfigFile"] = c.Observability.OperatorConfigFile
+	}
 	if c.Reports.RedactionFile != "" {
 		paths["reports.redactionFile"] = c.Reports.RedactionFile
+	}
+	if c.Reports.PolicyKeyFile != "" {
+		paths["reports.policyKeyFile"] = c.Reports.PolicyKeyFile
+	}
+	if c.LogCursorKeyFile != "" {
+		paths["logCursorKeyFile"] = c.LogCursorKeyFile
+	}
+	if ring := c.Notifications.TokenEncryption; ring != nil {
+		paths["notifications.tokenEncryption.current.keyFile"] = ring.Current.KeyFile
+		for index, key := range ring.Previous {
+			paths[fmt.Sprintf("notifications.tokenEncryption.previous[%d].keyFile", index)] = key.KeyFile
+		}
 	}
 	for index, source := range c.Controls {
 		paths[fmt.Sprintf("controls[%d].clientKeyFile", index)] = source.ClientKeyFile

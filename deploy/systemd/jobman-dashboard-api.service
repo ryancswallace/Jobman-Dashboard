@@ -1,0 +1,43 @@
+[Unit]
+Description=Jobman Dashboard API and web application
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=jobman-dashboard-api
+Group=jobman-dashboard-api
+SupplementaryGroups=jobman-dashboard-report-readers
+WorkingDirectory=/opt/jobman-dashboard/current
+ExecStartPre=/opt/jobman-dashboard/current/bin/jobman-dashboard --mode check-config --check-mode api --config /etc/jobman-dashboard-api/config.json
+ExecStart=/opt/jobman-dashboard/current/bin/jobman-dashboard --mode api --config /etc/jobman-dashboard-api/config.json
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=90s
+KillMode=control-group
+UMask=0077
+RuntimeDirectory=jobman-dashboard-api
+RuntimeDirectoryMode=0700
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectKernelLogs=true
+ProtectClock=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+ReadOnlyPaths=-/var/lib/jobman-dashboard/reports
+InaccessiblePaths=-/etc/jobman-dashboard-worker -/etc/jobman-log-broker
+LimitNOFILE=4096
+TasksMax=512
+
+[Install]
+WantedBy=multi-user.target

@@ -16,14 +16,17 @@ import (
 
 	"github.com/ryancswallace/jobman-dashboard/internal/auth"
 	"github.com/ryancswallace/jobman-dashboard/internal/monitoring"
+	"github.com/ryancswallace/jobman-dashboard/internal/observability"
 )
 
 type ClientConfig struct {
+	Observer     *observability.Registry
 	DeploymentID string
 	Origin       string
 	Roots        *x509.CertPool
 	Certificate  tls.Certificate
 	Signer       *auth.DelegationSigner
+	ActorMode    auth.DelegationMode
 }
 type Client struct {
 	config   ClientConfig
@@ -32,6 +35,11 @@ type Client struct {
 }
 
 func NewClient(c ClientConfig) (*Client, error) {
+	mode, modeErr := c.ActorMode.Canonical()
+	if modeErr != nil {
+		return nil, modeErr
+	}
+	c.ActorMode = mode
 	u, err := url.Parse(c.Origin)
 	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Opaque != "" || (u.Path != "" && u.Path != "/") || !uuid(c.DeploymentID) || c.Roots == nil || len(c.Certificate.Certificate) == 0 || c.Signer == nil {
 		return nil, errors.New("incomplete pinned log broker trust")
@@ -42,7 +50,11 @@ func NewClient(c ClientConfig) (*Client, error) {
 }
 func (c *Client) Close() { c.client.CloseIdleConnections() }
 
-func (c *Client) ReadChunk(ctx context.Context, a monitoring.Actor, m Manifest, chunk Chunk) (FileResult, error) {
+func (c *Client) ReadChunk(ctx context.Context, a monitoring.Actor, m Manifest, chunk Chunk) (result FileResult, resultErr error) {
+	start := time.Now()
+	defer func() {
+		c.config.Observer.ObserveBytes("logs", "chunk", c.config.DeploymentID, string(c.config.ActorMode), logObservation(result.State, resultErr), time.Since(start), int64(len(result.Bytes)))
+	}()
 	if m.Scope.DeploymentID != c.config.DeploymentID {
 		return FileResult{}, monitoring.ErrForbidden
 	}
@@ -52,7 +64,7 @@ func (c *Client) ReadChunk(ctx context.Context, a monitoring.Actor, m Manifest, 
 	if err != nil {
 		return FileResult{}, monitoring.ErrSource
 	}
-	header, err := c.config.Signer.Authorize(a, "logs.read", m.Scope.NamespaceID, "interactive")
+	header, err := c.config.Signer.Authorize(a, "logs.read", m.Scope.NamespaceID, string(c.config.ActorMode))
 	if err != nil {
 		return FileResult{}, monitoring.ErrAuthority
 	}
@@ -82,7 +94,6 @@ func (c *Client) ReadChunk(ctx context.Context, a monitoring.Actor, m Manifest, 
 	if err != nil || len(raw) > maxHelperOutput {
 		return FileResult{}, monitoring.ErrSource
 	}
-	var result FileResult
 	if json.Unmarshal(raw, &result) != nil || len(result.Bytes) > MaxChunkBytes {
 		return FileResult{}, monitoring.ErrSource
 	}

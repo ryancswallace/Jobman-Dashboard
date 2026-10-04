@@ -16,16 +16,30 @@ import (
 	"github.com/ryancswallace/jobman-dashboard/internal/store"
 )
 
-type statusOperatorOptions struct{ config, format string }
+type statusOperatorOptions struct{ config, operatorConfig, format string }
 
 func parseStatusOperator(args []string) (statusOperatorOptions, error) {
 	var o statusOperatorOptions
 	fs := flag.NewFlagSet("status", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	fs.StringVar(&o.config, "config", "", "absolute private runtime config path")
+	fs.StringVar(&o.config, "config", "", "absolute legacy runtime config path")
+	fs.StringVar(&o.operatorConfig, "operator-config", "", "absolute dedicated read-only operator config path")
 	fs.StringVar(&o.format, "format", "json", "json or prometheus")
-	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || !filepath.IsAbs(o.config) || o.format != "json" && o.format != "prometheus" {
-		return statusOperatorOptions{}, errors.New("status requires --config with an absolute path and optional --format=json|prometheus")
+	invalid := errors.New("status requires exactly one absolute --operator-config or legacy --config and optional --format=json|prometheus")
+	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || o.format != "json" && o.format != "prometheus" {
+		return statusOperatorOptions{}, invalid
+	}
+	configFlag, operatorFlag := false, false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "config" {
+			configFlag = true
+		}
+		if f.Name == "operator-config" {
+			operatorFlag = true
+		}
+	})
+	if configFlag == operatorFlag || configFlag && !filepath.IsAbs(o.config) || operatorFlag && !filepath.IsAbs(o.operatorConfig) {
+		return statusOperatorOptions{}, invalid
 	}
 	return o, nil
 }
@@ -37,11 +51,11 @@ func runStatusOperator(args []string, output io.Writer) error {
 	if err != nil {
 		return err
 	}
-	c, err := config.Load(o.config)
+	configured, err := loadStatusConfiguration(o)
 	if err != nil {
-		return errors.New("operator status configuration is unavailable or invalid")
+		return err
 	}
-	dsn, err := databaseSecret(c.DatabaseURLFile)
+	dsn, err := databaseSecret(configured.databaseURLFile)
 	if err != nil {
 		return errors.New("operator status database material is unavailable")
 	}
@@ -57,12 +71,42 @@ func runStatusOperator(args []string, output io.Writer) error {
 	if err = db.CheckSchema(ctx); err != nil {
 		return operations.ErrStatusUnavailable
 	}
-	deployments := make([]operations.Deployment, len(c.Controls))
-	for i, source := range c.Controls {
-		deployments[i] = operations.Deployment{ID: source.ID, Name: source.Name}
-	}
-	if err = operations.WriteStatus(ctx, db, deployments, o.format, output); err != nil {
+
+	if err = operations.WriteStatus(ctx, db, configured.deployments, o.format, output); err != nil {
 		return operations.ErrStatusUnavailable
 	}
 	return nil
+}
+
+// Loading this shape does not read credentials or initialize any runtime adapter.
+type statusConfiguration struct {
+	databaseURLFile string
+	deployments     []operations.Deployment
+}
+
+func loadStatusConfiguration(o statusOperatorOptions) (statusConfiguration, error) {
+	var result statusConfiguration
+	invalid := errors.New("operator status configuration is unavailable or invalid")
+	if o.operatorConfig != "" {
+		c, err := config.LoadOperator(o.operatorConfig)
+		if err != nil {
+			return result, invalid
+		}
+		result.databaseURLFile = c.DatabaseURLFile
+		result.deployments = make([]operations.Deployment, len(c.Deployments))
+		for i, source := range c.Deployments {
+			result.deployments[i] = operations.Deployment{ID: source.ID, Name: source.Name}
+		}
+		return result, nil
+	}
+	c, err := config.Load(o.config)
+	if err != nil {
+		return result, invalid
+	}
+	result.databaseURLFile = c.DatabaseURLFile
+	result.deployments = make([]operations.Deployment, len(c.Controls))
+	for i, source := range c.Controls {
+		result.deployments[i] = operations.Deployment{ID: source.ID, Name: source.Name}
+	}
+	return result, nil
 }

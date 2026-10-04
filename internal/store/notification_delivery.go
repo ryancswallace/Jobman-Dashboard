@@ -223,7 +223,7 @@ func (s *NotificationDeliveryStore) ClaimNotificationDelivery(ctx context.Contex
 	if n == 0 {
 		return resolve("suppressed")
 	}
-	i, err := installation(ctx, tx, c.Device.InstallationID, false)
+	i, err := deliveryInstallation(ctx, tx, c.Device.InstallationID, false)
 	if err != nil {
 		return c, err
 	}
@@ -351,7 +351,7 @@ func (s *NotificationDeliveryStore) PrepareNotificationDelivery(ctx context.Cont
 	if d.Outcome != notifications.EvaluationAuthorized {
 		return result, notifications.ErrEvaluationInvalid
 	}
-	i, err := installation(ctx, tx, c.Device.InstallationID, false)
+	i, err := deliveryInstallation(ctx, tx, c.Device.InstallationID, false)
 	if err != nil {
 		return result, err
 	}

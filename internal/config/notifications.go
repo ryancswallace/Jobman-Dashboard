@@ -19,7 +19,15 @@ type APNsProvider struct {
 type Notifications struct {
 	DeviceTopics      []NotificationTopic `json:"deviceTopics,omitempty"`
 	PreviousTokenKeys []Encryption        `json:"previousTokenKeys,omitempty"`
+	TokenEncryption   *TokenEncryption    `json:"tokenEncryption,omitempty"`
 	APNs              []APNsProvider      `json:"apns,omitempty"`
+}
+
+// TokenEncryption contains purpose-separated AES keys, never authentication
+// master keys. Its explicit presence selects the new, isolated key format.
+type TokenEncryption struct {
+	Current  Encryption   `json:"current"`
+	Previous []Encryption `json:"previous,omitempty"`
 }
 
 var notificationTopic = regexp.MustCompile(`^[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$`)
@@ -37,6 +45,18 @@ func validateNotifications(c Notifications, current Encryption, events Events) e
 		allowed[topic] = true
 	}
 	keys := map[string]bool{current.KeyID: true}
+	if ring := c.TokenEncryption; ring != nil {
+		if len(c.PreviousTokenKeys) > 0 || len(ring.Previous) > 7 || len(c.DeviceTopics) == 0 {
+			return errors.New("dedicated token encryption requires device topics, at most7 previous keys and no legacy read keys")
+		}
+		dedicated := map[string]bool{}
+		for _, key := range append([]Encryption{ring.Current}, ring.Previous...) {
+			if !text(key.KeyID, 64) || !absolutePath(key.KeyFile) || dedicated[key.KeyID] {
+				return errors.New("dedicated token keys require unique IDs and private absolute file paths")
+			}
+			dedicated[key.KeyID] = true
+		}
+	}
 	for _, key := range c.PreviousTokenKeys {
 		if !text(key.KeyID, 64) || !absolutePath(key.KeyFile) || keys[key.KeyID] {
 			return errors.New("previous notification token keys require unique IDs and private absolute file paths")

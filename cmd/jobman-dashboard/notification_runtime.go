@@ -43,8 +43,18 @@ func loadNotificationRuntime(c config.Config, currentKey []byte) (result *notifi
 	if err != nil {
 		return result, errors.New("notification device topic policy is invalid")
 	}
-	keys := map[string][]byte{c.Encryption.KeyID: currentKey}
-	for _, previous := range c.Notifications.PreviousTokenKeys {
+	currentID := c.Encryption.KeyID
+	keys := map[string][]byte{currentID: currentKey}
+	readKeys := c.Notifications.PreviousTokenKeys
+	if ring := c.Notifications.TokenEncryption; ring != nil {
+		if len(readKeys) != 0 || len(ring.Previous) > 7 {
+			return result, errors.New("dedicated token keys cannot be mixed with legacy read keys")
+		}
+		currentID = ring.Current.KeyID
+		keys = map[string][]byte{}
+		readKeys = append([]config.Encryption{ring.Current}, ring.Previous...)
+	}
+	for _, previous := range readKeys {
 		key, readErr := config.ReadSecret(previous.KeyFile, 32)
 		if readErr != nil || len(key) != 32 {
 			return result, errors.New("notification token read keys must contain exactly32 private raw bytes")
@@ -54,7 +64,11 @@ func loadNotificationRuntime(c config.Config, currentKey []byte) (result *notifi
 		}
 		keys[previous.KeyID] = key
 	}
-	result.cipher, err = notifications.NewDeviceCipher(c.Encryption.KeyID, keys)
+	if c.Notifications.TokenEncryption != nil {
+		result.cipher, err = notifications.NewDeviceCipherFromPurposeKeys(currentID, keys)
+	} else {
+		result.cipher, err = notifications.NewDeviceCipher(currentID, keys)
+	}
 	if err != nil {
 		return result, errors.New("notification token encryption material is invalid")
 	}

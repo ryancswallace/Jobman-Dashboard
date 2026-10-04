@@ -17,10 +17,17 @@ import (
 // fences every write; a process crash leaves recoverable work and immutable
 // unpublished objects, never a ready record with partial evidence.
 func (s *Service) RunOne(parent context.Context) (err error) {
+	if s.writer == nil {
+		return ErrInvalid
+	}
 	claim, err := s.queue.ClaimReport(parent)
 	if err != nil {
 		return err
 	}
+	start := time.Now()
+	defer func() {
+		s.observer.Observe("report", "task", claim.Task.Subject.DeploymentID, "worker", reportObservation(err), time.Since(start))
+	}()
 	ctx, cancel := context.WithTimeout(parent, TaskTimeout)
 	defer cancel()
 	defer func() {
@@ -70,7 +77,7 @@ func (s *Service) RunOne(parent context.Context) (err error) {
 	}
 	// Recover a publication whose prior worker died before its SQL commit.
 	// The original pair stays unchanged; source/policy/lease checks still apply.
-	_, object, recovered := s.objects.Recover(ctx, claim.Task.Subject, claim.Task.ID)
+	_, object, recovered := s.writer.Recover(ctx, claim.Task.Subject, claim.Task.ID)
 	if recovered != nil {
 		var reader PinnedLogs
 		if request.Profile == "include_log_tail" {
@@ -101,9 +108,9 @@ func (s *Service) RunOne(parent context.Context) (err error) {
 		} else if outdated {
 			return snapshotChanged()
 		}
-		object, e = s.objects.Put(ctx, claim.Task.ID, pair)
+		object, e = s.writer.Put(ctx, claim.Task.ID, pair)
 		if errors.Is(e, ErrConflict) {
-			_, object, e = s.objects.Recover(ctx, claim.Task.Subject, claim.Task.ID)
+			_, object, e = s.writer.Recover(ctx, claim.Task.Subject, claim.Task.ID)
 		}
 		if e != nil {
 			return e
@@ -137,6 +144,9 @@ func workerFailure(err error) string {
 // before the caller closes the database or object root. No unbounded goroutine
 // is created for an individual analysis or inaccessible source.
 func (s *Service) Run(ctx context.Context) {
+	if s.writer == nil {
+		return
+	}
 	var group sync.WaitGroup
 	for range 2 {
 		group.Go(func() {
@@ -158,17 +168,8 @@ func (s *Service) Run(ctx context.Context) {
 }
 
 func (s *Service) Prune(ctx context.Context) error {
-	objects, err := s.queue.DeleteExpiredReports(ctx)
-	if err != nil {
-		return err
+	if s.writer == nil {
+		return ErrInvalid
 	}
-	for _, object := range objects {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		if err = s.objects.Remove(object.ID); err != nil {
-			return err
-		}
-	}
-	return s.objects.Sweep(ctx, s.queue.ReportObjectReferenced)
+	return PruneObjects(ctx, s.queue, s.writer)
 }

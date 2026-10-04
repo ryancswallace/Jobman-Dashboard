@@ -7,10 +7,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ryancswallace/jobman-dashboard/internal/observability"
 	"github.com/ryancswallace/jobman-dashboard/internal/push"
 )
 
 type Sender struct {
+	observer   *observability.Registry
 	repository DeliveryRepository
 	authority  EventAuthority
 	providers  map[DeviceTopic]PushProvider
@@ -101,7 +103,12 @@ func (s *Sender) Step(ctx context.Context, id string) (progress bool, resultErr 
 			deadline = sourceExpiry
 		}
 		sendCtx, sendDone := context.WithDeadline(ctx, deadline)
+		start := time.Now()
 		result, err = p.Send(sendCtx, push.Request{DeliveryID: c.ID, InboxID: c.InboxID, Token: h.Device.Token, Topic: h.Device.Topic, Environment: h.Device.Environment, ExpiresAt: c.ExpiresAt})
+		s.observer.Observe("delivery", "attempt", "", "", providerObservation(result.Outcome, err), time.Since(start))
+		if err == nil && result.Outcome == "accepted" {
+			s.observer.Observe("delivery", "recorded_to_acceptance", "", "", "accepted", time.Since(c.Event.RecordedAt))
+		}
 		sendDone()
 		if err != nil {
 			result = push.Result{Outcome: "retry", Reason: "transport_unavailable", RetryAfter: time.Minute, Ambiguous: true}

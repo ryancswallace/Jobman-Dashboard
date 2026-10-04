@@ -9,6 +9,7 @@ import (
 
 	"github.com/ryancswallace/jobman-dashboard/internal/api"
 	"github.com/ryancswallace/jobman-dashboard/internal/monitoring"
+	"github.com/ryancswallace/jobman-dashboard/internal/observability"
 	"github.com/ryancswallace/jobman-diagnose/deterministic"
 	"github.com/ryancswallace/jobman-diagnose/diagnosis"
 	"github.com/ryancswallace/jobman/diagnostic"
@@ -42,17 +43,20 @@ type Page struct {
 }
 
 type ServiceConfig struct {
+	Observer         *observability.Registry
 	Sources          []Source
 	Queue            Queue
-	Objects          *ObjectStore
+	Objects          ObjectReader
 	Logs             LogService
 	Redaction        *RedactionPolicy
 	CompanionVersion string
 }
 type Service struct {
+	observer  *observability.Registry
 	sources   map[string]Source
 	queue     Queue
-	objects   *ObjectStore
+	objects   ObjectReader
+	writer    objectWriter
 	logs      LogService
 	redaction *RedactionPolicy
 	version   string
@@ -63,7 +67,8 @@ func NewService(c ServiceConfig) (*Service, error) {
 	if len(c.Sources) < 1 || len(c.Sources) > 32 || c.Queue == nil || c.Objects == nil || len(c.CompanionVersion) == 0 || len(c.CompanionVersion) > 128 {
 		return nil, ErrInvalid
 	}
-	s := &Service{sources: make(map[string]Source), queue: c.Queue, objects: c.Objects, logs: c.Logs, redaction: c.Redaction, version: c.CompanionVersion}
+	s := &Service{observer: c.Observer, sources: make(map[string]Source), queue: c.Queue, objects: c.Objects, logs: c.Logs, redaction: c.Redaction, version: c.CompanionVersion}
+	s.writer, _ = c.Objects.(objectWriter)
 	for _, src := range c.Sources {
 		if src == nil || !uuidPattern.MatchString(src.ID()) || s.sources[src.ID()] != nil {
 			return nil, ErrInvalid
