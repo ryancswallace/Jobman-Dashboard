@@ -359,7 +359,7 @@ func TestLabDeployedNotificationsFromControlTerminalEvents(t *testing.T) {
 }
 
 type labBoundedNotificationOutput struct {
-	bytes.Buffer
+	buffer   bytes.Buffer
 	overflow bool
 }
 
@@ -368,5 +368,11 @@ func (b *labBoundedNotificationOutput) Write(p []byte) (int, error) {
 		b.overflow = true
 		return 0, errors.New("synthetic helper output exceeded bound")
 	}
-	return b.Buffer.Write(p)
+	return b.buffer.Write(p)
 }
+
+// Keep only the bounded Write path visible to io.Copy/exec.Cmd. Embedding
+// bytes.Buffer would promote ReadFrom and let subprocess output bypass Write.
+func (b *labBoundedNotificationOutput) Bytes() []byte { return b.buffer.Bytes() }
+func (b *labBoundedNotificationOutput) Len() int      { return b.buffer.Len() }
+func (b *labBoundedNotificationOutput) Reset()        { b.buffer.Reset() }

@@ -192,7 +192,10 @@ func labExecutionControl(t *testing.T, ctx context.Context, session labNativeSes
 	}
 }
 
-type labExecutionOutput struct{ bytes.Buffer }
+type labExecutionOutput struct{ buffer bytes.Buffer }
+
+func (w *labExecutionOutput) Bytes() []byte { return w.buffer.Bytes() }
+func (w *labExecutionOutput) Len() int      { return w.buffer.Len() }
 
 func labExecutionID(value string) bool {
 	return value != "00000000-0000-0000-0000-000000000000" && regexp.MustCompile(`^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$`).MatchString(value)
@@ -202,7 +205,7 @@ func (w *labExecutionOutput) Write(value []byte) (int, error) {
 	if w.Len()+len(value) > 32768 {
 		return 0, io.ErrShortBuffer
 	}
-	return w.Buffer.Write(value)
+	return w.buffer.Write(value)
 }
 
 func labExecutionPrepareCommand(t *testing.T, ctx context.Context, root, action, plan, digest, build string, input any) []byte {

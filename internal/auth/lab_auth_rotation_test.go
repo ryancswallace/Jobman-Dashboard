@@ -429,15 +429,18 @@ func (d labRotationDriver) staged() error {
 }
 
 type labRotationOutput struct {
-	bytes.Buffer
+	buffer  bytes.Buffer
 	maximum int
 }
+
+func (b *labRotationOutput) Bytes() []byte { return b.buffer.Bytes() }
+func (b *labRotationOutput) Len() int      { return b.buffer.Len() }
 
 func (b *labRotationOutput) Write(value []byte) (int, error) {
 	if b.Len()+len(value) > b.maximum {
 		return 0, errors.New("rotation command output exceeded bound")
 	}
-	return b.Buffer.Write(value)
+	return b.buffer.Write(value)
 }
 
 func (d labRotationDriver) run(ctx context.Context, phase string) error {

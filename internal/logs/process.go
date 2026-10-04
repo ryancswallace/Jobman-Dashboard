@@ -85,17 +85,21 @@ func (p *ProcessReader) Read(ctx context.Context, request FileRequest) FileResul
 	}
 }
 
+// A named buffer prevents io.Copy from bypassing Write through a promoted
+// bytes.Buffer.ReadFrom method when exec.Cmd copies the helper output.
 type limitedBuffer struct {
-	bytes.Buffer
+	buffer    bytes.Buffer
 	remaining int
 }
+
+func (b *limitedBuffer) Bytes() []byte { return b.buffer.Bytes() }
 
 func (b *limitedBuffer) Write(p []byte) (int, error) {
 	if len(p) > b.remaining {
 		return 0, errors.New("reader output exceeds bound")
 	}
 	b.remaining -= len(p)
-	return b.Buffer.Write(p)
+	return b.buffer.Write(p)
 }
 
 // RunHelper handles exactly one bounded private stdin request, writes one result
