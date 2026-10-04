@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -189,18 +190,16 @@ func (d labInstallDriver) run(ctx context.Context, phase, selected string) error
 	}
 	command := exec.CommandContext(ctx, "python3", args...)
 	command.Env = []string{"PATH=/usr/bin:/bin:/usr/sbin:/sbin", "PYTHONDONTWRITEBYTECODE=1"}
-	command.WaitDelay = 3 * time.Second
-	output := &labRotationOutput{maximum: 128 << 10}
-	command.Stdout, command.Stderr = output, io.Discard
-	if command.Run() != nil {
-		return errors.New("installation phase failed; preserve pending receipts and recover explicitly")
+	output, err := labInstallPhaseCommand(command, phase)
+	if err != nil {
+		return err
 	}
 	var value struct {
 		Completed, Verified, Complete bool
 		OperationID                   string `json:"operationId"`
 		Phase, Selected               string
 	}
-	if json.Unmarshal(output.Bytes(), &value) != nil {
+	if json.Unmarshal(output, &value) != nil {
 		return errors.New("installation completion invalid")
 	}
 	if phase == "verify" {
@@ -215,6 +214,39 @@ func (d labInstallDriver) run(ctx context.Context, phase, selected string) error
 		return errors.New("installation completion scope differs")
 	}
 	return nil
+}
+
+// Only exact fixed helper diagnostics cross the subprocess boundary. Private
+// stderr, arguments, paths and arbitrary exception values are never displayed.
+type labInstallOutput struct {
+	capture  labRotationOutput
+	overflow bool
+}
+
+func (b *labInstallOutput) Write(value []byte) (int, error) {
+	n, err := b.capture.Write(value)
+	if err != nil {
+		b.overflow = true
+	}
+	return n, err
+}
+
+func labInstallPhaseCommand(command *exec.Cmd, phase string) ([]byte, error) {
+	command.WaitDelay = 3 * time.Second
+	output := &labInstallOutput{capture: labRotationOutput{maximum: 128 << 10}}
+	diagnostic := &labInstallOutput{capture: labRotationOutput{maximum: 8 << 10}}
+	command.Stdout, command.Stderr = output, diagnostic
+	if command.Run() != nil {
+		code := "unclassified"
+		for _, known := range []string{"install_api_local_validation", "install_worker_local_validation", "directory_identity", "directory_parent", "install_not_stopped", "fresh_install_failed"} {
+			if !output.overflow && !diagnostic.overflow && string(diagnostic.capture.Bytes()) == "Fresh install stopped ("+known+"); retain all receipts; do not repeat uncertain mutations.\n" {
+				code = known
+				break
+			}
+		}
+		return nil, fmt.Errorf("installation %s failed (%s); preserve pending receipts and recover explicitly", phase, code)
+	}
+	return output.capture.Bytes(), nil
 }
 
 func labInstallExchange(ctx context.Context, client *http.Client, method, target string, headers http.Header, body []byte, scope ...string) (labWebResponse, error) {
@@ -605,7 +637,7 @@ func TestLabFreshInstallationAndSupportedRollback(t *testing.T) {
 	verify("baseline")
 	for _, phase := range []string{"upgrade", "rollback"} {
 		if err := driver.run(ctx, phase, ""); err != nil {
-			t.Fatal("Reviewed compatible binary transition failed; preserve exact pending receipt")
+			t.Fatalf("Reviewed compatible binary transition failed; preserve exact pending receipt: %v", err)
 		}
 		verify(phase)
 	}
@@ -626,6 +658,51 @@ func LabInstallationPreferenceBody(current api.Preferences) ([]byte, error) {
 type labInstallRoundTrip func(*http.Request) (*http.Response, error)
 
 func (f labInstallRoundTrip) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestLabInstallationPhaseErrorsRemainFinite(t *testing.T) {
+	for _, item := range []struct{ name, stderr, want string }{
+		{"api", "Fresh install stopped (install_api_local_validation); retain all receipts; do not repeat uncertain mutations.\n", "install_api_local_validation"},
+		{"worker", "Fresh install stopped (install_worker_local_validation); retain all receipts; do not repeat uncertain mutations.\n", "install_worker_local_validation"},
+		{"private", "private-canary /private/config postgres://hidden", "unclassified"},
+		{"unknown-code", "Fresh install stopped (private-canary); retain all receipts; do not repeat uncertain mutations.\n", "unclassified"},
+		{"extra-content", "Fresh install stopped (directory_identity); retain all receipts; do not repeat uncertain mutations.\nprivate-canary", "unclassified"},
+		{"oversize", strings.Repeat("private-canary", 1024), "unclassified"},
+	} {
+		t.Run(item.name, func(t *testing.T) {
+			command := exec.CommandContext(t.Context(), "python3", "-c", "import sys;sys.stdout.write('private-stdout');sys.stderr.write("+strconv.Quote(item.stderr)+");sys.exit(1)")
+			command.Env = []string{"PATH=/usr/bin:/bin"}
+			raw, err := labInstallPhaseCommand(command, "upgrade")
+			if raw != nil || err == nil || err.Error() != "installation upgrade failed ("+item.want+"); preserve pending receipts and recover explicitly" {
+				t.Fatalf("unexpected finite diagnostic: %v", err)
+			}
+		})
+	}
+}
+
+func TestLabInstallationOverflowCannotClassifyRetainedPrefix(t *testing.T) {
+	line := "Fresh install stopped (install_api_local_validation); retain all receipts; do not repeat uncertain mutations.\n"
+	for _, stream := range []string{"stdout", "stderr"} {
+		t.Run(stream, func(t *testing.T) {
+			// Flush the complete known diagnostic before an oversized later write.
+			// os/exec must classify neither a truncated stderr nor a stdout failure.
+			program := "import sys,time;sys.stderr.write(" + strconv.Quote(line) + ");sys.stderr.flush();time.sleep(0.1);sys." + stream + ".write('private-canary'*20000);sys." + stream + ".flush();sys.exit(1)"
+			command := exec.CommandContext(t.Context(), "python3", "-c", program)
+			command.Env = []string{"PATH=/usr/bin:/bin"}
+			raw, err := labInstallPhaseCommand(command, "upgrade")
+			if raw != nil || err == nil || err.Error() != "installation upgrade failed (unclassified); preserve pending receipts and recover explicitly" {
+				t.Fatalf("oversized output classified a retained prefix: %v", err)
+			}
+		})
+	}
+	// Independently pin the split-write state even when an OS coalesces pipe reads.
+	output := &labInstallOutput{capture: labRotationOutput{maximum: 8 << 10}}
+	if _, err := output.Write([]byte(line)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := output.Write(make([]byte, 8<<10)); err == nil || !output.overflow || string(output.capture.Bytes()) != line {
+		t.Fatal("overflow did not preserve bounded bytes and an explicit failure flag")
+	}
+}
 
 func TestLabInstallationRequestBoundsBeforeTransport(t *testing.T) {
 	calls := 0
