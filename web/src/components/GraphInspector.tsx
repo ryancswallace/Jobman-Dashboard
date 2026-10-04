@@ -109,6 +109,9 @@ function Inspector({
                           <td>
                             <button
                               className="text-button"
+                              aria-current={
+                                selected === node.id ? "true" : undefined
+                              }
                               onClick={() => onSelect(node.id)}
                             >
                               {node.name ?? node.id}
