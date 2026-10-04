@@ -516,12 +516,17 @@ func (e *Engine) Job(ctx context.Context, a Actor, s api.Scope, id string) (api.
 }
 
 func (e *Engine) Overview(ctx context.Context, a Actor, q Query, w api.Window) (api.Overview, error) {
+	// Control persists and echoes completion bounds at PostgreSQL microsecond
+	// precision. Canonicalize once before fanout so every source and the returned
+	// window use identical bounds; the adapter can still require an exact echo.
+	w.From = w.From.UTC().Truncate(time.Microsecond)
+	w.To = w.To.UTC().Truncate(time.Microsecond)
 	o := api.Overview{Terminal: make(map[string]*int64), Window: w, Completeness: "complete", Sources: []api.SourceStatus{}, FetchedAt: e.Now()}
 	for _, k := range []string{"success", "failure", "cancelled", "timed_out", "aborted", "lost", "unknown"} {
 		o.Terminal[k] = nil
 	}
 	if w.From.IsZero() || !w.From.Before(w.To) {
-		return o, failure("invalid_request", "Supply an increasing completion window.")
+		return o, failure("invalid_request", "Supply an increasing completion window at microsecond precision.")
 	}
 	scopes, grants, err := e.authorize(q, e.discover(ctx, a))
 	if err != nil {

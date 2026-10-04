@@ -282,6 +282,41 @@ func labMultiOverview(t *testing.T, read labMultiRead, research []api.Scope, all
 	}
 }
 
+// labMultiRangeMatches checks immutable fixture bytes against the documented
+// tail/forward offsets, including empty terminal continuation responses.
+func labMultiRangeMatches(output api.LogRange, run api.RunReference, start int, expected string) bool {
+	raw, err := base64.StdEncoding.DecodeString(output.BytesBase64)
+	return err == nil && string(raw) == expected && output.StartOffset == strconv.Itoa(start) && output.EndOffset == strconv.Itoa(start+len(expected)) && output.State == "complete" && output.Stream == "stdout" && uuid(run.ID) && uuid(run.ExecutionID) && run.Number != "" && output.RunID == run.ID && output.RunNumber == run.Number && output.ExecutionID == run.ExecutionID
+}
+
+func TestLabMultiSourceTailAndForwardAssertions(t *testing.T) {
+	run := api.RunReference{ID: "79000000-0000-4000-8000-000000000001", Number: "1", ExecutionID: "79000000-0000-4000-8000-000000000002"}
+	tail := api.LogRange{BytesBase64: base64.StdEncoding.EncodeToString([]byte("lasttail")), Stream: "stdout", State: "complete", RunID: run.ID, RunNumber: run.Number, ExecutionID: run.ExecutionID, StartOffset: "65", EndOffset: "73"}
+	if !labMultiRangeMatches(tail, run, 65, "lasttail") || labMultiRangeMatches(tail, run, 0, "lasttail") {
+		t.Fatal("Tail must start at the actual nonzero offset")
+	}
+	forward := api.LogRange{Stream: "stdout", State: "complete", RunID: run.ID, RunNumber: run.Number, ExecutionID: run.ExecutionID, StartOffset: "73", EndOffset: "73"}
+	if !labMultiRangeMatches(forward, run, 73, "") {
+		t.Fatal("Terminal continuation must represent empty bytes at the prior end")
+	}
+	for name, change := range map[string]func(*api.LogRange){
+		"missing run":        func(v *api.LogRange) { v.RunID = "" },
+		"missing run number": func(v *api.LogRange) { v.RunNumber = "" },
+		"wrong execution":    func(v *api.LogRange) { v.ExecutionID = run.ID },
+		"missing offset":     func(v *api.LogRange) { v.StartOffset = "" },
+		"prefix not suffix":  func(v *api.LogRange) { v.BytesBase64 = base64.StdEncoding.EncodeToString([]byte("prefixxx")) },
+		"inaccessible":       func(v *api.LogRange) { v.State = "mapping_inaccessible" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			value := tail
+			change(&value)
+			if labMultiRangeMatches(value, run, 65, "lasttail") {
+				t.Fatal("Malformed or misattributed page was accepted")
+			}
+		})
+	}
+}
+
 // Read-only ordinary deployed API acceptance. Source observations for these
 // fixture jobs are synthetic; this does not claim actual secondary execution.
 func TestLabMultiSourceMonitoringAndIsolation(t *testing.T) {
@@ -433,40 +468,29 @@ func TestLabMultiSourceMonitoringAndIsolation(t *testing.T) {
 					if detail.Job.CurrentRun == nil || !uuid(detail.Job.CurrentRun.ID) || !uuid(detail.Job.CurrentRun.ExecutionID) {
 						t.Fatal("Fixture current run identity is missing")
 					}
-					var output api.LogRange
-					read(prefix+"/logs?stream=stdout&limitBytes=8", &output, 200)
-					originalCursor := output.NextCursor
-					var bytes []byte
-					next := ""
-					for chunk := 0; ; chunk++ {
-						if chunk >= 16 {
-							t.Fatal("Synthetic log range did not terminate")
-						}
-						if chunk > 0 {
-							output = api.LogRange{}
-							read(prefix+"/logs?stream=stdout&limitBytes=8&cursor="+url.QueryEscape(next), &output, 200)
-						}
-						raw, err := base64.StdEncoding.DecodeString(output.BytesBase64)
-						if err != nil || len(raw) > 8 || output.StartOffset != strconv.Itoa(len(bytes)) || output.EndOffset != strconv.Itoa(len(bytes)+len(raw)) || output.RunID != detail.Job.CurrentRun.ID || output.RunNumber != detail.Job.CurrentRun.Number || output.ExecutionID != detail.Job.CurrentRun.ExecutionID || output.Stream != "stdout" {
-							t.Fatal("Source-qualified log byte offsets or run provenance differ")
-						}
-						bytes = append(bytes, raw...)
-						next = output.NextCursor
-						if len(bytes) == len(labSyntheticLog) {
-							break
-						}
-						if next == "" || len(raw) == 0 {
-							t.Fatal("Log bytes lost before declared completion")
-						}
+					var full api.LogRange
+					read(prefix+"/logs?stream=stdout&limitBytes=262144", &full, 200)
+					if !labMultiRangeMatches(full, *detail.Job.CurrentRun, 0, labSyntheticLog) {
+						t.Fatal("Actual complete NFS fixture bytes or run provenance differ")
 					}
-					if string(bytes) != labSyntheticLog || output.State != "complete" || originalCursor == "" {
-						t.Fatal("Actual NFS synthetic bytes or complete state differ")
+					// The initial request reads the last limitBytes; its cursor advances
+					// from that tail position, rather than starting a file download.
+					var tail api.LogRange
+					read(prefix+"/logs?stream=stdout&limitBytes=8", &tail, 200)
+					if !labMultiRangeMatches(tail, *detail.Job.CurrentRun, len(labSyntheticLog)-8, labSyntheticLog[len(labSyntheticLog)-8:]) || tail.NextCursor == "" {
+						t.Fatal("Bounded log tail bytes, offsets or provenance differ")
+					}
+					originalCursor := tail.NextCursor
+					var forward api.LogRange
+					read(prefix+"/logs?stream=stdout&limitBytes=8&cursor="+url.QueryEscape(originalCursor), &forward, 200)
+					if !labMultiRangeMatches(forward, *detail.Job.CurrentRun, len(labSyntheticLog), "") {
+						t.Fatal("Terminal forward cursor did not retain exact empty offset and run provenance")
 					}
 					var emptyDetail api.JobDetail
 					read(labMultiPrefix(scope)+"/jobs/"+ns.JobIDs[1], &emptyDetail, 200)
 					var empty api.LogRange
 					read(labMultiPrefix(scope)+"/jobs/"+ns.JobIDs[1]+"/logs?stream=stdout", &empty, 200)
-					if emptyDetail.Job.CurrentRun == nil || emptyDetail.Job.Scope != scope || emptyDetail.Job.ID != ns.JobIDs[1] || empty.State != "complete" || empty.BytesBase64 != "" || empty.StartOffset != "0" || empty.EndOffset != "0" || empty.RunID != emptyDetail.Job.CurrentRun.ID || empty.RunNumber != emptyDetail.Job.CurrentRun.Number || empty.ExecutionID != emptyDetail.Job.CurrentRun.ExecutionID || empty.Stream != "stdout" {
+					if emptyDetail.Job.CurrentRun == nil || !uuid(emptyDetail.Job.CurrentRun.ID) || !uuid(emptyDetail.Job.CurrentRun.ExecutionID) || emptyDetail.Job.Scope != scope || emptyDetail.Job.ID != ns.JobIDs[1] || empty.State != "complete" || empty.BytesBase64 != "" || empty.StartOffset != "0" || empty.EndOffset != "0" || empty.RunID != emptyDetail.Job.CurrentRun.ID || empty.RunNumber != emptyDetail.Job.CurrentRun.Number || empty.ExecutionID != emptyDetail.Job.CurrentRun.ExecutionID || empty.Stream != "stdout" {
 						t.Fatal("Empty stream was not independently represented")
 					}
 					other := research[0]

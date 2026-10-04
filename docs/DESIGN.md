@@ -235,6 +235,8 @@ Control implementation includes forward-only migrations, repository interfaces, 
 
 ### 5.2 Factual job model and counts
 
+Overview completion bounds are truncated to UTC microsecond precision before source reads, and the response echoes those exact bounds; intervals that collapse after normalization are invalid. This matches Control's PostgreSQL timestamp precision while retaining strict validation of each source's echoed window.
+
 Control already stores `owner_principal_id`; expose and map it rather than deriving ownership from a name. For imported history, distinguish the importing principal from the original submitter if the latter is unknown. Imported records without a verified original owner must not match “all my jobs” merely because that user imported them. Collection children and graph nodes inherit the authoritative submission identity according to their source contract.
 
 Persist execution-start and completion observations from authoritative events, including observed time, recorded time, and provenance. Control already has a `completed_at` field for imported history; extend/populate lifecycle fields for ordinary execution through explicit transitions. Do not backfill `startedAt` or `completedAt` from arbitrary `updatedAt`. Backfill only from reliable retained events/import evidence and mark unknown history explicitly. Expose scheduler-native IDs and timestamps separately from Control timestamps. Agent changes are required only where an essential fact is not currently emitted; audit current events before extending the portable protocol.
