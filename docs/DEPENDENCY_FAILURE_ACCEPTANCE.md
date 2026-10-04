@@ -230,7 +230,7 @@ none contains a token, password or cookie:
 - Database case only: `JOBMAN_DASHBOARD_LAB_NOTIFICATION_RECEIPTS`, a new empty
   owner0700 canonical `/private/tmp/jobman-dashboard-notification-receipts-<unique>`
   directory. The captured path is passed explicitly to every normal-cancellation
-  wrapper call; the six retained failed-scenario IDs remain excluded. Directory
+  wrapper call; the eight retained failed-scenario IDs remain excluded. Directory
   and broker cases do not use it. See `LAB_MULTISOURCE_NOTIFICATIONS.md`.
 
 The main context ends 65 seconds before the six-minute outer deadline; cleanup

@@ -140,7 +140,11 @@ helper execution, guest postflight, SSH transport, host result validation and
 immutable receipt retention failures from an event identity mismatch. Subprocess
 errors, stderr and private material are never echoed. Both output streams are
 bounded; malformed diagnostic frames become a fixed generic failure. This
-instrumentation does not establish the cause of a previous live failure.
+instrumentation does not establish the cause of a previous live failure. The
+read-only barrier separately identifies input, source-query, Dashboard-query and
+result-validation stages. Exact built-in exception classes map to fixed codes;
+exception text, field names and tracebacks are never emitted. A pending boolean
+remains an ordinary successful response, followed by the existing bounded poll.
 
 A fresh run uses two newly generated nonce receipts. Both the harness and explicit
 root wrapper exclude every retained prior receipt:
@@ -148,6 +152,7 @@ root wrapper exclude every retained prior receipt:
 - `7ae1782e0d424061e8f056f7d4dde9bf`, `ecf5578b777a10c0a997e3a15218fcfb`
 - `63861951db782332bb16cc5f58a0a5d6`, `28bd57c3d4a8d292c37c0b1d1520c821`
 - `8281f530b049327cf138cfeabd32f268`, `e406f287dc15461d0d79351de1d5485c`
+- `bb399d49f2dc05be412399b5b474feb5`, `59373e309864f44603cc5fc183e61d4c`
 
 Their original jobs and evidence stay at their original paths. This change does
 not copy, repair, migrate or cancel them. A prepare call in the explicit root
@@ -163,6 +168,14 @@ all regular-file, owner,0600, single-link, bounded-size and immutable-byte guard
 No directory permission or source authorization check is relaxed. The wrapper's
 legacy default path remains for compatibility; new deployed acceptance uses the
 explicit private root. This local finding is not a passing notification result.
+
+The fourth run reached a validated cancellation and explicit idempotency check,
+then failed at the read-only barrier with an unclassified guest-preflight error.
+Both a fixed read-only SQL probe and the exact original settled-only wrapper later
+passed without changing receipt bytes. All published/settled boolean combinations
+also pass in the actual shared-global bootstrap regression. The transient cause
+remains unresolved; added finite diagnostics are not a speculative repair or a
+passing live result. That run and its cleanup receipts stay preserved and excluded.
 
 Offline tests run without live opt-ins:
 

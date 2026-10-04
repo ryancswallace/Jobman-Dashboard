@@ -30,6 +30,7 @@ var labMultiNotificationRetainedReceipts = []string{
 	"7ae1782e0d424061e8f056f7d4dde9bf", "ecf5578b777a10c0a997e3a15218fcfb",
 	"63861951db782332bb16cc5f58a0a5d6", "28bd57c3d4a8d292c37c0b1d1520c821",
 	"8281f530b049327cf138cfeabd32f268", "e406f287dc15461d0d79351de1d5485c",
+	"bb399d49f2dc05be412399b5b474feb5", "59373e309864f44603cc5fc183e61d4c",
 }
 
 func labMultiNotificationFreshReceipt(receipt string) bool {
@@ -59,6 +60,12 @@ func labMultiNotificationReceiptRoot(path, parent string) error {
 }
 
 var labMultiNotificationReasonCodes = []string{
+	"python_key_error",
+	"python_type_error",
+	"python_name_error",
+	"python_value_error",
+	"python_attribute_error",
+	"python_unbound_local_error",
 	"common_command_deadline",
 	"common_command_error_bound",
 	"common_command_failed",
@@ -139,7 +146,7 @@ func labMultiNotificationFailure(raw []byte) (string, bool) {
 	if _, err := decoder.Token(); err != io.EOF {
 		return "", false
 	}
-	stages := []string{"host_input", "host_transport", "host_decode", "host_validate", "host_receipt", "guest_preflight", "guest_material", "helper_run", "guest_cleanup", "guest_postflight", "guest_barrier"}
+	stages := []string{"host_input", "host_transport", "host_decode", "host_validate", "host_receipt", "guest_preflight", "guest_material", "helper_run", "guest_cleanup", "guest_postflight", "guest_barrier", "guest_barrier_input", "guest_barrier_source", "guest_barrier_dashboard", "guest_barrier_result"}
 	if !slices.Contains(stages, values["stage"]) || !slices.Contains(labMultiNotificationReasonCodes, values["code"]) {
 		return "", false
 	}
@@ -652,7 +659,7 @@ func TestLabMultiNotificationContributionGuards(t *testing.T) {
 
 func TestLabMultiNotificationDiagnostics(t *testing.T) {
 	const canary = "private-database-password-canary"
-	for _, stage := range []string{"host_input", "host_transport", "host_decode", "host_validate", "host_receipt", "guest_preflight", "guest_material", "helper_run", "guest_cleanup", "guest_postflight", "guest_barrier"} {
+	for _, stage := range []string{"host_input", "host_transport", "host_decode", "host_validate", "host_receipt", "guest_preflight", "guest_material", "helper_run", "guest_cleanup", "guest_postflight", "guest_barrier", "guest_barrier_input", "guest_barrier_source", "guest_barrier_dashboard", "guest_barrier_result"} {
 		for _, code := range labMultiNotificationReasonCodes {
 			frame, _ := json.Marshal(map[string]any{"scenarioFailure": map[string]string{"stage": stage, "code": code}})
 			var output, diagnostic labBoundedNotificationOutput
