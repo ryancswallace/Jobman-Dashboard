@@ -1,7 +1,11 @@
 # Bounded dependency-failure acceptance
 
-Status: offline implementation and independent review in progress. No live fault
-result is claimed. Root coordinates every Lab invocation after the exact driver,
+Status: the first live directory interruption passed outage assertions but failed
+its initial recovery identity check. Cleanup restored the directory; independent
+verification and operation closure passed. The failed receipt is retained, and
+full directory acceptance remains open pending the reviewed recovery-check repair
+and a fresh exercise. Broker and database scenarios have not run. Root coordinates
+every Lab invocation after the exact driver,
 plan, and recovery actions have been reviewed. This supplements T02, T05, and T11
 in [the design](DESIGN.md); it does not replace healthy scale acceptance.
 
