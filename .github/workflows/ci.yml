@@ -4,6 +4,27 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      candidateVersion:
+        description: Optional vX.Y.Z-rc.N to build candidate bundles after all checks
+        required: false
+        type: string
+
+      nativeArchive:
+        description: Also retain an unsigned iPhone Release archive (not installable)
+        required: false
+        type: boolean
+        default: false
+      nativeVersion:
+        description: Native numeric marketing version (three components)
+        required: false
+        type: string
+        default: '0.1.0'
+      nativeBuild:
+        description: Native numeric build identifier (one to three components)
+        required: false
+        type: string
+        default: '1'
 
 permissions:
   contents: read
@@ -36,9 +57,11 @@ jobs:
           go-version-file: go.version
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: 26.5.1
+          node-version-file: node.version
           cache: npm
           cache-dependency-path: web/package-lock.json
+      - name: Select the pinned npm version
+        run: npm install --global "npm@$(cat npm.version)" --ignore-scripts --no-audit --fund=false
       - run: npm ci --prefix web
       - run: make check
         env:
@@ -64,5 +87,59 @@ jobs:
           swift --version
       - name: Test native core
         run: ./ios/scripts/test-core.sh
+      - name: Test explicit native packaging inputs
+        run: python3 ios/scripts/test-package-app.py
       - name: Build unsigned iPhone simulator app
         run: ./ios/scripts/build-simulator.sh
+      - name: Archive unsigned iPhone Release app
+        if: github.event_name == 'workflow_dispatch' && (inputs.nativeArchive || inputs.candidateVersion != '')
+        env:
+          NATIVE_VERSION: ${{ inputs.nativeVersion }}
+          NATIVE_BUILD: ${{ inputs.nativeBuild }}
+        run: |
+          python3 ios/scripts/package-app.py unsigned --version "$NATIVE_VERSION" --build "$NATIVE_BUILD" --output "$RUNNER_TEMP/native-package"
+      - name: Retain unsigned native archive and provenance
+        if: github.event_name == 'workflow_dispatch' && (inputs.nativeArchive || inputs.candidateVersion != '')
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dashboard-iphone-unsigned-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/native-package/JobmanDashboard-unsigned.xcarchive.tar.gz
+            ${{ runner.temp }}/native-package/build-intent.json
+            ${{ runner.temp }}/native-package/build-receipt.json
+            ${{ runner.temp }}/native-package/archive-files.json
+            ${{ runner.temp }}/native-package/xcodebuild.log
+          if-no-files-found: error
+          retention-days: 30
+
+  candidate:
+    if: github.event_name == 'workflow_dispatch' && inputs.candidateVersion != ''
+    needs: [backend-web, iphone]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.version
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: node.version
+      - name: Select the pinned npm version
+        run: npm install --global "npm@$(cat npm.version)" --ignore-scripts --no-audit --fund=false
+      - name: Build twice and compare both architecture archives
+        env:
+          CANDIDATE_VERSION: ${{ inputs.candidateVersion }}
+        run: |
+          python3 scripts/build-release.py --version "$CANDIDATE_VERSION" --output-directory "$RUNNER_TEMP/candidate-first"
+          python3 scripts/build-release.py --version "$CANDIDATE_VERSION" --output-directory "$RUNNER_TEMP/candidate-second"
+          cmp "$RUNNER_TEMP/candidate-first/SHA256SUMS" "$RUNNER_TEMP/candidate-second/SHA256SUMS"
+      - name: Retain verified candidate packages
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dashboard-${{ inputs.candidateVersion }}-${{ github.sha }}
+          path: ${{ runner.temp }}/candidate-first/*
+          if-no-files-found: error
+          retention-days: 30

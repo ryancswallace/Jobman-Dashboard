@@ -15,16 +15,17 @@ import {
 import { Empty, ErrorNotice, Spinner, Status } from "./States";
 import "./Reports.css";
 
-export function Reports({ job }: { job: JobRef }) {
+export function Reports({ job, run }: { job: JobRef; run?: Wire.JobRun }) {
   const { identity } = useSession();
   return (
     <ReportBrowser
-      key={`${identity}:${resourcePath(job, "jobs", job.jobId)}`}
+      key={`${identity}:${resourcePath(job, "jobs", job.jobId)}:${run?.id ?? "default"}`}
       job={job}
+      run={run}
     />
   );
 }
-function ReportBrowser({ job }: { job: JobRef }) {
+function ReportBrowser({ job, run }: { job: JobRef; run?: Wire.JobRun }) {
   const { identity, bootstrap } = useSession();
   const path = resourcePath(job, "jobs", job.jobId);
   const [readGeneration, setReadGeneration] = useState(0);
@@ -45,7 +46,7 @@ function ReportBrowser({ job }: { job: JobRef }) {
   const results = useResource(
     `${path}/reports?${new URLSearchParams({ limit: "20", ...(cursor ? { cursor } : {}) })}`,
     `${identity}:${readGeneration}`,
-    5000,
+    bootstrap.preferences.refreshSeconds * 1000,
     decode,
   );
   useEffect(() => () => pending.current?.abort(), []);
@@ -56,7 +57,7 @@ function ReportBrowser({ job }: { job: JobRef }) {
   };
   const generate = async () => {
     if (pending.current) return;
-    const selectedRun = runId.trim();
+    const selectedRun = run?.id ?? runId.trim();
     if (
       selectedRun &&
       (!runIDPattern.test(selectedRun) ||
@@ -164,7 +165,8 @@ function ReportBrowser({ job }: { job: JobRef }) {
             Actual run UUID (optional)
             <input
               aria-label="Report run UUID"
-              value={runId}
+              value={run?.id ?? runId}
+              readOnly={!!run}
               disabled={working}
               placeholder="Recent runs"
               onChange={(event) => setRunId(event.target.value)}
@@ -193,7 +195,10 @@ function ReportBrowser({ job }: { job: JobRef }) {
         <div className="panel-heading">
           <div>
             <h2>Report history</h2>
-            <p>Reports available to your account for this job.</p>
+            <p>
+              Reports available to your account for this job, across all runs.
+              Each report retains its original run references.
+            </p>
           </div>
           <button className="button secondary" onClick={restart}>
             Refresh reports
@@ -325,7 +330,24 @@ function ReportView({
     },
     [job.deploymentId, job.namespaceId, job.jobId, taskId],
   );
-  const result = useResource(path, identity, 5000, decode);
+  const interval = bootstrap.preferences.refreshSeconds * 1000;
+  const result = useResource(path, identity, interval, decode);
+  // Following a selected pending task is explicit progress feedback, even in
+  // manual mode. Ordinary report/citation reads keep the user's preference.
+  useEffect(() => {
+    if (
+      interval === 5000 ||
+      result.loading ||
+      result.error ||
+      !result.data ||
+      !["queued", "collecting", "analyzing"].includes(result.data.state)
+    )
+      return;
+    const timer = setTimeout(() => {
+      if (document.visibilityState !== "hidden") result.refresh();
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [interval, result.data, result.loading, result.error, result.refresh]);
   useEffect(() => {
     if (result.error) onReadError(result.error);
   }, [result.error, onReadError]);
@@ -382,7 +404,7 @@ function ReportView({
           {!report.detail && !report.failureCode && (
             <p role="status">
               {["queued", "collecting", "analyzing"].includes(report.state)
-                ? "The report is in progress. Status updates automatically while this view is visible."
+                ? "The report is in progress. Status updates every five seconds while this view is visible, including in manual refresh mode."
                 : "Sealed findings are not available for this task."}
             </p>
           )}
@@ -699,7 +721,12 @@ function CitationView({
       citationId,
     ],
   );
-  const result = useResource(path, identity, 5000, decode);
+  const result = useResource(
+    path,
+    identity,
+    bootstrap.preferences.refreshSeconds * 1000,
+    decode,
+  );
   useEffect(() => {
     if (result.error) onReadError(result.error);
   }, [result.error, onReadError]);

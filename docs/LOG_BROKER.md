@@ -2,7 +2,7 @@
 
 The broker reads immutable Control log chunks from explicitly approved local or NFS roots. Dashboard assembles byte ranges through authenticated broker calls; the web and iPhone receive bytes, original offsets and stream state. They receive no storage roots, object keys, certificates or download URLs. Artifact metadata uses a separate bounded Control path.
 
-Implementation status: the file/process, delegation, cursor and broker transport paths have focused tests and independent security review. Actual Control manifest integration, cross-user NFS ACL acceptance and failure/load testing remain required. This document does not establish release acceptance.
+Implementation status: the file/process, delegation, cursor and broker transport paths have focused tests and independent security review. Actual Control manifests and newly produced cross-user NFS chunks pass [subprocess acceptance](LAB_EXECUTION.md); [split acceptance](LAB_SPLIT.md) verifies separate interactive/worker callers. The full failure/load matrix remains open. This document does not establish release acceptance.
 
 ## Placement and credentials
 
@@ -32,7 +32,7 @@ bin/jobman-dashboard --config /etc/jobman-dashboard/config.json --mode check-con
 
 `check-config` validates structure and local key material. It does not contact Control, read log roots, prove ACL inheritance, or alter the broker ledger. Service startup checks the private state directory and locks it against a second process. The process never reads another service's database or accepts a filesystem path from an API caller.
 
-For existing and future log files, provision and verify the designated reader's ACLs. A default POSIX ACL alone does **not** override files created with mode `0600` or directories created with `0700`: the ACL mask can remove the effective named-reader rights. The Jobman producer must use the explicit supported reader policy and verify inherited ACLs; private behavior elsewhere must remain unchanged. This producer/Lab integration is currently under implementation. Do not use a recursive permission widening workaround or claim new-file acceptance before the producer check passes.
+For existing and future log files, provision and verify the designated reader's ACLs. A default POSIX ACL alone does **not** override files created with mode `0600` or directories created with `0700`: the ACL mask can remove the effective named-reader rights. The Jobman producer must use the explicit supported reader policy and verify inherited ACLs; private behavior elsewhere must remain unchanged. This producer policy passes actual synthetic NFS new-file checks. Validate the same behavior on each deployment's store; a recursive permission widening workaround is not a substitute.
 
 ## Read boundaries
 

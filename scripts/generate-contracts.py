@@ -73,7 +73,7 @@ def operations(document):
     ids = set()
     models = document["components"]["schemas"]
     for path, item in sorted(document["paths"].items()):
-        require(path.startswith("/api/v1/"), f"Unsupported route {path}")
+        require(path.startswith("/api/v1/") or path == "/auth/native/device-revocations" and set(item) == {"post"} and item["post"].get("security") == [], f"Unsupported route {path}")
         require(set(item) <= METHODS, f"{path}: unsupported path-level fields")
         for method, operation in sorted(item.items()):
             op_id = operation.get("operationId", "")

@@ -125,3 +125,119 @@ it("generated callable client preserves source paths and secure transport", asyn
     credentials: "same-origin",
   });
 });
+
+describe("bounded browser reads", () => {
+  afterEach(() => vi.useRealTimers());
+  it("times out stalled headers, aborts fetch, and never retries an uncertain mutation", async () => {
+    vi.useFakeTimers();
+    const fetcher = vi.fn<typeof fetch>(() => new Promise<Response>(() => {}));
+    vi.stubGlobal("fetch", fetcher);
+    const checked = expect(
+      request("/api/v1/preferences", { method: "PUT", body: {} }),
+    ).rejects.toMatchObject({
+      code: "request_timeout",
+      message: expect.stringContaining("may have been saved"),
+    });
+    await vi.advanceTimersByTimeAsync(30000);
+    await checked;
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher.mock.calls[0][1]?.signal?.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it("shares one deadline across headers and a stalled body without waiting for cancel", async () => {
+    vi.useFakeTimers();
+    const cancel = vi.fn(() => new Promise<void>(() => {}));
+    const body = new ReadableStream<Uint8Array>({ cancel });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) =>
+            setTimeout(
+              () =>
+                resolve(
+                  new Response(body, {
+                    headers: { "Content-Type": "application/json" },
+                  }),
+                ),
+              20000,
+            ),
+          ),
+      ),
+    );
+    const checked = expect(request("/api/v1/jobs")).rejects.toMatchObject({
+      code: "request_timeout",
+    });
+    await vi.advanceTimersByTimeAsync(29999);
+    expect(cancel).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    await checked;
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it("keeps caller cancellation distinct even while the body is pending", async () => {
+    const cancel = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(new ReadableStream({ cancel }), {
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+    const controller = new AbortController();
+    const checked = expect(
+      request("/api/v1/jobs", { signal: controller.signal }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    await Promise.resolve();
+    await Promise.resolve();
+    controller.abort();
+    await checked;
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+  it("rejects both declared and chunked oversized JSON before decoding", async () => {
+    for (const declared of [true, false]) {
+      const cancel = vi.fn();
+      const body = new ReadableStream<Uint8Array>({
+        start(stream) {
+          if (!declared) stream.enqueue(new Uint8Array(4 * 1024 * 1024 + 1));
+        },
+        cancel,
+      });
+      const headers = new Headers({ "Content-Type": "application/json" });
+      if (declared) headers.set("Content-Length", String(4 * 1024 * 1024 + 1));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(new Response(body, { headers })),
+      );
+      await expect(request("/api/v1/jobs")).rejects.toMatchObject({
+        code: "response_too_large",
+      });
+      expect(cancel).toHaveBeenCalledOnce();
+    }
+  });
+  it("accepts the exact byte ceiling and split UTF-8 without changing JSON values", async () => {
+    const bytes = new TextEncoder().encode(
+      JSON.stringify("€" + "x".repeat(4 * 1024 * 1024 - 5)),
+    );
+    expect(bytes.length).toBe(4 * 1024 * 1024);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          new ReadableStream({
+            start(stream) {
+              stream.enqueue(bytes.subarray(0, 2));
+              stream.enqueue(bytes.subarray(2));
+              stream.close();
+            },
+          }),
+          { headers: { "Content-Type": "application/json" } },
+        ),
+      ),
+    );
+    const value = await request<string>("/api/v1/jobs");
+    expect(value.startsWith("€")).toBe(true);
+    expect(value.length).toBe(4 * 1024 * 1024 - 4);
+  });
+});

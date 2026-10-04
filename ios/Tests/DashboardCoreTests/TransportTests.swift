@@ -41,12 +41,19 @@ struct TransportTests {
     @Test func opaqueUnbindCredentialCanOnlyUseExactUnauthenticatedPath() async throws {
         FixtureURLProtocol.respond = { request in
             #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+            #expect(request.value(forHTTPHeaderField: "Cookie") == nil)
+            #expect(request.value(forHTTPHeaderField: "Origin") == nil)
+            #expect(request.value(forHTTPHeaderField: "If-Match") == nil)
             return (204, Data())
         }
         let _: EmptyResponse = try await client().request(path: "/auth/native/device-revocations", token: nil, method: "POST", body: Data("{}".utf8))
         do {
             let _: EmptyResponse = try await client().request(path: "/auth/native/device-revocations", token: "wrong", method: "POST")
             Issue.record("Unbind endpoint accepted bearer token")
+        } catch let error as DashboardError { #expect(error == .invalidAddress) }
+        do {
+            _ = try await client().data(path: "/auth/native/device-revocations", token: nil, method: "POST", revision: "1")
+            Issue.record("Anonymous revocation accepted a conditional header")
         } catch let error as DashboardError { #expect(error == .invalidAddress) }
     }
 
@@ -56,5 +63,25 @@ struct TransportTests {
             let _: EmptyResponse = try await client().request(path: "/api/v1/bootstrap", token: "fixture-token")
             Issue.record("Oversized response was accepted")
         } catch let error as DashboardError { #expect(error == .responseTooLarge) }
+    }
+
+    @Test func generatedReservationPreservesExclusiveConditionalCreationHeader() async throws {
+        FixtureURLProtocol.respond = { request in
+            #expect(request.httpMethod == "POST")
+            #expect(request.value(forHTTPHeaderField: "If-None-Match") == "*")
+            #expect(request.value(forHTTPHeaderField: "If-Match") == nil)
+            #expect(request.value(forHTTPHeaderField: "Idempotency-Key") == nil)
+            return (200, Data(#"{"installationId":"90000000-0000-4000-8000-000000000001","revision":"1","revocationId":"91000000-0000-4000-8000-000000000001","intent":"bind"}"#.utf8))
+        }
+        let installation = try DeviceInstallation(id: "90000000-0000-4000-8000-000000000001", randomBytes: Data(repeating: 1, count: 32))
+        let capability = try DeviceRevocationCapability(id: "91000000-0000-4000-8000-000000000001", randomBytes: Data(repeating: 2, count: 32))
+        let transport = try client()
+        let generated = DashboardClient(transport: AuthenticatedTransport(transport: transport, token: "fixture-token"))
+        let receipt = try await generated.reserveDeviceRevocation(installationId: installation.id, headers: .init(ifNoneMatch: "*"), body: installation.revocationInput(capability))
+        try receipt.validate(installationID: installation.id, capability: capability, intent: "bind")
+        do {
+            _ = try await transport.data(path: "/api/v1/devices/test/revocation-reservations", token: "fixture-token", method: "POST", revision: "1", ifNoneMatch: "*")
+            Issue.record("Mutually exclusive revision and creation headers were accepted")
+        } catch let error as DashboardError { #expect(error == .invalidResponse) }
     }
 }

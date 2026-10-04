@@ -45,6 +45,7 @@ type BrokerRegistration struct {
 	NamespaceIDs          []string `json:"namespaceIds"`
 }
 type BrokerConfig struct {
+	Observability             *Observability       `json:"observability,omitempty"`
 	ConfigurationRevision     int64                `json:"configurationRevision"`
 	PublicOrigin              string               `json:"publicOrigin"`
 	Listen                    string               `json:"listen"`
@@ -70,6 +71,9 @@ func LoadBroker(path string) (BrokerConfig, error) {
 	return c, c.Validate()
 }
 func (c BrokerConfig) Validate() error {
+	if err := c.Observability.Validate(); err != nil {
+		return err
+	}
 	if c.ConfigurationRevision < 1 || c.ReaderConcurrency < 1 || c.ReaderConcurrency > 16 || c.ReaderTimeoutMilliseconds < 1 || c.ReaderTimeoutMilliseconds > 10000 {
 		return errors.New("invalid broker revision or bounded reader settings")
 	}

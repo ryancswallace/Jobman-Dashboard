@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSession } from "../lib/session";
-import { request, APIError } from "../lib/transport";
+import { request, APIError, authorizationErrors } from "../lib/transport";
 import { useResource } from "../lib/useResource";
-import { decodePage } from "../lib/api";
-import type { Device, Preferences } from "../lib/models";
-import { title } from "../lib/format";
+import type { Preferences } from "../lib/models";
+import { title, timestamp } from "../lib/format";
 import {
   Empty,
   ErrorNotice,
@@ -12,24 +11,36 @@ import {
   Spinner,
   Status,
 } from "../components/States";
-const decodeDevices = (value: unknown) => decodePage<Device>(value);
+import {
+  decodeDevices,
+  deviceSettings,
+  deviceDeliveryState,
+  updateDevice,
+  removeDevice,
+  type Device,
+  type DeviceSettingsInput,
+} from "../lib/devices";
+import "./Settings.css";
 export function SettingsPage() {
-  const { identity, bootstrap, refreshBootstrap, logout } = useSession(),
+  const { identity } = useSession();
+  return <SettingsWorkspace key={identity} />;
+}
+function SettingsWorkspace() {
+  const { bootstrap, refreshBootstrap, logout } = useSession(),
     [draft, setDraft] = useState<Preferences>(bootstrap.preferences),
     [dirty, setDirty] = useState(false),
     [error, setError] = useState<APIError>(),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);
-  const devices = useResource(
-    "/api/v1/devices?limit=50",
-    identity,
-    0,
-    decodeDevices,
-  );
+  const preferencesController = useRef<AbortController | undefined>(undefined);
+  useEffect(() => () => preferencesController.current?.abort(), []);
   useEffect(() => {
     if (!dirty) setDraft(bootstrap.preferences);
   }, [bootstrap.preferences, dirty]);
   const save = async () => {
+    if (preferencesController.current) return;
+    const active = new AbortController();
+    preferencesController.current = active;
     setBusy(true);
     setError(undefined);
     try {
@@ -38,11 +49,14 @@ export function SettingsPage() {
         method: "PUT",
         body: draft,
         revision: draft.revision,
+        signal: active.signal,
       });
+      if (active.signal.aborted) return;
       setDirty(false);
       setMessage("Preferences saved.");
       refreshBootstrap();
     } catch (e) {
+      if (active.signal.aborted) return;
       setError(
         e instanceof APIError
           ? e
@@ -52,25 +66,8 @@ export function SettingsPage() {
             ),
       );
     } finally {
-      setBusy(false);
-    }
-  };
-  const toggleDevice = async (device: Device) => {
-    try {
-      await request(`/api/v1/devices/${encodeURIComponent(device.id)}`, {
-        method: "PATCH",
-        body: { enabled: !device.enabled },
-      });
-      devices.refresh();
-    } catch (e) {
-      setError(
-        e instanceof APIError
-          ? e
-          : new APIError(
-              "request_failed",
-              "Device delivery could not be updated.",
-            ),
-      );
+      if (!active.signal.aborted) setBusy(false);
+      preferencesController.current = undefined;
     }
   };
   return (
@@ -230,52 +227,356 @@ export function SettingsPage() {
             ))}
           </div>
         </section>
-        <section className="panel wide">
-          <div className="panel-heading">
-            <div>
-              <h2>iPhone notification delivery</h2>
-              <p>
-                Muting a device leaves your rules and inbox active. APNs
-                registration is managed by the native app.
-              </p>
-            </div>
-          </div>
-          {devices.error && (
-            <ErrorNotice error={devices.error} retry={devices.refresh} />
-          )}{" "}
-          {!devices.data && devices.loading ? (
-            <Spinner label="Loading devices" />
-          ) : devices.data?.data.length ? (
-            <div className="panel-body">
-              {devices.data.data.map((device) => (
-                <div className="device-row" key={device.id}>
-                  <div>
-                    <strong>{device.name}</strong>
-                    <p className="muted small">
-                      {device.platform ?? "iPhone"} · OS permission:{" "}
-                      {title(device.permission)}
-                    </p>
-                  </div>
-                  <Status value={device.enabled ? "enabled" : "muted"} />
-                  <button
-                    className="button secondary"
-                    onClick={() => void toggleDevice(device)}
-                  >
-                    {device.enabled ? "Mute this device" : "Enable delivery"}
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            !devices.error && (
-              <Empty title="No registered iPhones">
-                Sign in through the native iPhone app to register a device and
-                choose notification permission.
-              </Empty>
-            )
-          )}
-        </section>
+        <NotificationDevices />
       </div>
     </>
+  );
+}
+
+function NotificationDevices() {
+  const { identity, bootstrap } = useSession();
+  const devices = useResource(
+    "/api/v1/devices",
+    identity,
+    10000,
+    decodeDevices,
+  );
+  const [edit, setEdit] = useState<{
+    device: Device;
+    draft: DeviceSettingsInput;
+  }>();
+  const [remove, setRemove] = useState<Device>();
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState<APIError>(),
+    [notice, setNotice] = useState("");
+  const [blockedData, setBlockedData] = useState<unknown>();
+  const controller = useRef<AbortController | undefined>(undefined);
+  useEffect(() => () => controller.current?.abort(), []);
+  useEffect(() => {
+    const failure = devices.error;
+    if (
+      failure &&
+      (authorizationErrors.has(failure.code) ||
+        failure.status === 401 ||
+        failure.status === 403)
+    ) {
+      controller.current?.abort();
+      controller.current = undefined;
+      setBusy(false);
+      setEdit(undefined);
+      setRemove(undefined);
+      setNotice("");
+    }
+  }, [devices.error]);
+  const refresh = () => {
+    if (controller.current) return;
+    setEdit(undefined);
+    setRemove(undefined);
+    setError(undefined);
+    devices.refresh();
+  };
+  const privateError =
+    error &&
+    (authorizationErrors.has(error.code) ||
+      error.status === 401 ||
+      error.status === 403);
+  const page =
+    devices.error ||
+    privateError ||
+    (blockedData && blockedData === devices.data)
+      ? undefined
+      : devices.data;
+  const changed =
+    !!edit &&
+    page?.items.find((d) => d.installationId === edit.device.installationId)
+      ?.revision !== edit.device.revision;
+  const act = async (device: Device, input?: DeviceSettingsInput) => {
+    if (controller.current) return;
+    if (input) {
+      try {
+        input = deviceSettings(input);
+      } catch (e) {
+        setError(e as APIError);
+        return;
+      }
+    }
+    const active = new AbortController();
+    controller.current = active;
+    setBusy(true);
+    setError(undefined);
+    setNotice("");
+    try {
+      if (input) await updateDevice(device, input, active.signal);
+      else await removeDevice(device, active.signal);
+      if (active.signal.aborted) return;
+      setNotice(
+        input
+          ? "Device preferences saved. Delivery also depends on iPhone permission and setup."
+          : "Device removed. Reattaching it requires an explicit action in the iPhone app.",
+      );
+      setEdit(undefined);
+      setRemove(undefined);
+      setBlockedData(devices.data);
+      devices.refresh();
+    } catch (failure) {
+      if (active.signal.aborted) return;
+      const e =
+        failure instanceof APIError
+          ? failure
+          : new APIError(
+              "request_failed",
+              "The device change could not be confirmed.",
+            );
+      setError(e);
+      setEdit(undefined);
+      setRemove(undefined);
+      setBlockedData(devices.data);
+      setNotice(
+        e.code === "revision_conflict"
+          ? "This device changed elsewhere. Refresh devices before editing again."
+          : "Refresh devices to check the current state before trying another change.",
+      );
+    } finally {
+      if (!active.signal.aborted) setBusy(false);
+      if (controller.current === active) controller.current = undefined;
+    }
+  };
+  return (
+    <section className="panel wide notification-devices">
+      <div className="panel-heading">
+        <div>
+          <h2>iPhone notification delivery</h2>
+          <p>
+            Each device has its own delivery preferences. Alert rules and your
+            inbox stay active. Register phones through the native app.
+          </p>
+        </div>
+        <button
+          className="button secondary"
+          disabled={busy || devices.loading}
+          onClick={refresh}
+        >
+          Refresh devices
+        </button>
+      </div>
+      {(error || devices.error) && (
+        <ErrorNotice error={(error || devices.error)!} />
+      )}
+      {notice && (
+        <p className="notice subtle" role="status">
+          {notice}
+        </p>
+      )}
+      {devices.loading && !page ? (
+        <Spinner label="Loading devices" />
+      ) : page?.items.length ? (
+        <div className="device-list">
+          {page.items.map((device) => (
+            <article
+              className="device-card"
+              key={device.installationId}
+              aria-label={device.label}
+            >
+              <div className="device-card-heading">
+                <div>
+                  <h3>{device.label}</h3>
+                  <p className="small muted">{deviceDeliveryState(device)}</p>
+                </div>
+                <Status
+                  value={
+                    !device.enabled
+                      ? "disabled"
+                      : device.muted
+                        ? "muted"
+                        : "enabled"
+                  }
+                />
+              </div>
+              <dl className="device-facts">
+                <div>
+                  <dt>iOS permission</dt>
+                  <dd>{title(device.permission)}</dd>
+                </div>
+                <div>
+                  <dt>Notification token</dt>
+                  <dd>{title(device.tokenStatus)}</dd>
+                </div>
+                <div>
+                  <dt>Last seen</dt>
+                  <dd>
+                    {timestamp(
+                      device.lastSeenAt,
+                      bootstrap.preferences.timezone,
+                    )}
+                  </dd>
+                </div>
+              </dl>
+              <div className="device-actions">
+                <button
+                  className="button secondary"
+                  disabled={busy || devices.loading || !!edit || !!remove}
+                  onClick={() =>
+                    void act(device, {
+                      label: device.label,
+                      enabled: !device.enabled,
+                      muted: device.muted,
+                    })
+                  }
+                >
+                  {device.enabled ? "Stop delivery" : "Enable delivery"}
+                </button>
+                <button
+                  className="button secondary"
+                  disabled={busy || devices.loading || !!edit || !!remove}
+                  onClick={() =>
+                    void act(device, {
+                      label: device.label,
+                      enabled: device.enabled,
+                      muted: !device.muted,
+                    })
+                  }
+                >
+                  {device.muted ? "Unmute device" : "Mute device"}
+                </button>
+                <button
+                  className="text-button"
+                  disabled={busy || devices.loading || !!edit || !!remove}
+                  onClick={() => {
+                    setEdit({
+                      device,
+                      draft: {
+                        label: device.label,
+                        enabled: device.enabled,
+                        muted: device.muted,
+                      },
+                    });
+                    setError(undefined);
+                    setNotice("");
+                  }}
+                >
+                  Edit device
+                </button>
+                <button
+                  className="text-button"
+                  disabled={busy || devices.loading || !!edit || !!remove}
+                  onClick={() => {
+                    setRemove(device);
+                    setError(undefined);
+                    setNotice("");
+                  }}
+                >
+                  Remove device
+                </button>
+              </div>
+              {edit?.device.installationId === device.installationId && (
+                <form
+                  className="device-editor form-stack"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!changed) void act(edit.device, edit.draft);
+                  }}
+                >
+                  {changed && (
+                    <p className="notice warning" role="status">
+                      This device changed while you were editing. Refresh
+                      devices to load its current preferences.
+                    </p>
+                  )}
+                  <label>
+                    Device label
+                    <input
+                      value={edit.draft.label}
+                      disabled={busy || changed}
+                      onChange={(e) =>
+                        setEdit({
+                          ...edit,
+                          draft: { ...edit.draft, label: e.target.value },
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="device-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={edit.draft.enabled}
+                      disabled={busy || changed}
+                      onChange={(e) =>
+                        setEdit({
+                          ...edit,
+                          draft: { ...edit.draft, enabled: e.target.checked },
+                        })
+                      }
+                    />
+                    Delivery enabled
+                  </label>
+                  <label className="device-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={edit.draft.muted}
+                      disabled={busy || changed}
+                      onChange={(e) =>
+                        setEdit({
+                          ...edit,
+                          draft: { ...edit.draft, muted: e.target.checked },
+                        })
+                      }
+                    />
+                    Muted on this device
+                  </label>
+                  <div className="device-actions">
+                    <button className="button" disabled={busy || changed}>
+                      {busy ? "Saving…" : "Save device"}
+                    </button>
+                    <button
+                      type="button"
+                      className="button secondary"
+                      disabled={busy}
+                      onClick={() => setEdit(undefined)}
+                    >
+                      Cancel editing
+                    </button>
+                  </div>
+                </form>
+              )}
+              {remove?.installationId === device.installationId && (
+                <div className="device-removal">
+                  <p>
+                    Remove <strong>{device.label}</strong> from this account? It
+                    will stop receiving new deliveries. The iPhone must
+                    explicitly reattach before delivery resumes.
+                  </p>
+                  <div className="device-actions">
+                    <button
+                      className="button"
+                      disabled={busy || remove.revision !== device.revision}
+                      onClick={() => void act(remove)}
+                    >
+                      Confirm removal
+                    </button>
+                    <button
+                      className="button secondary"
+                      disabled={busy}
+                      onClick={() => setRemove(undefined)}
+                    >
+                      Keep device
+                    </button>
+                  </div>
+                  {remove.revision !== device.revision && (
+                    <p role="status">
+                      This device changed. Refresh before removing it.
+                    </p>
+                  )}
+                </div>
+              )}
+            </article>
+          ))}
+        </div>
+      ) : page && !page.items.length ? (
+        <Empty title="No registered iPhones">
+          Sign in through the native iPhone app to register a device and choose
+          notification permission.
+        </Empty>
+      ) : null}
+    </section>
   );
 }

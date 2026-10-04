@@ -22,6 +22,9 @@ type Discovery struct {
 	InstanceID    string
 	RecoveryEpoch string
 	ServiceTime   time.Time
+	// PrincipalID is private verified per-Control identity for owner matching.
+	// It is not a Dashboard account ID or a client-supplied identity claim.
+	PrincipalID string `json:"-"`
 }
 
 type Query struct {

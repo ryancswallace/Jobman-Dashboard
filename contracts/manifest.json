@@ -1,7 +1,7 @@
 {
   "apiVersion": "0.1.0-alpha.1",
   "generator": "scripts/generate-contracts.py",
-  "openapiSha256": "cb3bf0b4080cd3b2ba8d9e2325fad6bf914343e87f5baa925001394a0a697ca1",
+  "openapiSha256": "e7c39db8f3a349ee5b639eee4bea16a86e779aeeef4175ab67ebf5ae9b9442e4",
   "operations": [
     "bootstrap",
     "job",
@@ -11,6 +11,8 @@
     "requestReport",
     "report",
     "citation",
+    "runs",
+    "run",
     "target",
     "targetPartitions",
     "graphEdges",
@@ -18,17 +20,31 @@
     "workload",
     "workloadChildren",
     "devices",
-    "updateDevice",
+    "removeDevice",
+    "bindDevice",
+    "detachInstallation",
+    "inspectInstallation",
+    "activateDeviceRevocation",
+    "reserveDeviceRevocation",
+    "updateDeviceSettings",
+    "switchDeviceBinding",
+    "refreshDeviceToken",
     "inbox",
+    "inboxItem",
     "updateInbox",
     "jobs",
     "overview",
     "updatePreferences",
     "rules",
     "createRule",
+    "deleteRule",
+    "rule",
     "updateRule",
+    "setRuleEnabled",
+    "revalidateRule",
     "targets",
-    "workloads"
+    "workloads",
+    "revokeNativeDevice"
   ],
-  "schemaCount": 70
+  "schemaCount": 84
 }

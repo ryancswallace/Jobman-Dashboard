@@ -32,13 +32,16 @@ struct JobmanDashboardApp: App {
             }
             .task {
                 if let id = notifications.consumePendingInbox() { store.open(.inbox(id)) }
+                #if DEBUG
+                if store.previewMode, NativeInboxFixtures.enabled, ProcessInfo.processInfo.arguments.contains("--dashboard-inbox-open-id"),
+                   let route = InboxPushRoute.route(schemaVersion: 1, inboxID: "92000000-0000-4000-8000-000000000001") { store.open(route) }
+                #endif
             }
-            .onReceive(NotificationCenter.default.publisher(for: .dashboardPushRegistered)) { message in
-                if let token = message.userInfo?["token"] as? String {
-                    let enabled: Bool? = PushRegistration.enableRequested ? true : nil
-                    PushRegistration.enableRequested = false
-                    Task { await store.registerPush(token: token, enabled: enabled) }
-                }
+            .onReceive(NotificationCenter.default.publisher(for: .dashboardPushRegistered)) { _ in
+                Task { await store.refreshDeviceRegistration() }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .dashboardPushRegistrationFailed)) { _ in
+                store.devices.registrationFailed("Apple notification registration failed. Check network access and the app’s signing configuration, then try again.")
             }
             .onChange(of: scenePhase) { _, phase in store.setActive(phase == .active) }
         }

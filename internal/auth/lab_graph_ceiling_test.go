@@ -1,0 +1,710 @@
+//go:build integration
+
+package auth
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/url"
+	"os"
+	"path/filepath"
+	"reflect"
+	"slices"
+	"strconv"
+	"testing"
+	"time"
+
+	"github.com/ryancswallace/jobman-dashboard/internal/api"
+)
+
+type labCeilingManifest struct {
+	Version            int    `json:"version"`
+	Synthetic          bool   `json:"synthetic"`
+	Mode               string `json:"mode"`
+	DeploymentID       string `json:"deploymentId"`
+	InstanceID         string `json:"instanceId"`
+	RecoveryEpoch      string `json:"recoveryEpoch"`
+	NamespaceID        string `json:"namespaceId"`
+	Namespace          string `json:"namespace"`
+	TargetID           string `json:"targetId"`
+	TargetGenerationID string `json:"targetGenerationId"`
+	GraphID            string `json:"graphId"`
+	Revision           string `json:"revision"`
+	TotalNodes         string `json:"totalNodes"`
+	TotalEdges         string `json:"totalEdges"`
+	RequestDigest      string `json:"requestDigest"`
+	Nodes              []struct {
+		Index int    `json:"index"`
+		ID    string `json:"id"`
+	} `json:"nodes"`
+}
+
+const labCeilingManifestLimit = 2 << 20
+
+// The graph handoff is a private receipt, not a configuration/trust-root file.
+// Reuse the receipt reader's owner/mode/link/identity checks with this explicit
+// graph bound; production configuration readers retain their 1 MiB maximum.
+func labCeilingLoad(path, expected string) (labCeilingManifest, error) {
+	raw, err := labRestorePrivate(path, labCeilingManifestLimit)
+	if err != nil {
+		return labCeilingManifest{}, errors.New("bounded private graph manifest unavailable or unsafe")
+	}
+	return labCeilingDecode(raw, expected)
+}
+
+func labCeilingDecode(raw []byte, expected string) (labCeilingManifest, error) {
+	var m labCeilingManifest
+	sum := sha256.Sum256(raw)
+	if len(raw) == 0 || len(raw) > labCeilingManifestLimit || hex.EncodeToString(sum[:]) != expected {
+		return m, errors.New("reviewed graph manifest digest or size differs")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&m); err != nil {
+		return m, errors.New("graph manifest shape differs")
+	}
+	if decoder.Decode(new(any)) != io.EOF {
+		return m, errors.New("graph manifest has trailing content")
+	}
+	if m.Version != 1 || !m.Synthetic || m.Mode != "admitted-no-execution" || m.DeploymentID != labDeployment || m.InstanceID != "e633cf92-258d-48ff-965a-fda88d68ef3a" || m.RecoveryEpoch != "1" || m.Namespace != "dashboard-operations" || m.Revision != "1" || m.TotalNodes != "10000" || m.TotalEdges != "100000" || len(m.Nodes) != 10000 {
+		return m, errors.New("fixed synthetic graph source or bounds differ")
+	}
+	if !uuid(m.NamespaceID) || !uuid(m.TargetID) || !uuid(m.TargetGenerationID) || !uuid(m.GraphID) || len(m.RequestDigest) != 71 || m.RequestDigest[:7] != "sha256:" {
+		return m, errors.New("graph source identity or digest is invalid")
+	}
+	if digest, err := hex.DecodeString(m.RequestDigest[7:]); err != nil || len(digest) != 32 {
+		return m, errors.New("graph request digest is invalid")
+	}
+	seen := map[string]bool{}
+	for i, n := range m.Nodes {
+		if n.Index != i || !uuid(n.ID) || seen[n.ID] {
+			return m, errors.New("graph node mapping differs")
+		}
+		seen[n.ID] = true
+	}
+	return m, nil
+}
+func (m labCeilingManifest) scope() api.Scope {
+	return api.Scope{DeploymentID: m.DeploymentID, NamespaceID: m.NamespaceID}
+}
+func (m labCeilingManifest) path() string {
+	return labMultiPrefix(m.scope()) + "/workloads/graph/" + m.GraphID
+}
+
+// This independent integer relation is shared only by the test's assertions;
+// neither source helper nor client fixture code is imported by this harness.
+func labCeilingPair(from, to int) bool {
+	return from >= 0 && to >= 0 && from < 10000 && to < 10000 && (from == 0 && to > 0 || from >= 1 && from <= 9000 && to > from && to <= from+10 || from == 9001 && to == 9002)
+}
+func labCeilingIncoming(index int) int {
+	if index == 0 {
+		return 0
+	}
+	total := 1
+	low, high := max(1, index-10), min(9000, index-1)
+	if high >= low {
+		total += high - low + 1
+	}
+	if index == 9002 {
+		total++
+	}
+	return total
+}
+func labCeilingChild(m labCeilingManifest, n api.WorkloadChild, index int) bool {
+	if index < 0 || index >= len(m.Nodes) {
+		return false
+	}
+	j := n.Job
+	want := m.Nodes[index].ID
+	name := fmt.Sprintf("node-%05d", index)
+	incoming := strconv.Itoa(labCeilingIncoming(index))
+	return n.ID == want && n.Index == strconv.Itoa(index) && n.Name == name && n.Disposition == "" && n.TaskIndex == "" &&
+		reflect.DeepEqual(n.DependencyCounts, map[string]string{"total": incoming, "waiting": incoming, "satisfied": "0", "unsatisfied": "0"}) &&
+		j.ID == want && j.Scope == m.scope() && j.Name == name && j.TargetID == m.TargetID && j.TargetGenerationID == m.TargetGenerationID && j.Backend == "subprocess" &&
+		j.Revision == "1" && j.DesiredState == "run" && j.Phase == "accepted" && j.Outcome == "" && j.Confidence == "" && j.Disposition == "" && !j.Imported && j.CurrentRun == nil && j.StartedAt == nil && j.CompletedAt == nil && j.Scheduler == nil &&
+		j.Owner != nil && uuid(j.Owner.ID) && j.Owner.IsCurrentUser && j.Group != nil && j.Group.GraphID == m.GraphID && j.Group.GraphIndex != nil && *j.Group.GraphIndex == index && j.Group.CollectionID == "" && j.Group.CollectionIndex == nil &&
+		!j.CreatedAt.IsZero() && j.UpdatedAt.Equal(j.CreatedAt) && j.Lifecycle != nil && *j.Lifecycle == (api.Lifecycle{}) && reflect.DeepEqual(j.Labels, map[string]string{"fixture": "synthetic-graph-ceiling-no-execution"})
+}
+func labCeilingEdge(edge api.GraphEdge, indices map[string]int) (from, to int, valid bool) {
+	from, hasFrom := indices[edge.FromJobID]
+	to, hasTo := indices[edge.ToJobID]
+	return from, to, hasFrom && hasTo && labCeilingPair(from, to) && edge.From == fmt.Sprintf("node-%05d", from) && edge.To == fmt.Sprintf("node-%05d", to) && edge.Predicate == "success" && edge.Outcomes != nil && len(edge.Outcomes) == 0 && edge.UpstreamPhase == "accepted" && edge.UpstreamOutcome == "" && edge.State == "waiting"
+}
+func labCeilingProvenance(t *testing.T, m labCeilingManifest, complete string, sources []api.SourceStatus, fetched time.Time) {
+	t.Helper()
+	if complete != "complete" || fetched.IsZero() || len(sources) != 1 || sources[0].Scope != m.scope() || sources[0].Status != "available" || sources[0].AsOf == nil || sources[0].AsOf.IsZero() || sources[0].FetchedAt.IsZero() {
+		t.Fatal("Graph page authority/completeness provenance differs")
+	}
+}
+func labCeilingGrant(t *testing.T, read labMultiRead, m labCeilingManifest, allowed bool) {
+	t.Helper()
+	var b api.Bootstrap
+	read("/api/v1/bootstrap", &b, 200)
+	if b.FixtureMode || b.APIVersion != api.Version || b.Completeness != "complete" || !uuid(b.Account.ID) {
+		t.Fatal("Live signed-account bootstrap required")
+	}
+	found := false
+	for _, d := range b.Deployments {
+		if d.ID != m.DeploymentID {
+			continue
+		}
+		if d.Status != "available" {
+			t.Fatal("Graph source unavailable")
+		}
+		for _, n := range d.Namespaces {
+			if n.ID == m.NamespaceID {
+				if found || n.Name != m.Namespace || !n.AuthorizationExpiresAt.After(time.Now()) || !slices.Contains(n.Capabilities, "groups.read") || !slices.Contains(n.Capabilities, "jobs.read") {
+					t.Fatal("Graph namespace proof differs")
+				}
+				found = true
+			}
+		}
+	}
+	if found != allowed {
+		t.Fatal("Current source-qualified graph grant differs")
+	}
+}
+
+// Keep only current plus64 prior selectors and hashes of immutable page facts.
+// The test oracle never caches full pages or all historical cursor tokens.
+type labCeilingReadPage struct {
+	cursor, next string
+	facts        [32]byte
+}
+type labCeilingReadHistory struct{ pages []labCeilingReadPage }
+
+func (h *labCeilingReadHistory) remember(cursor, next string, items any) error {
+	raw, err := json.Marshal(items)
+	if err != nil || len(raw) > 2<<20 || len(cursor) > 512 || len(next) > 512 || next != "" && next == cursor {
+		return errors.New("graph replay facts or selectors exceed bounds")
+	}
+	for _, page := range h.pages {
+		if page.cursor == cursor {
+			return errors.New("graph pagination repeated a retained selector")
+		}
+	}
+	h.pages = append(h.pages, labCeilingReadPage{cursor: cursor, next: next, facts: sha256.Sum256(raw)})
+	if len(h.pages) > 65 {
+		h.pages = slices.Clone(h.pages[1:])
+	}
+	return nil
+}
+func (p labCeilingReadPage) matches(next string, items any) bool {
+	raw, err := json.Marshal(items)
+	return err == nil && len(raw) <= 2<<20 && p.next == next && p.facts == sha256.Sum256(raw)
+}
+
+// GET-only real HTTP acceptance. Fixture admission and its source/row receipts
+// are separately reviewed Lab operations; this test never seeds or executes jobs.
+func TestLabDeployedGraphCeiling(t *testing.T) {
+	if os.Getenv("JOBMAN_DASHBOARD_LAB_GRAPH_CEILING") != "1" {
+		t.Skip("reviewed inert graph admission and explicit HTTP opt-in required")
+	}
+	m, err := labCeilingLoad(os.Getenv("JOBMAN_DASHBOARD_LAB_GRAPH_MANIFEST"), os.Getenv("JOBMAN_DASHBOARD_LAB_GRAPH_MANIFEST_SHA256"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 8*time.Minute)
+	defer cancel()
+	alice := labNativeSignIn(t, "alice", "71000000-0000-4000-8000-000000000001")
+	bob := labNativeSignIn(t, "bob", "71000000-0000-4000-8000-000000000002")
+	reader := func(session labNativeSession) labMultiRead {
+		request := labReportClient(t, ctx, session)
+		return func(path string, target any, status int) {
+			t.Helper()
+			response := request("GET", path, session.accessToken, "", nil, target, status)
+			if len(response) > 2<<20 {
+				t.Fatal("Graph response exceeded the client bound")
+			}
+		}
+	}
+	read, denied := reader(alice), reader(bob)
+	source := labExecutionControl(t, ctx, alice)
+	checkIdentity := func() {
+		var caps struct {
+			Capabilities struct {
+				InstanceID    string `json:"instanceId"`
+				RecoveryEpoch string `json:"recoveryEpoch"`
+			} `json:"capabilities"`
+		}
+		source("GET", "/v1/capabilities", "", nil, &caps)
+		if caps.Capabilities.InstanceID != m.InstanceID || caps.Capabilities.RecoveryEpoch != m.RecoveryEpoch {
+			t.Fatal("Current graph source instance/epoch differs")
+		}
+	}
+	checkIdentity()
+	labCeilingGrant(t, read, m, true)
+	labCeilingGrant(t, denied, m, false)
+	indices := make(map[string]int, 10000)
+	for _, n := range m.Nodes {
+		indices[n.ID] = n.Index
+	}
+	cursor, firstChild := "", ""
+	childHistory := labCeilingReadHistory{}
+	count := 0
+	for pageNumber := 0; pageNumber < 200; pageNumber++ {
+		q := url.Values{"limit": {"50"}}
+		if cursor != "" {
+			q.Set("cursor", cursor)
+		}
+		var page api.WorkloadDetail
+		read(m.path()+"?"+q.Encode(), &page, 200)
+		labCeilingProvenance(t, m, page.Completeness, page.Sources, page.FetchedAt)
+		w := page.Workload
+		if page.Total != "10000" || len(page.Children) != 50 || w.Scope != m.scope() || w.ID != m.GraphID || w.Kind != "graph" || w.Name != "synthetic-ceiling-graph-v1" || w.Revision != "1" || w.TotalChildren != "10000" || w.Phase != "accepted" || w.Outcome != "" || w.Concurrency != "1" || w.UnsatisfiedPolicy != "skip" || w.AsOf.IsZero() || !reflect.DeepEqual(w.Counts, map[string]string{"active": "0", "terminal": "0", "success": "0", "failure": "0", "cancelled": "0", "waiting": "10000", "skipped": "0", "blocked": "0"}) {
+			t.Fatal("Graph wrapper or complete child total differs")
+		}
+		for _, child := range page.Children {
+			if !labCeilingChild(m, child, count) {
+				t.Fatal("Graph child identity, ordering, dependency facts or execution state differs")
+			}
+			count++
+		}
+		if err := childHistory.remember(cursor, page.NextCursor, page.Children); err != nil {
+			t.Fatal(err)
+		}
+		cursor = page.NextCursor
+		if pageNumber == 0 {
+			firstChild = cursor
+		}
+		if (cursor == "") != (pageNumber == 199) {
+			t.Fatal("Graph child pagination ended early or continued past total")
+		}
+	}
+	if len(childHistory.pages) != 65 {
+		t.Fatal("Child Back window differs")
+	}
+	for index := len(childHistory.pages) - 2; index >= 0; index-- {
+		prior := childHistory.pages[index]
+		var page api.WorkloadDetail
+		read(m.path()+"?"+url.Values{"limit": {"50"}, "cursor": {prior.cursor}}.Encode(), &page, 200)
+		labCeilingProvenance(t, m, page.Completeness, page.Sources, page.FetchedAt)
+		if page.Workload.Scope != m.scope() || page.Workload.ID != m.GraphID || page.Total != "10000" || !prior.matches(page.NextCursor, page.Children) {
+			t.Fatal("Recent child Back page or immutable successor changed")
+		}
+	}
+	lastChild := childHistory.pages[len(childHistory.pages)-1]
+	var terminalChild api.WorkloadDetail
+	read(m.path()+"?"+url.Values{"limit": {"50"}, "cursor": {lastChild.cursor}}.Encode(), &terminalChild, 200)
+	labCeilingProvenance(t, m, terminalChild.Completeness, terminalChild.Sources, terminalChild.FetchedAt)
+	if terminalChild.Workload.Scope != m.scope() || terminalChild.Workload.ID != m.GraphID || terminalChild.Total != "10000" || !lastChild.matches(terminalChild.NextCursor, terminalChild.Children) {
+		t.Fatal("Back replay evicted or changed the terminal child page")
+	}
+	read(m.path()+"?"+url.Values{"limit": {"50"}, "cursor": {firstChild}}.Encode(), nil, 409)
+	cursor, firstEdge := "", ""
+	edgeHistory := labCeilingReadHistory{}
+	edges := map[[2]int]bool{}
+	previous := ""
+	for pageNumber := 0; pageNumber < 1000; pageNumber++ {
+		q := url.Values{"limit": {"100"}}
+		if cursor != "" {
+			q.Set("cursor", cursor)
+		}
+		var page api.GraphEdgePage
+		read(m.path()+"/dependencies?"+q.Encode(), &page, 200)
+		labCeilingProvenance(t, m, page.Completeness, page.Sources, page.FetchedAt)
+		if page.Total != "100000" || len(page.Items) != 100 {
+			t.Fatal("Graph dependency bound/total differs")
+		}
+		for _, edge := range page.Items {
+			from, to, valid := labCeilingEdge(edge, indices)
+			pair := [2]int{from, to}
+			order := edge.FromJobID + "/" + edge.ToJobID
+			if !valid || edges[pair] || order <= previous {
+				t.Fatal("Graph dependency identity, order, predicate or readiness differs")
+			}
+			edges[pair] = true
+			previous = order
+		}
+		if err := edgeHistory.remember(cursor, page.NextCursor, page.Items); err != nil {
+			t.Fatal(err)
+		}
+		cursor = page.NextCursor
+		if pageNumber == 0 {
+			firstEdge = cursor
+		}
+		if (cursor == "") != (pageNumber == 999) {
+			t.Fatal("Graph dependency pagination ended early or continued past total")
+		}
+	}
+	if count != 10000 || len(edges) != 100000 || firstChild == "" || firstEdge == "" {
+		t.Fatal("Complete graph traversal coverage differs")
+	}
+	if len(edgeHistory.pages) != 65 {
+		t.Fatal("Dependency Back window differs")
+	}
+	for index := len(edgeHistory.pages) - 2; index >= 0; index-- {
+		prior := edgeHistory.pages[index]
+		var page api.GraphEdgePage
+		read(m.path()+"/dependencies?"+url.Values{"limit": {"100"}, "cursor": {prior.cursor}}.Encode(), &page, 200)
+		labCeilingProvenance(t, m, page.Completeness, page.Sources, page.FetchedAt)
+		if page.Total != "100000" || !prior.matches(page.NextCursor, page.Items) {
+			t.Fatal("Recent dependency Back page or immutable successor changed")
+		}
+	}
+	// Back reads may not destroy the retained terminal page or reopen traversal.
+	last := edgeHistory.pages[len(edgeHistory.pages)-1]
+	var terminal api.GraphEdgePage
+	read(m.path()+"/dependencies?"+url.Values{"limit": {"100"}, "cursor": {last.cursor}}.Encode(), &terminal, 200)
+	labCeilingProvenance(t, m, terminal.Completeness, terminal.Sources, terminal.FetchedAt)
+	if terminal.Total != "100000" || !last.matches(terminal.NextCursor, terminal.Items) {
+		t.Fatal("Back replay evicted or changed the terminal dependency page")
+	}
+	read(m.path()+"/dependencies?"+url.Values{"limit": {"100"}, "cursor": {firstEdge}}.Encode(), nil, 409)
+	for _, test := range []struct{ center, nodes, edges int }{{0, 10000, 100000}, {1, 12, 66}, {9999, 2, 1}} {
+		for _, bounds := range [][2]int{{200, 500}, {3, 2}} {
+			q := url.Values{"nodeId": {m.Nodes[test.center].ID}, "maxNodes": {strconv.Itoa(bounds[0])}, "maxEdges": {strconv.Itoa(bounds[1])}}
+			var page api.GraphNeighborhood
+			read(m.path()+"/neighborhood?"+q.Encode(), &page, 200)
+			labCeilingProvenance(t, m, page.Completeness, page.Sources, page.FetchedAt)
+			if page.CenterID != m.Nodes[test.center].ID || page.TotalNodes != strconv.Itoa(test.nodes) || page.TotalEdges != strconv.Itoa(test.edges) || len(page.Nodes) != min(bounds[0], test.nodes) || len(page.Edges) > bounds[1] || page.OmittedNodes != strconv.Itoa(test.nodes-len(page.Nodes)) || page.OmittedEdges != strconv.Itoa(test.edges-len(page.Edges)) {
+				t.Fatal("Graph neighborhood scope, bounds or omission totals differ")
+			}
+			members := map[string]bool{}
+			for _, node := range page.Nodes {
+				index, ok := indices[node.ID]
+				if !ok || members[node.ID] || !labCeilingChild(m, node, index) || index != test.center && !labCeilingPair(index, test.center) && !labCeilingPair(test.center, index) {
+					t.Fatal("Neighborhood node is duplicated or outside one hop")
+				}
+				members[node.ID] = true
+			}
+			if !members[page.CenterID] {
+				t.Fatal("Neighborhood omitted its selected center")
+			}
+			pairs := map[[2]int]bool{}
+			for _, edge := range page.Edges {
+				from, to, valid := labCeilingEdge(edge, indices)
+				pair := [2]int{from, to}
+				if !valid || pairs[pair] || !members[edge.FromJobID] || !members[edge.ToJobID] {
+					t.Fatal("Neighborhood edge escaped loaded induced relation")
+				}
+				pairs[pair] = true
+			}
+			if test.nodes <= bounds[0] && test.edges <= bounds[1] && len(pairs) != test.edges {
+				t.Fatal("Complete small neighborhood lost induced edges")
+			}
+		}
+	}
+	for _, selected := range []struct {
+		direction string
+		total     int
+	}{{"", 11}, {"incoming", 1}, {"outgoing", 10}} {
+		q := url.Values{"nodeId": {m.Nodes[1].ID}, "limit": {"100"}}
+		if selected.direction != "" {
+			q.Set("direction", selected.direction)
+		}
+		var page api.GraphEdgePage
+		read(m.path()+"/dependencies?"+q.Encode(), &page, 200)
+		labCeilingProvenance(t, m, page.Completeness, page.Sources, page.FetchedAt)
+		if page.Total != strconv.Itoa(selected.total) || len(page.Items) != selected.total || page.NextCursor != "" {
+			t.Fatal("Selected-node dependency view lost its complete bounded relation")
+		}
+		seen := map[[2]int]bool{}
+		for _, edge := range page.Items {
+			from, to, valid := labCeilingEdge(edge, indices)
+			pair := [2]int{from, to}
+			if !valid || seen[pair] || from != 1 && to != 1 || selected.direction == "incoming" && to != 1 || selected.direction == "outgoing" && from != 1 {
+				t.Fatal("Selected-node dependency direction or endpoint differs")
+			}
+			seen[pair] = true
+		}
+	}
+	denied(m.path(), nil, 403)
+	denied(m.path()+"/children?limit=50&cursor="+url.QueryEscape(lastChild.cursor), nil, 403)
+	denied(m.path()+"/dependencies?limit=100&cursor="+url.QueryEscape(last.cursor), nil, 403)
+	read(m.path()+"/children?limit=51&cursor="+url.QueryEscape(lastChild.cursor), nil, 409)
+	read(m.path()+"/dependencies?limit=100&nodeId="+m.Nodes[0].ID+"&cursor="+url.QueryEscape(last.cursor), nil, 409)
+	other := labReadMultiFixture(t, alice.root+"/.lab/dashboard/fixture-info.json", false)
+	for _, ns := range other.Namespaces {
+		if ns.Name == "dashboard-research" {
+			path := labMultiPrefix(api.Scope{DeploymentID: m.DeploymentID, NamespaceID: ns.ID}) + "/workloads/graph/" + ns.GraphID
+			read(path+"/children?limit=50&cursor="+url.QueryEscape(lastChild.cursor), nil, 409)
+		}
+	}
+	checkIdentity()
+	labCeilingGrant(t, read, m, true)
+	labCeilingGrant(t, denied, m, false)
+	t.Log("PASS: real verified-TLS source-qualified graph HTTP navigation, 200 child pages/1000 dependency pages, exact 10000/100000 relation, recent64 Back replay with immutable successors and evicted409, bounded induced neighborhoods and account/query/scope cursor denial. Synthetic admitted metadata; no executor, rendered browser, simulator or physical-device claim.")
+}
+
+func TestLabGraphCeilingIndependentTopology(t *testing.T) {
+	total := 0
+	incoming := make([]int, 10000)
+	// Enumerate the independent relation, not the source fixture's edge builder.
+	for from := 0; from < 10000; from++ {
+		for to := from + 1; to < 10000; to++ {
+			if labCeilingPair(from, to) {
+				total++
+				incoming[to]++
+			}
+		}
+	}
+	if total != 100000 {
+		t.Fatal("Independent graph relation has the wrong size")
+	}
+	for index, n := range incoming {
+		if n != labCeilingIncoming(index) {
+			t.Fatal("Independent incoming count differs")
+		}
+	}
+	for _, test := range []struct{ center, nodes, edges int }{{1, 12, 66}, {9999, 2, 1}} {
+		members := []int{}
+		for i := 0; i < 10000; i++ {
+			if i == test.center || labCeilingPair(i, test.center) || labCeilingPair(test.center, i) {
+				members = append(members, i)
+			}
+		}
+		edges := 0
+		for _, from := range members {
+			for _, to := range members {
+				if labCeilingPair(from, to) {
+					edges++
+				}
+			}
+		}
+		if len(members) != test.nodes || edges != test.edges {
+			t.Fatal("Independent induced neighborhood differs")
+		}
+	}
+}
+
+func labCeilingTestManifest() labCeilingManifest {
+	m := labCeilingManifest{Version: 1, Synthetic: true, Mode: "admitted-no-execution", DeploymentID: labDeployment, InstanceID: "e633cf92-258d-48ff-965a-fda88d68ef3a", RecoveryEpoch: "1", NamespaceID: "76000000-0000-4000-8000-000000000001", Namespace: "dashboard-operations", TargetID: "76000000-0000-4000-8000-000000000002", TargetGenerationID: "76000000-0000-4000-8000-000000000003", GraphID: "76000000-0000-4000-8000-000000000004", Revision: "1", TotalNodes: "10000", TotalEdges: "100000", RequestDigest: "sha256:" + fmt.Sprintf("%064x", 1)}
+	for i := 0; i < 10000; i++ {
+		m.Nodes = append(m.Nodes, struct {
+			Index int    `json:"index"`
+			ID    string `json:"id"`
+		}{i, fmt.Sprintf("77000000-0000-4000-8000-%012d", i+1)})
+	}
+	return m
+}
+
+func TestLabGraphCeilingFileLoader(t *testing.T) {
+	want := labCeilingTestManifest()
+	raw, err := json.MarshalIndent(want, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = append(raw, '\n')
+	if len(raw) != 849551 {
+		t.Fatal("Synthetic receipt no longer matches the actual handoff format/size")
+	}
+	newFile := func(t *testing.T, value []byte) string {
+		t.Helper()
+		root, err := filepath.EvalSymlinks(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(root, 0700); err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(root, "graph.json")
+		if err := os.WriteFile(path, value, 0600); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	digest := func(value []byte) string {
+		sum := sha256.Sum256(value)
+		return hex.EncodeToString(sum[:])
+	}
+	for _, size := range []int{len(raw), (1 << 20) + 1, labCeilingManifestLimit} {
+		t.Run(strconv.Itoa(size), func(t *testing.T) {
+			value := append(slices.Clone(raw), bytes.Repeat([]byte(" "), size-len(raw))...)
+			got, err := labCeilingLoad(newFile(t, value), digest(value))
+			if err != nil || !reflect.DeepEqual(got, want) {
+				t.Fatal("Valid complete bounded graph receipt rejected", err)
+			}
+		})
+	}
+	for name, value := range map[string][]byte{
+		"empty":     nil,
+		"oversize":  append(slices.Clone(raw), bytes.Repeat([]byte(" "), labCeilingManifestLimit+1-len(raw))...),
+		"malformed": []byte(`{"version":1}`),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := labCeilingLoad(newFile(t, value), digest(value)); err == nil {
+				t.Fatal("Invalid graph receipt accepted")
+			}
+		})
+	}
+	for _, name := range []string{"digest", "missing", "relative", "directory", "symlink", "parent symlink", "hardlink", "public file", "public parent"} {
+		t.Run(name, func(t *testing.T) {
+			path := newFile(t, raw)
+			expected := digest(raw)
+			var err error
+			switch name {
+			case "digest":
+				expected = digest([]byte("different bytes"))
+			case "missing":
+				path += ".missing"
+			case "relative":
+				path = "graph.json"
+			case "directory":
+				path = filepath.Dir(path)
+			case "symlink":
+				err = os.Symlink(path, path+".link")
+				path += ".link"
+			case "parent symlink":
+				link := filepath.Join(filepath.Dir(path), "parent")
+				err = os.Symlink(filepath.Dir(path), link)
+				path = filepath.Join(link, "graph.json")
+			case "hardlink":
+				err = os.Link(path, path+".link")
+			case "public file":
+				err = os.Chmod(path, 0644)
+			case "public parent":
+				err = os.Chmod(filepath.Dir(path), 0755)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := labCeilingLoad(path, expected); err == nil {
+				t.Fatal("Unsafe or changed graph receipt accepted")
+			}
+		})
+	}
+}
+
+func TestLabGraphCeilingManifestRejectsDrift(t *testing.T) {
+	check := func(m labCeilingManifest) error {
+		raw, err := json.Marshal(m)
+		if err != nil {
+			return err
+		}
+		sum := sha256.Sum256(raw)
+		_, err = labCeilingDecode(raw, hex.EncodeToString(sum[:]))
+		return err
+	}
+	if err := check(labCeilingTestManifest()); err != nil {
+		t.Fatal(err)
+	}
+	for name, mutate := range map[string]func(*labCeilingManifest){
+		"other source":     func(m *labCeilingManifest) { m.DeploymentID = labSecondaryDeployment },
+		"other instance":   func(m *labCeilingManifest) { m.InstanceID = labSecondaryInstance },
+		"restore":          func(m *labCeilingManifest) { m.RecoveryEpoch = "2" },
+		"execution claim":  func(m *labCeilingManifest) { m.Mode = "executed" },
+		"missing node":     func(m *labCeilingManifest) { m.Nodes = m.Nodes[:9999] },
+		"duplicate node":   func(m *labCeilingManifest) { m.Nodes[9999].ID = m.Nodes[0].ID },
+		"wrong index":      func(m *labCeilingManifest) { m.Nodes[1].Index = 2 },
+		"rounded count":    func(m *labCeilingManifest) { m.TotalEdges = "100001" },
+		"malformed digest": func(m *labCeilingManifest) { m.RequestDigest = "sha256:" + fmt.Sprintf("%064s", "x") },
+	} {
+		t.Run(name, func(t *testing.T) {
+			m := labCeilingTestManifest()
+			mutate(&m)
+			if check(m) == nil {
+				t.Fatal("Changed reviewed graph identity accepted")
+			}
+		})
+	}
+	raw, _ := json.Marshal(labCeilingTestManifest())
+	sum := sha256.Sum256(raw)
+	digest := hex.EncodeToString(sum[:])
+	raw = append(raw, ' ')
+	if _, err := labCeilingDecode(raw, digest); err == nil {
+		t.Fatal("Changed manifest bytes accepted under prior digest")
+	}
+	for _, suffix := range []string{"{}", " null"} {
+		bad := append(slices.Clone(raw), suffix...)
+		hash := sha256.Sum256(bad)
+		if _, err := labCeilingDecode(bad, hex.EncodeToString(hash[:])); err == nil {
+			t.Fatal("Trailing manifest document accepted")
+		}
+	}
+}
+func TestLabGraphCeilingRejectsExecutionAndWrongRelation(t *testing.T) {
+	m := labCeilingTestManifest()
+	index := 11
+	when := time.Date(2026, 10, 4, 0, 0, 0, 0, time.UTC)
+	child := func() api.WorkloadChild {
+		return api.WorkloadChild{ID: m.Nodes[index].ID, Name: "node-00011", Index: "11", DependencyCounts: map[string]string{"total": "11", "waiting": "11", "satisfied": "0", "unsatisfied": "0"}, Job: api.Job{Scope: m.scope(), ID: m.Nodes[index].ID, Name: "node-00011", TargetID: m.TargetID, TargetGenerationID: m.TargetGenerationID, Backend: "subprocess", Revision: "1", DesiredState: "run", Phase: "accepted", CreatedAt: when, UpdatedAt: when, Lifecycle: &api.Lifecycle{}, Group: &api.GroupReference{GraphID: m.GraphID, GraphIndex: &index}, Owner: &api.Owner{ID: "76000000-0000-4000-8000-000000000005", IsCurrentUser: true}, Labels: map[string]string{"fixture": "synthetic-graph-ceiling-no-execution"}}}
+	}
+	if !labCeilingChild(m, child(), index) {
+		t.Fatal("Valid source child rejected")
+	}
+	for name, mutate := range map[string]func(*api.WorkloadChild){
+		"source":            func(c *api.WorkloadChild) { c.Job.DeploymentID = labSecondaryDeployment },
+		"run":               func(c *api.WorkloadChild) { c.Job.CurrentRun = &api.RunReference{ID: m.GraphID, Number: "1"} },
+		"imported":          func(c *api.WorkloadChild) { c.Job.Imported = true },
+		"started":           func(c *api.WorkloadChild) { c.Job.StartedAt = &when },
+		"target generation": func(c *api.WorkloadChild) { c.Job.TargetGenerationID = m.TargetID },
+		"satisfied":         func(c *api.WorkloadChild) { c.DependencyCounts["satisfied"] = "1" },
+		"disposition":       func(c *api.WorkloadChild) { c.Disposition = "ready" },
+		"missing lifecycle": func(c *api.WorkloadChild) { c.Job.Lifecycle = nil },
+	} {
+		t.Run(name, func(t *testing.T) {
+			value := child()
+			mutate(&value)
+			if labCeilingChild(m, value, index) {
+				t.Fatal("Fabricated or misattributed graph state accepted")
+			}
+		})
+	}
+	edge := api.GraphEdge{From: "node-00001", To: "node-00011", FromJobID: m.Nodes[1].ID, ToJobID: m.Nodes[11].ID, Predicate: "success", Outcomes: []string{}, UpstreamPhase: "accepted", State: "waiting"}
+	indices := map[string]int{m.Nodes[1].ID: 1, m.Nodes[11].ID: 11, m.Nodes[12].ID: 12}
+	if _, _, ok := labCeilingEdge(edge, indices); !ok {
+		t.Fatal("Valid graph edge rejected")
+	}
+	for name, mutate := range map[string]func(*api.GraphEdge){
+		"outside adjacency": func(e *api.GraphEdge) { e.ToJobID = m.Nodes[12].ID; e.To = "node-00012" },
+		"display name":      func(e *api.GraphEdge) { e.From = "node-00000" },
+		"predicate":         func(e *api.GraphEdge) { e.Predicate = "terminal" },
+		"missing outcomes":  func(e *api.GraphEdge) { e.Outcomes = nil },
+		"readiness":         func(e *api.GraphEdge) { e.State = "satisfied" },
+		"terminal":          func(e *api.GraphEdge) { e.UpstreamPhase = "terminal"; e.UpstreamOutcome = "success" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			value := edge
+			mutate(&value)
+			if _, _, ok := labCeilingEdge(value, indices); ok {
+				t.Fatal("Wrong graph relation or evidence accepted")
+			}
+		})
+	}
+}
+
+func TestLabGraphCeilingReplayOracle(t *testing.T) {
+	var history labCeilingReadHistory
+	for i := 0; i < 1000; i++ {
+		if err := history.remember(fmt.Sprintf("cursor-%d", i), fmt.Sprintf("cursor-%d", i+1), []string{fmt.Sprintf("fact-%d", i)}); err != nil {
+			t.Fatal(err)
+		}
+		if len(history.pages) > 65 {
+			t.Fatal("Replay oracle retained unbounded tokens")
+		}
+	}
+	if len(history.pages) != 65 || history.pages[0].cursor != "cursor-935" || history.pages[64].cursor != "cursor-999" {
+		t.Fatal("Replay oracle window differs")
+	}
+	for i, page := range history.pages {
+		if !page.matches(fmt.Sprintf("cursor-%d", 936+i), []string{fmt.Sprintf("fact-%d", 935+i)}) {
+			t.Fatal("Original replay facts rejected")
+		}
+		if page.matches(page.next, []string{"changed"}) || page.matches("changed", []string{fmt.Sprintf("fact-%d", 935+i)}) {
+			t.Fatal("Changed facts/successor accepted")
+		}
+	}
+	before := slices.Clone(history.pages)
+	for _, test := range []struct {
+		cursor, next string
+		items        any
+	}{
+		{"cursor-999", "next", []string{"facts"}},
+		{"new", "new", []string{"facts"}},
+		{string(bytes.Repeat([]byte("x"), 513)), "next", nil},
+		{"new", string(bytes.Repeat([]byte("x"), 513)), nil},
+		{"new", "next", string(bytes.Repeat([]byte("x"), 2<<20))},
+		{"new", "next", func() {}},
+	} {
+		if err := history.remember(test.cursor, test.next, test.items); err == nil || !reflect.DeepEqual(before, history.pages) {
+			t.Fatal("Invalid replay record changed the bounded oracle")
+		}
+	}
+}

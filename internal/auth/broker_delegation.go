@@ -59,8 +59,21 @@ func NewBrokerVerifier(services []BrokerService) (*BrokerVerifier, error) {
 	return v, nil
 }
 
+// VerifiedDelegation is emitted only after signature, certificate, audience,
+// operation, namespace, freshness and replay checks. Mode is provenance, not a
+// permission grant; downstream reads still require current Control authority.
+type VerifiedDelegation struct {
+	Actor monitoring.Actor
+	Mode  DelegationMode
+}
+
 func (v *BrokerVerifier) Authenticate(r *http.Request, scope api.Scope) (monitoring.Actor, error) {
-	deny := func() (monitoring.Actor, error) { return monitoring.Actor{}, monitoring.ErrAuthority }
+	verified, err := v.AuthenticateDelegation(r, scope)
+	return verified.Actor, err
+}
+
+func (v *BrokerVerifier) AuthenticateDelegation(r *http.Request, scope api.Scope) (VerifiedDelegation, error) {
+	deny := func() (VerifiedDelegation, error) { return VerifiedDelegation{}, monitoring.ErrAuthority }
 	if r.TLS == nil || len(r.TLS.VerifiedChains) == 0 || len(r.TLS.PeerCertificates) == 0 || len(r.Header.Values("Authorization")) != 1 {
 		return deny()
 	}
@@ -123,5 +136,5 @@ func (v *BrokerVerifier) Authenticate(r *http.Request, scope api.Scope) (monitor
 	v.used[replayKey] = claims.Expiry.Time().Add(5 * time.Second)
 	// No Dashboard account ID is accepted from the request body. The signed
 	// immutable directory identity is the broker's stable cursor/account scope.
-	return monitoring.Actor{Account: api.Account{ID: claims.Actor.DirectoryID}, DirectoryID: claims.Actor.DirectoryID, Issuer: claims.Actor.Issuer, Subject: claims.Actor.Subject}, nil
+	return VerifiedDelegation{Actor: monitoring.Actor{Account: api.Account{ID: claims.Actor.DirectoryID}, DirectoryID: claims.Actor.DirectoryID, Issuer: claims.Actor.Issuer, Subject: claims.Actor.Subject}, Mode: DelegationMode(claims.Mode)}, nil
 }

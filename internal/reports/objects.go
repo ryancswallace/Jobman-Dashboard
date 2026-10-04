@@ -8,11 +8,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/ryancswallace/jobman-dashboard/internal/observability"
 	"io"
 	"os"
 	"path/filepath"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/ryancswallace/jobman-diagnose/diagnosis"
 )
@@ -55,34 +57,67 @@ type diskPair struct {
 // ObjectStore owns one private local directory. Callers must complete current
 // authorization before returning any loaded object. No filesystem path is ever
 // returned to an API client or accepted from one.
-type ObjectStore struct {
+type objectDirectory struct {
+	observer *observability.Registry
 	root     *os.Root
+	access   ObjectAccess
+}
+
+type ObjectStore struct {
+	*objectDirectory
 	sweepMu  sync.Mutex
 	sweepDir *os.File
 }
 
 func OpenObjects(path string) (*ObjectStore, error) {
-	if !filepath.IsAbs(path) || filepath.Clean(path) != path {
+	return OpenObjectsWithAccess(path, ObjectAccess{})
+}
+
+func OpenObjectsWithAccess(path string, access ObjectAccess) (*ObjectStore, error) {
+	directory, err := openObjectDirectory(path, access, true)
+	if err != nil {
+		return nil, err
+	}
+	return &ObjectStore{objectDirectory: directory}, nil
+}
+
+func openObjectDirectory(path string, access ObjectAccess, writer bool) (*objectDirectory, error) {
+	if !filepath.IsAbs(path) || filepath.Clean(path) != path || access.Validate() != nil {
 		return nil, ErrObject
 	}
-	if err := os.Mkdir(path, 0700); err != nil && !errors.Is(err, os.ErrExist) {
-		return nil, ErrObject
+	// Only the legacy private writer may create its root. A shared root must be
+	// provisioned by an operator with the intended immutable UID/GID/mode.
+	if writer && access.Mode == "" {
+		if err := os.Mkdir(path, 0700); err != nil && !errors.Is(err, os.ErrExist) {
+			return nil, ErrObject
+		}
 	}
 	info, err := os.Lstat(path)
-	if err != nil || !info.IsDir() || info.Mode().Perm() != 0700 || info.Mode()&os.ModeSymlink != 0 {
+	if err != nil || !info.IsDir() || info.Mode().Perm() != access.directoryMode() || info.Mode()&(os.ModeSymlink|os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 {
 		return nil, ErrObject
 	}
 	root, err := os.OpenRoot(path)
 	if err != nil {
 		return nil, ErrObject
 	}
+	directory := &objectDirectory{root: root, access: access}
 	opened, err := root.Stat(".")
-	if err != nil || !os.SameFile(info, opened) {
+	if err != nil || !os.SameFile(info, opened) || directory.validateRoot(writer) != nil {
 		root.Close()
 		return nil, ErrObject
 	}
-	return &ObjectStore{root: root}, nil
+	return directory, nil
 }
+
+func (s *objectDirectory) validateRoot(writer bool) error {
+	file, err := openObjectNoFollow(s.root, ".")
+	if err != nil {
+		return ErrObject
+	}
+	defer file.Close()
+	return validateObjectAccess(file, s.access, true, writer)
+}
+
 func (s *ObjectStore) Close() error {
 	s.sweepMu.Lock()
 	defer s.sweepMu.Unlock()
@@ -120,8 +155,12 @@ func encodePair(pair Pair) ([]byte, error) {
 // under a new UUID. Link's exclusive destination semantics prevent overwriting
 // an existing pair, including on concurrent retries. The temporary name is
 // removed and directory synced before any ready database reference is published.
-func (s *ObjectStore) Put(ctx context.Context, id string, pair Pair) (Object, error) {
-	if !uuidPattern.MatchString(id) || ctx.Err() != nil {
+func (s *ObjectStore) Put(ctx context.Context, id string, pair Pair) (result Object, resultErr error) {
+	start := time.Now()
+	defer func() {
+		s.observer.Observe("object", "publish", "", "", reportObservation(resultErr), time.Since(start))
+	}()
+	if !uuidPattern.MatchString(id) || ctx.Err() != nil || s.validateRoot(true) != nil {
 		return Object{}, ErrObject
 	}
 	data, err := encodePair(pair)
@@ -138,12 +177,20 @@ func (s *ObjectStore) Put(ctx context.Context, id string, pair Pair) (Object, er
 		return Object{}, ErrObject
 	}
 	defer s.root.Remove(name)
+	// Check inherited ACLs while the temporary inode still has mode 0600.
+	if err = prepareObjectFile(file, s.access); err != nil {
+		file.Close()
+		return Object{}, ErrObject
+	}
 	_, writeErr := file.Write(data)
+	if writeErr == nil {
+		writeErr = publishObjectPermissions(file, s.access)
+	}
 	if writeErr == nil {
 		writeErr = file.Sync()
 	}
 	closeErr := file.Close()
-	if writeErr != nil || closeErr != nil || ctx.Err() != nil {
+	if writeErr != nil || closeErr != nil || ctx.Err() != nil || s.validateRoot(true) != nil {
 		return Object{}, ErrObject
 	}
 	if err = s.root.Link(name, id+".json"); err != nil {
@@ -172,10 +219,16 @@ func (s *ObjectStore) sync() error {
 }
 
 func (s *ObjectStore) Read(ctx context.Context, expected Subject, object Object) (Pair, error) {
+	return s.objectDirectory.read(ctx, expected, object)
+}
+
+func (s *objectDirectory) read(ctx context.Context, expected Subject, object Object) (result Pair, resultErr error) {
+	start := time.Now()
+	defer func() { s.observer.Observe("object", "read", "", "", reportObservation(resultErr), time.Since(start)) }()
 	if object.Validate() != nil || expected.Validate() != nil || ctx.Err() != nil {
 		return Pair{}, ErrObject
 	}
-	pair, actual, err := s.Recover(ctx, expected, object.ID)
+	pair, actual, err := s.recover(ctx, expected, object.ID)
 	if err != nil || actual != object {
 		return Pair{}, ErrObject
 	}
@@ -185,8 +238,16 @@ func (s *ObjectStore) Read(ctx context.Context, expected Subject, object Object)
 // Recover supports a crash after private publication but before committing its
 // database reference. It verifies the entire pair against the claimed task's
 // subject; callers must still own the current lease and reauthorize publication.
-func (s *ObjectStore) Recover(ctx context.Context, expected Subject, id string) (Pair, Object, error) {
-	if !uuidPattern.MatchString(id) || expected.Validate() != nil || ctx.Err() != nil {
+func (s *ObjectStore) Recover(ctx context.Context, expected Subject, id string) (result Pair, resultObject Object, resultErr error) {
+	start := time.Now()
+	defer func() {
+		s.observer.Observe("object", "recover", "", "", reportObservation(resultErr), time.Since(start))
+	}()
+	return s.objectDirectory.recover(ctx, expected, id)
+}
+
+func (s *objectDirectory) recover(ctx context.Context, expected Subject, id string) (Pair, Object, error) {
+	if !uuidPattern.MatchString(id) || expected.Validate() != nil || ctx.Err() != nil || s.validateRoot(false) != nil {
 		return Pair{}, Object{}, ErrObject
 	}
 	name := id + ".json"
@@ -194,20 +255,20 @@ func (s *ObjectStore) Recover(ctx context.Context, expected Subject, id string) 
 	if err != nil {
 		return Pair{}, Object{}, ErrObject
 	}
-	if !info.Mode().IsRegular() || info.Mode().Perm() != 0600 || info.Size() < 1 || info.Size() > maximumPairBytes {
+	if !info.Mode().IsRegular() || info.Mode().Perm() != s.access.objectMode() || info.Size() < 1 || info.Size() > maximumPairBytes {
 		return Pair{}, Object{}, ErrObject
 	}
-	file, err := s.root.Open(name)
+	file, err := openObjectNoFollow(s.root, name)
 	if err != nil {
 		return Pair{}, Object{}, ErrObject
 	}
 	defer file.Close()
 	opened, err := file.Stat()
-	if err != nil || !os.SameFile(info, opened) {
+	if err != nil || !os.SameFile(info, opened) || validateObjectAccess(file, s.access, false, false) != nil {
 		return Pair{}, Object{}, ErrObject
 	}
 	data, err := io.ReadAll(io.LimitReader(file, maximumPairBytes+1))
-	if err != nil || len(data) > maximumPairBytes || ctx.Err() != nil {
+	if err != nil || len(data) > maximumPairBytes || ctx.Err() != nil || validateObjectAccess(file, s.access, false, false) != nil || s.validateRoot(false) != nil {
 		return Pair{}, Object{}, ErrObject
 	}
 	var disk diskPair
@@ -237,8 +298,12 @@ func (s *ObjectStore) Recover(ctx context.Context, expected Subject, id string) 
 
 // Remove is used only after the database reference has expired. One unlink
 // removes report and evidence together. The ID is a validated internal UUID.
-func (s *ObjectStore) Remove(id string) error {
-	if !uuidPattern.MatchString(id) {
+func (s *ObjectStore) Remove(id string) (resultErr error) {
+	start := time.Now()
+	defer func() {
+		s.observer.Observe("object", "remove", "", "", reportObservation(resultErr), time.Since(start))
+	}()
+	if !uuidPattern.MatchString(id) || s.validateRoot(true) != nil {
 		return ErrObject
 	}
 	if err := s.root.Remove(id + ".json"); err != nil && !errors.Is(err, os.ErrNotExist) {

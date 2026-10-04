@@ -48,7 +48,8 @@ const page = (items: unknown[]) => ({
   sources: [],
   fetchedAt: new Date().toISOString(),
 });
-let fetcher: ReturnType<typeof vi.fn>;
+type FixtureFetch = (input: string, options?: RequestInit) => Promise<Response>;
+let fetcher: ReturnType<typeof vi.fn<FixtureFetch>>;
 beforeEach(() => {
   // Node's native experimental Web Storage can shadow jsdom's implementation.
   const storage = new Map<string, string>();
@@ -64,7 +65,7 @@ beforeEach(() => {
   } satisfies Storage);
   history.replaceState(null, "", "/");
   fetcher = vi
-    .fn()
+    .fn<FixtureFetch>()
     .mockImplementation(async (input: string, options?: RequestInit) => {
       const url = new URL(input, "http://localhost");
       if (url.pathname === "/api/v1/bootstrap") return Response.json(bootstrap);
@@ -148,7 +149,7 @@ describe("web monitoring workflows", () => {
       "/deployments/east/namespaces/ns/jobs/duplicate-id",
     );
     const previous = fetcher.getMockImplementation()!;
-    fetcher.mockImplementation((input: string, options?: RequestInit) =>
+    fetcher.mockImplementation(async (input: string, options?: RequestInit) =>
       input.endsWith("/jobs/duplicate-id")
         ? Response.json({
             job: {
@@ -227,6 +228,49 @@ describe("web monitoring workflows", () => {
     );
   });
   it("creates an opt-in namespace rule across two sources with all terminal outcomes", async () => {
+    const nsID = "71000000-0000-4000-8000-000000000001";
+    const deployments = [
+      "71000000-0000-4000-8000-000000000002",
+      "71000000-0000-4000-8000-000000000003",
+    ];
+    const originalFetch = fetcher.getMockImplementation()!;
+    fetcher.mockImplementation(async (input: string, options?: RequestInit) => {
+      if (input === "/api/v1/bootstrap")
+        return Response.json({
+          ...bootstrap,
+          deployments: bootstrap.deployments.map((source, index) => ({
+            ...source,
+            id: deployments[index],
+            namespaces: [
+              {
+                ...ns,
+                id: nsID,
+                capabilities: ["namespace.read", "jobs.read"],
+              },
+            ],
+          })),
+        });
+      if (input === "/api/v1/rules" && options?.method === "POST") {
+        const request = JSON.parse(String(options.body));
+        return Response.json(
+          {
+            ...request,
+            id: "71000000-0000-4000-8000-000000000004",
+            revision: "1",
+            scopes: request.namespaces.map((ref: object) => ({
+              ...ref,
+              status: "pending",
+            })),
+            inaccessibleScopes: 0,
+            unavailableScopes: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          { status: 201 },
+        );
+      }
+      return originalFetch(input, options);
+    });
     history.replaceState(null, "", "/alerts");
     render(<App />);
     await screen.findByRole("button", { name: "+ New alert rule" });
@@ -253,21 +297,26 @@ describe("web monitoring workflows", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save rule" }));
     await waitFor(() =>
       expect(
-        fetcher.mock.calls.some(([, options]) => options.method === "POST"),
+        fetcher.mock.calls.some(([, options]) => options?.method === "POST"),
       ).toBe(true),
     );
     const mutation = fetcher.mock.calls.find(
-      ([, options]) => options.method === "POST",
+      ([, options]) => options?.method === "POST",
     )!;
-    expect(JSON.parse(mutation[1].body)).toMatchObject({
+    const mutationOptions = mutation[1];
+    if (typeof mutationOptions?.body !== "string")
+      throw new Error("Expected a serialized rule request");
+    expect(JSON.parse(mutationOptions.body)).toMatchObject({
       scope: "namespace_jobs",
       outcomeMode: "all_terminal",
       namespaces: [
-        { deploymentId: "east", namespaceId: "ns" },
-        { deploymentId: "west", namespaceId: "ns" },
+        { deploymentId: deployments[0], namespaceId: nsID },
+        { deploymentId: deployments[1], namespaceId: nsID },
       ],
     });
-    expect(mutation[1].headers.get("X-CSRF-Token")).toBe("fixture-csrf");
+    expect(new Headers(mutationOptions.headers).get("X-CSRF-Token")).toBe(
+      "fixture-csrf",
+    );
   });
   it("preserves denied and network failures rather than pretending lists are empty", async () => {
     history.replaceState(null, "", "/targets");

@@ -1,0 +1,41 @@
+.inbox-heading h2 {
+  font-size: 1rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.inbox-times {
+  display: flex;
+  gap: 0.5rem 1.5rem;
+  flex-wrap: wrap;
+  margin: 0.7rem 0;
+  font-size: 0.8rem;
+}
+.inbox-times dt {
+  color: var(--muted);
+}
+.inbox-times dd {
+  margin: 0.15rem 0 0;
+}
+.inbox-context {
+  margin: 0.8rem 0;
+}
+.inbox-context summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.inbox-context li {
+  margin: 0.35rem 0;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+.inbox-body > .mono {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  .inbox-times {
+    display: block;
+  }
+  .inbox-times > div {
+    margin: 0.55rem 0;
+  }
+}

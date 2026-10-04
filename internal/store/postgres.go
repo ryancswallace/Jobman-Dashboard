@@ -8,6 +8,7 @@ import (
 	"embed"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/fs"
 	"slices"
@@ -48,6 +49,9 @@ func (s *Store) Close() { s.Pool.Close() }
 
 // CheckSchema lets a runtime identity verify the migration ledger without any
 // DDL authority. Newer or modified schemas require an explicit operator upgrade.
+// ErrSchemaMismatch identifies a completed ledger comparison, not an outage.
+var ErrSchemaMismatch = errors.New("Dashboard schema is incompatible with this binary")
+
 func (s *Store) CheckSchema(ctx context.Context) error {
 	names, err := fs.Glob(migrations, "migrations/*.sql")
 	if err != nil {
@@ -70,7 +74,7 @@ func (s *Store) CheckSchema(ctx context.Context) error {
 		return err
 	}
 	if len(actual) != len(names) {
-		return fmt.Errorf("Dashboard schema version does not match this binary")
+		return fmt.Errorf("%w: migration version", ErrSchemaMismatch)
 	}
 	for _, name := range names {
 		data, err := migrations.ReadFile(name)
@@ -79,7 +83,7 @@ func (s *Store) CheckSchema(ctx context.Context) error {
 		}
 		hash := sha256.Sum256(data)
 		if actual[name] != hex.EncodeToString(hash[:]) {
-			return fmt.Errorf("Dashboard schema integrity check failed")
+			return fmt.Errorf("%w: migration integrity", ErrSchemaMismatch)
 		}
 	}
 	return nil

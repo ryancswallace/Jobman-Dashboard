@@ -71,7 +71,7 @@ export function GraphView({
           <svg
             width={layout.width}
             height={layout.height}
-            role="img"
+            role="group"
             aria-label="Source-reported dependencies"
           >
             <defs>
@@ -106,6 +106,7 @@ export function GraphView({
                   key={node.id}
                   transform={`translate(${position.x},${position.y})`}
                   role="button"
+                  aria-current={selected === node.id ? "true" : undefined}
                   tabIndex={0}
                   aria-label={`${node.name ?? node.id}, ${node.job.phase}, ${node.readiness ?? "readiness unavailable"}`}
                   onClick={() => onSelect(node.id)}

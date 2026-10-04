@@ -7,7 +7,7 @@ import { JobDetailPage } from "./pages/JobDetail";
 import { WorkloadsPage, WorkloadDetailPage } from "./pages/Workloads";
 import { TargetsPage, TargetDetailPage } from "./pages/Targets";
 import { AlertsPage } from "./pages/Alerts";
-import { InboxPage } from "./pages/Inbox";
+import { InboxPage, InboxDetailPage } from "./pages/Inbox";
 import { SettingsPage } from "./pages/Settings";
 import { NotFound } from "./components/States";
 export function App() {
@@ -34,6 +34,7 @@ export function App() {
             />
             <Route path="alerts" element={<AlertsPage />} />
             <Route path="inbox" element={<InboxPage />} />
+            <Route path="inbox/:inboxId" element={<InboxDetailPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="*" element={<NotFound />} />
           </Route>

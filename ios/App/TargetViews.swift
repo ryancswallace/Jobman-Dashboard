@@ -17,7 +17,8 @@ private struct TargetCatalogRows: View {
     @State private var cursor: String?
     @State private var history: [String?] = []
     @State private var error: String?
-    @State private var loading = false
+    @State private var requests = ReadRequestGate()
+    private var loading: Bool { requests.busy }
     var body: some View {
         Section {
             if let page {
@@ -37,17 +38,18 @@ private struct TargetCatalogRows: View {
             if let error { ErrorMessage(error: error) }
             if loading { ProgressView("Loading targets…") }
             Button("Refresh targets") { Task { if await load() { history = [] } } }.disabled(loading)
-        }.task { await load() }
+        }.task(id: store.foregroundGeneration) { await load(cursor, replacing: true) }
     }
-    @discardableResult private func load(_ next: String? = nil) async -> Bool {
-        guard !loading else { return false }; loading = true; defer { loading = false }
+    @discardableResult private func load(_ next: String? = nil, replacing: Bool = false) async -> Bool {
+        guard let token = requests.begin(replacing: replacing) else { return false }; defer { requests.finish(token) }
         do {
             var query = try store.query(); query.append(.init(name: "limit", value: "50")); if let next { query.append(.init(name: "cursor", value: next)) }
             let result: Page<Target> = try await store.request(path: "/api/v1/targets", query: query)
+            guard requests.accepts(token) else { return false }
             guard result.total != nil, result.totals != nil, result.items.count <= 200, Set(result.items.map(\.id)).count == result.items.count else { throw DashboardError.invalidResponse }
             try result.items.forEach { try $0.validate() }
             page = result; cursor = next; error = nil; return true
-        } catch is CancellationError { return false } catch { self.error = error.localizedDescription; return false }
+        } catch is CancellationError { return false } catch { if requests.accepts(token) { self.error = error.localizedDescription }; return false }
     }
 }
 struct TargetDetailView: View {
@@ -55,7 +57,8 @@ struct TargetDetailView: View {
     let selection: Target
     @State private var detail: TargetDetail?
     @State private var error: String?
-    @State private var loading = false
+    @State private var requests = ReadRequestGate()
+    private var loading: Bool { requests.busy }
     @State private var refreshID = UUID()
     var body: some View {
         List {
@@ -96,13 +99,13 @@ struct TargetDetailView: View {
                 }
                 SourceSummary(completeness: detail.completeness, sources: detail.sources, fetchedAt: detail.fetchedAt)
             }
-        }.navigationTitle(detail?.target.name ?? selection.name).task { await load() }.refreshable { await load() }
+        }.navigationTitle(detail?.target.name ?? selection.name).task(id: store.foregroundGeneration) { await load(replacing: true) }.refreshable { await load() }
     }
     private func targetSet(_ title: String, _ values: [String]) -> some View { DisclosureGroup("\(title) (\(values.count))") { ForEach(values, id: \.self) { Text($0) }; if values.isEmpty { Text("None advertised") } } }
-    private func load() async {
-        guard !loading else { return }; loading = true; defer { loading = false }
-        do { let result: TargetDetail = try await store.request(path: selection.path); try result.validate(expected: selection); detail = result; refreshID = UUID(); error = nil }
-        catch is CancellationError {} catch { self.error = error.localizedDescription }
+    private func load(replacing: Bool = false) async {
+        guard let token = requests.begin(replacing: replacing) else { return }; defer { requests.finish(token) }
+        do { let result: TargetDetail = try await store.request(path: selection.path); guard requests.accepts(token) else { return }; try result.validate(expected: selection); detail = result; refreshID = UUID(); error = nil }
+        catch is CancellationError {} catch { if requests.accepts(token) { self.error = error.localizedDescription } }
     }
 }
 private struct TargetPartitionsView: View {
@@ -113,7 +116,8 @@ private struct TargetPartitionsView: View {
     @State private var history: [String?] = []
     @State private var requiresRefresh = false
     @State private var error: String?
-    @State private var loading = false
+    @State private var requests = ReadRequestGate()
+    private var loading: Bool { requests.busy }
     var body: some View {
         List {
             Section { Text("\(target.deploymentId) / \(target.namespaceId)"); Text("Generation \(target.generation.number)").font(.caption); Text("Each page verifies current access and target generation.").font(.footnote) }
@@ -128,17 +132,17 @@ private struct TargetPartitionsView: View {
             if let error { ErrorMessage(error: error) }
             if loading { ProgressView("Loading partitions…") }
             Button("Refresh target and restart partitions") { Task { await restart() } }.disabled(loading).accessibilityIdentifier("restartTargetPartitions")
-        }.navigationTitle("Partitions").task { await load() }
+        }.navigationTitle("Partitions").task(id: store.foregroundGeneration) { await load(cursor, replacing: true) }
     }
     private func restart() async {
-        guard !loading else { return }; loading = true
-        do { let result: TargetDetail = try await store.request(path: target.path); try result.validate(expected: target); target = result.target; page = nil; cursor = nil; history = []; requiresRefresh = false; error = nil; loading = false; await load() }
-        catch { self.error = error.localizedDescription; loading = false }
+        guard let token = requests.begin() else { return }; defer { requests.finish(token) }
+        do { let result: TargetDetail = try await store.request(path: target.path); guard requests.accepts(token) else { return }; try result.validate(expected: target); target = result.target; page = nil; cursor = nil; history = []; requiresRefresh = false; error = nil; requests.finish(token); await load() }
+        catch is CancellationError {} catch { if requests.accepts(token) { self.error = error.localizedDescription } }
     }
-    @discardableResult private func load(_ next: String? = nil) async -> Bool {
-        guard !loading, !requiresRefresh else { return false }; loading = true; defer { loading = false }
+    @discardableResult private func load(_ next: String? = nil, replacing: Bool = false) async -> Bool {
+        guard !requiresRefresh, let token = requests.begin(replacing: replacing) else { return false }; defer { requests.finish(token) }
         do { var query: [URLQueryItem] = [.init(name: "generationId", value: target.generation.id), .init(name: "limit", value: "50")]; if let next { query.append(.init(name: "cursor", value: next)) }
-            let result: TargetPartitionPage = try await store.request(path: target.path + "/partitions", query: query); try result.validate(target: target); page = result; cursor = next; error = nil; return true
-        } catch is CancellationError { return false } catch { if let e = error as? DashboardError, [.targetChanged, .cursorExpired].contains(e) { requiresRefresh = true; page = nil }; self.error = error.localizedDescription; return false }
+            let result: TargetPartitionPage = try await store.request(path: target.path + "/partitions", query: query); guard requests.accepts(token) else { return false }; try result.validate(target: target); page = result; cursor = next; error = nil; return true
+        } catch is CancellationError { return false } catch { guard requests.accepts(token) else { return false }; if let e = error as? DashboardError, [.targetChanged, .cursorExpired].contains(e) { requiresRefresh = true; page = nil }; self.error = error.localizedDescription; return false }
     }
 }

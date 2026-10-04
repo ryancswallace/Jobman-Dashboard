@@ -1,3 +1,4 @@
+import type * as Wire from "../../../contracts/typescript/dashboard.generated";
 import { useEffect, useRef, useState } from "react";
 import type { JobRef, LogChunk } from "../lib/models";
 import {
@@ -8,9 +9,11 @@ import {
 } from "../lib/transport";
 import { appendLog, type LogBuffer } from "../lib/logs";
 import { useSession } from "../lib/session";
-import { ErrorNotice, Spinner, Status } from "./States";
-export function LogViewer({ job }: { job: JobRef }) {
+import { ErrorNotice, Freshness, Spinner, Status } from "./States";
+export function LogViewer({ job, run }: { job: JobRef; run?: Wire.JobRun }) {
   const { identity } = useSession();
+  const [fetchedAt, setFetchedAt] = useState<string>();
+  const [capturedAt, setCapturedAt] = useState<string>();
   const [stream, setStream] = useState("stdout"),
     [following, setFollowing] = useState(true),
     [search, setSearch] = useState(""),
@@ -51,24 +54,40 @@ export function LogViewer({ job }: { job: JobRef }) {
     decoder.current = new TextDecoder();
     requestedTick.current = undefined;
     setState("loading");
+    setFetchedAt(undefined);
+    setCapturedAt(undefined);
     setError(undefined);
-  }, [identity, path, stream]);
+  }, [identity, path, stream, run?.id]);
   useEffect(() => {
     let live = true,
       stopped = false,
+      scene = 0,
       timer: ReturnType<typeof setTimeout> | undefined,
       controller: AbortController | undefined;
     const load = async () => {
       if (!live || controller || document.visibilityState === "hidden") return;
       controller = new AbortController();
+      const readController = controller,
+        readScene = scene;
       setLoading(true);
       try {
         const params = new URLSearchParams({ stream, limitBytes: "262144" });
         if (cursor.current) params.set("cursor", cursor.current);
+        if (run) params.set("runNumber", run.number);
         const chunk = await request<LogChunk>(`${path}/logs?${params}`, {
-          signal: controller.signal,
+          signal: readController.signal,
         });
-        if (live) {
+        if (live && readScene === scene) {
+          if (
+            run &&
+            (chunk.runId !== run.id ||
+              chunk.runNumber !== run.number ||
+              chunk.executionId !== (run.executionId ?? ""))
+          )
+            throw new APIError(
+              "stream_changed",
+              "The response no longer matches the selected run. Refresh run selection.",
+            );
           if (execution.current && chunk.executionId !== execution.current)
             throw new APIError(
               "stream_changed",
@@ -110,6 +129,12 @@ export function LogViewer({ job }: { job: JobRef }) {
           execution.current = chunk.executionId;
           setState(chunk.truncated ? "truncated" : chunk.state);
           setError(undefined);
+          setFetchedAt(new Date().toISOString());
+          setCapturedAt(
+            chunk.capturedAt && Number.isFinite(Date.parse(chunk.capturedAt))
+              ? chunk.capturedAt
+              : undefined,
+          );
           if (
             chunk.state === "complete" ||
             (!chunk.nextCursor && bytes.length > 0)
@@ -119,6 +144,7 @@ export function LogViewer({ job }: { job: JobRef }) {
       } catch (reason) {
         if (
           live &&
+          readScene === scene &&
           !(reason instanceof DOMException && reason.name === "AbortError")
         ) {
           const e =
@@ -134,8 +160,8 @@ export function LogViewer({ job }: { job: JobRef }) {
             setBuffer({ text: "", evicted: false, gap: false });
         }
       } finally {
-        controller = undefined;
-        if (live) {
+        if (controller === readController) controller = undefined;
+        if (live && readScene === scene) {
           setLoading(false);
           if (following && !stopped)
             timer = setTimeout(() => void load(), 5000);
@@ -145,19 +171,45 @@ export function LogViewer({ job }: { job: JobRef }) {
     const manuallyRefreshed = requestedTick.current !== tick;
     requestedTick.current = tick;
     if (following || manuallyRefreshed) void load();
-    const visible = () => {
+    const reconnect = () => {
+      scene++;
       clearTimeout(timer);
-      if (following && document.visibilityState === "visible" && !stopped)
-        void load();
+      controller?.abort();
+      controller = undefined;
+      setFollowing(false);
+      setLoading(false);
+      if (document.visibilityState !== "visible") return;
+      // A resumed scene obtains a fresh authorized tail even when following
+      // was paused or the old stream completed. Never append a pre-hide reply.
+      cursor.current = undefined;
+      end.current = undefined;
+      execution.current = undefined;
+      decoder.current = new TextDecoder();
+      setBuffer({ text: "", evicted: false, gap: false });
+      setCapturedAt(undefined);
+      setError(undefined);
+      setState("loading");
+      setTick((value) => value + 1);
     };
-    document.addEventListener("visibilitychange", visible);
+    document.addEventListener("visibilitychange", reconnect);
+    window.addEventListener("online", reconnect);
     return () => {
       live = false;
       clearTimeout(timer);
       controller?.abort();
-      document.removeEventListener("visibilitychange", visible);
+      document.removeEventListener("visibilitychange", reconnect);
+      window.removeEventListener("online", reconnect);
     };
-  }, [identity, path, stream, following, tick]);
+  }, [
+    identity,
+    path,
+    stream,
+    following,
+    tick,
+    run?.id,
+    run?.number,
+    run?.executionId,
+  ]);
   useEffect(() => {
     if (following && view.current)
       view.current.scrollTop = view.current.scrollHeight;
@@ -237,6 +289,23 @@ export function LogViewer({ job }: { job: JobRef }) {
       )}
       <div className="log-footer">
         <Status value={state} />
+        <Freshness fetchedAt={fetchedAt} loading={loading} error={!!error} />
+        {fetchedAt && (
+          <time
+            dateTime={fetchedAt}
+            title="Last successful authorized log read"
+          >
+            {fetchedAt}
+          </time>
+        )}
+        <span>
+          Source capture:{" "}
+          {capturedAt ? (
+            <time dateTime={capturedAt}>{capturedAt}</time>
+          ) : (
+            "Unavailable"
+          )}
+        </span>
         <span>
           Original byte range {buffer.startOffset ?? "—"}–
           {buffer.endOffset ?? "—"} · {following ? "Following" : "Paused"}

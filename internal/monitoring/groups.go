@@ -322,6 +322,11 @@ type groupResourceCursor struct {
 	AfterIndex   int       `json:"afterIndex"`
 	SourceCursor string    `json:"sourceCursor"`
 	LastEdge     string    `json:"lastEdge,omitempty"`
+
+	key      string
+	version  uint64
+	position uint64
+	history  *groupCursorHistory
 }
 
 func (e *Engine) authorizedGroup(ctx context.Context, a Actor, scope api.Scope) (GroupSource, string, error) {
@@ -337,43 +342,6 @@ func (e *Engine) authorizedGroup(ctx context.Context, a Actor, scope api.Scope) 
 		return nil, "", errGroupsUnsupported
 	}
 	return src, grants[scope], nil
-}
-func (e *Engine) groupCursor(ctx context.Context, a Actor, q groupResourceQuery, authority, cursor string) (groupResourceCursor, error) {
-	state := groupResourceCursor{CursorIdentity: CursorIdentity{AccountID: a.Account.ID, QueryHash: groupHash(q), Initial: cursor == ""}, Expires: e.Now().Add(15 * time.Minute), Authority: authority, AfterIndex: -1}
-	if cursor == "" {
-		return state, nil
-	}
-	if !strings.HasPrefix(cursor, "r.") || len(cursor) > 512 {
-		return state, ErrCursor
-	}
-	key := strings.TrimPrefix(cursor, "r.")
-	data, version, err := e.cursors.Load(ctx, key)
-	if err != nil {
-		return state, ErrCursor
-	}
-	expected := state
-	if json.Unmarshal(data, &state) != nil || state.AccountID != expected.AccountID || state.QueryHash != expected.QueryHash || state.Authority != authority || !e.Now().Before(state.Expires) {
-		return state, ErrCursor
-	}
-	// Mark a visited initial continuation so polling cannot evict Back history.
-	if version == 1 && state.Initial {
-		if err = e.cursors.Advance(ctx, key, version, data); err != nil && !errors.Is(err, ErrCursor) {
-			return state, err
-		}
-	}
-	state.Initial = false
-	return state, nil
-}
-func (e *Engine) saveGroupCursor(ctx context.Context, state groupResourceCursor) (string, error) {
-	data, err := encodeState(state)
-	if err != nil {
-		return "", err
-	}
-	key, err := e.cursors.Create(ctx, data, state.Expires)
-	if err != nil {
-		return "", err
-	}
-	return "r." + key, nil
 }
 func (e *Engine) recheckGroup(ctx context.Context, a Actor, scope api.Scope, before string) error {
 	_, after, err := e.authorizedGroup(ctx, a, scope)

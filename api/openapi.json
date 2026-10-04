@@ -793,12 +793,14 @@
     "/api/v1/rules": {
       "get": {
         "operationId": "rules",
+        "description": "List personal rules. No request body, unknown or duplicate query parameters accepted. At most100 live rules per account, traversed with opaque cursors.",
         "parameters": [
           {
             "in": "query",
             "name": "cursor",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 128
             }
           },
           {
@@ -806,15 +808,15 @@
             "name": "limit",
             "schema": {
               "type": "integer",
-              "default": 50,
+              "default": 20,
               "minimum": 1,
-              "maximum": 200
+              "maximum": 20
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Authorized result",
+            "description": "Authorized personal alert-rule result",
             "content": {
               "application/json": {
                 "schema": {
@@ -824,7 +826,7 @@
             }
           },
           "default": {
-            "description": "Safe error",
+            "description": "Safe error.400 invalid_request;401 unauthenticated;403 forbidden;404 not_found_or_inaccessible;409 revision_conflict/cursor_expired;422 unsupported_outcome;429 rate_limited or rule_capacity;503 authority/source unavailable. Only rate_limited includes Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -837,6 +839,7 @@
       },
       "post": {
         "operationId": "createRule",
+        "description": "Create an opt-in personal rule after current namespace/job authorization. Returns ETag and Location. Feed outages yield pending scopes; no historical activation is inferred. At most10 regular mutations/minute; bounded retained history has a separate stop reserve.",
         "parameters": [
           {
             "in": "header",
@@ -844,20 +847,12 @@
             "schema": {
               "type": "string"
             },
-            "description": "Required for cookie-authenticated mutations; not a bearer-token substitute."
-          },
-          {
-            "in": "header",
-            "name": "Idempotency-Key",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "description": "Required for cookie-authenticated mutations; bearer-authenticated native requests do not use browser CSRF tokens."
           }
         ],
         "responses": {
-          "200": {
-            "description": "Authorized result",
+          "201": {
+            "description": "Authorized personal alert-rule result",
             "content": {
               "application/json": {
                 "schema": {
@@ -867,7 +862,7 @@
             }
           },
           "default": {
-            "description": "Safe error",
+            "description": "Safe error.400 invalid_request;401 unauthenticated;403 forbidden;404 not_found_or_inaccessible;409 revision_conflict/cursor_expired;422 unsupported_outcome;429 rate_limited or rule_capacity;503 authority/source unavailable. Only rate_limited includes Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -895,9 +890,17 @@
         "parameters": [
           {
             "in": "query",
-            "name": "cursor",
+            "name": "scope",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
             }
           },
           {
@@ -905,9 +908,9 @@
             "name": "limit",
             "schema": {
               "type": "integer",
-              "default": 50,
+              "default": 20,
               "minimum": 1,
-              "maximum": 200
+              "maximum": 50
             }
           },
           {
@@ -939,87 +942,29 @@
               }
             }
           }
-        }
-      }
-    },
-    "/api/v1/devices": {
-      "get": {
-        "operationId": "devices",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "cursor",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "limit",
-            "schema": {
-              "type": "integer",
-              "default": 50,
-              "minimum": 1,
-              "maximum": 200
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Authorized result",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DevicePage"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Safe error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
+        },
+        "description": "Current namespace-authorized, nonexpired history. Partial unreadCount is an authorized subtotal, never an unavailable-scope count. Absent scope selects all authorized namespaces; explicit [] selects none. Continuations bind account/filter/scopes/current authority and expire after ten minutes."
       }
     },
     "/api/v1/rules/{ruleId}": {
-      "put": {
-        "operationId": "updateRule",
+      "get": {
+        "operationId": "rule",
+        "description": "Read one owned rule with current source authorization and redacted inaccessible scopes. Returns ETag. No query or body accepted.",
         "parameters": [
           {
             "in": "path",
             "name": "ruleId",
             "required": true,
             "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "X-CSRF-Token",
-            "schema": {
-              "type": "string"
-            },
-            "description": "Required for cookie-authenticated mutations; not a bearer-token substitute."
-          },
-          {
-            "in": "header",
-            "name": "If-Match",
-            "required": true,
-            "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Authorized result",
+            "description": "Authorized personal alert-rule result",
             "content": {
               "application/json": {
                 "schema": {
@@ -1029,7 +974,63 @@
             }
           },
           "default": {
-            "description": "Safe error",
+            "description": "Safe error.400 invalid_request;401 unauthenticated;403 forbidden;404 not_found_or_inaccessible;409 revision_conflict/cursor_expired;422 unsupported_outcome;429 rate_limited or rule_capacity;503 authority/source unavailable. Only rate_limited includes Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateRule",
+        "description": "Replace complete intent under revision check. Material scope/outcome/enable changes create fresh activation intervals. Name-only edits may preserve them. Returns ETag. Use enabled-only operation when references are redacted.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ruleId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required for cookie-authenticated mutations; bearer-authenticated native requests do not use browser CSRF tokens."
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 21
+            },
+            "description": "One current positive signed64-bit decimal revision. Strong quoted ETag or bare decimal accepted; weak tags, wildcard, lists and noncanonical numbers rejected."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized personal alert-rule result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rule"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Safe error.400 invalid_request;401 unauthenticated;403 forbidden;404 not_found_or_inaccessible;409 revision_conflict/cursor_expired;422 unsupported_outcome;429 rate_limited or rule_capacity;503 authority/source unavailable. Only rate_limited includes Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1045,6 +1046,55 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/RuleInput"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteRule",
+        "description": "Delete personal rule and immediately suppress its candidates. No body/query. Preserves immutable history and remains available during source outages and ordinary edit quota exhaustion.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ruleId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required for cookie-authenticated mutations; bearer-authenticated native requests do not use browser CSRF tokens."
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 21
+            },
+            "description": "One current positive signed64-bit decimal revision. Strong quoted ETag or bare decimal accepted; weak tags, wildcard, lists and noncanonical numbers rejected."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Rule deleted; no body"
+          },
+          "default": {
+            "description": "Safe error.400 invalid_request;401 unauthenticated;403 forbidden;404 not_found_or_inaccessible;409 revision_conflict/cursor_expired;422 unsupported_outcome;429 rate_limited or rule_capacity;503 authority/source unavailable. Only rate_limited includes Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
               }
             }
           }
@@ -1103,28 +1153,19 @@
               }
             }
           }
-        }
-      }
-    },
-    "/api/v1/devices/{deviceId}": {
-      "patch": {
-        "operationId": "updateDevice",
+        },
+        "description": "Idempotently set read state. Requires current owner/alias and source namespace authority before and after mutation, including expiry checks after database locks. Cookie requests require CSRF protection."
+      },
+      "get": {
+        "operationId": "inboxItem",
         "parameters": [
           {
             "in": "path",
-            "name": "deviceId",
+            "name": "inboxId",
             "required": true,
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "in": "header",
-            "name": "X-CSRF-Token",
-            "schema": {
-              "type": "string"
-            },
-            "description": "Required for cookie-authenticated mutations; not a bearer-token substitute."
           }
         ],
         "responses": {
@@ -1133,7 +1174,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Device"
+                  "$ref": "#/components/schemas/InboxItem"
                 }
               }
             }
@@ -1149,16 +1190,7 @@
             }
           }
         },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DeviceUpdate"
-              }
-            }
-          }
-        }
+        "description": "Resolve an opaque push reference only after current namespace/jobs.read authorization. Historical facts survive deletion of the source job; no cached job name is returned."
       }
     },
     "/api/v1/preferences": {
@@ -1727,6 +1759,925 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/rules/{ruleId}/enabled": {
+      "put": {
+        "operationId": "setRuleEnabled",
+        "description": "Change only enabled state using stored intent; no hidden scope reconstruction required. Disabling commits without Control availability and bypasses ordinary edit quota. Enabling requires fresh current authorization and activation boundaries. Exact1024-byte-bounded body {enabled:boolean}; returns ETag.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ruleId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required for cookie-authenticated mutations; bearer-authenticated native requests do not use browser CSRF tokens."
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 21
+            },
+            "description": "One current positive signed64-bit decimal revision. Strong quoted ETag or bare decimal accepted; weak tags, wildcard, lists and noncanonical numbers rejected."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized personal alert-rule result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rule"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Safe error.400 invalid_request;401 unauthenticated;403 forbidden;404 not_found_or_inaccessible;409 revision_conflict/cursor_expired;422 unsupported_outcome;429 rate_limited or rule_capacity;503 authority/source unavailable. Only rate_limited includes Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleEnabledInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rules/{ruleId}/revalidate": {
+      "post": {
+        "operationId": "revalidateRule",
+        "description": "Explicitly request fresh activation for pending or previously inaccessible scopes after current authorization. Healthy sources progress independently of unavailable siblings. Does not enable a disabled rule. No query or body accepted; server always records explicit user revalidation. Returns ETag.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ruleId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required for cookie-authenticated mutations; bearer-authenticated native requests do not use browser CSRF tokens."
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 21
+            },
+            "description": "One current positive signed64-bit decimal revision. Strong quoted ETag or bare decimal accepted; weak tags, wildcard, lists and noncanonical numbers rejected."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized personal alert-rule result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rule"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Safe error.400 invalid_request;401 unauthenticated;403 forbidden;404 not_found_or_inaccessible;409 revision_conflict/cursor_expired;422 unsupported_outcome;429 rate_limited or rule_capacity;503 authority/source unavailable. Only rate_limited includes Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices": {
+      "get": {
+        "operationId": "devices",
+        "description": "List current owned devices, at most50; no body. Installation creation is capped100 per original creator and10000 globally. Retained binding history is capped100 per installation and never silently deleted. No query parameters accepted. Duplicate, unknown, case-variant and null JSON fields are rejected. Proof/token bodies must not be logged.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Safe owned device result; individual/inspection responses include exact revision ETag.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DevicePage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Safe error:400 invalid_request;401 unauthenticated;403 forbidden;404 not_found_or_inaccessible (unknown/wrong proof/wrong owner/removed);409 revision_conflict;429 rate_limited or device_capacity;503 unavailable. Only rate_limited includes Retry-After. No raw storage/crypto details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{installationId}/inspect": {
+      "post": {
+        "operationId": "inspectInstallation",
+        "description": "Read current revision and binding flags using authenticated actor plus installation proof.512-byte body. Unknown installation and wrong proof are indistinguishable. No query parameters accepted. Duplicate, unknown, case-variant and null JSON fields are rejected. Proof/token bodies must not be logged.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "installationId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "description": "Canonical lowercase nonzero UUID."
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required for cookie-authenticated mutations; bearer-authenticated native requests do not use browser CSRF tokens."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Safe owned device result; individual/inspection responses include exact revision ETag.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallationState"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Safe error:400 invalid_request;401 unauthenticated;403 forbidden;404 not_found_or_inaccessible (unknown/wrong proof/wrong owner/removed);409 revision_conflict;429 rate_limited or device_capacity;503 unavailable. Only rate_limited includes Retry-After. No raw storage/crypto details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstallationProofInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{installationId}/bind": {
+      "post": {
+        "operationId": "bindDevice",
+        "description": "Explicit confirmed bind using an acknowledged reservation and its immutable target. Requires positive If-Match and the same pre-persisted revocation pair. Never initiate before reservation acknowledgement. A cancelled reservation cannot attach. 16KiB strict JSON; no query; no secret/token logging.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "installationId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "description": "Canonical lowercase nonzero UUID."
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required for cookie-authenticated mutations; bearer-authenticated native requests do not use browser CSRF tokens."
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "schema": {
+              "type": "string",
+              "maxLength": 21
+            },
+            "description": "Positive current revision from an acknowledged revocation reservation. Mixed or repeated conditional headers are rejected.",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Safe owned device result; individual/inspection responses include exact revision ETag.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Device"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Safe error:400 invalid_request;401 unauthenticated;403 forbidden;404 not_found_or_inaccessible (unknown/wrong proof/wrong owner/removed);409 revision_conflict;429 rate_limited or device_capacity;503 unavailable. Only rate_limited includes Retry-After. No raw storage/crypto details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceBindInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{installationId}/switch": {
+      "post": {
+        "operationId": "switchDeviceBinding",
+        "description": "Explicit confirmed switch using an acknowledged reservation and its immutable target. Requires positive If-Match and the same pre-persisted revocation pair. Never initiate before reservation acknowledgement. A cancelled reservation cannot attach. 16KiB strict JSON; no query; no secret/token logging.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "installationId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "description": "Canonical lowercase nonzero UUID."
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required for cookie-authenticated mutations; bearer-authenticated native requests do not use browser CSRF tokens."
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 21
+            },
+            "description": "Positive current revision from an acknowledged revocation reservation. Mixed or repeated conditional headers are rejected."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Safe owned device result; individual/inspection responses include exact revision ETag.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Device"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Safe error:400 invalid_request;401 unauthenticated;403 forbidden;404 not_found_or_inaccessible (unknown/wrong proof/wrong owner/removed);409 revision_conflict;429 rate_limited or device_capacity;503 unavailable. Only rate_limited includes Retry-After. No raw storage/crypto details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceSwitchInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{installationId}/token": {
+      "put": {
+        "operationId": "refreshDeviceToken",
+        "description": "Refresh token/OS permission on the existing current-account binding; never bind after remote removal.8KiB body. Token refresh and settings share30 mutations per fixed60-second installation window; actual permission loss bypasses admission. No query parameters accepted. Duplicate, unknown, case-variant and null JSON fields are rejected. Proof/token bodies must not be logged.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "installationId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "description": "Canonical lowercase nonzero UUID."
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required for cookie-authenticated mutations; bearer-authenticated native requests do not use browser CSRF tokens."
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 21
+            },
+            "description": "One current positive signed64-bit decimal revision. Strong quoted ETag or bare decimal accepted; weak tags, wildcard, lists and noncanonical numbers rejected."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Safe owned device result; individual/inspection responses include exact revision ETag.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Device"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Safe error:400 invalid_request;401 unauthenticated;403 forbidden;404 not_found_or_inaccessible (unknown/wrong proof/wrong owner/removed);409 revision_conflict;429 rate_limited or device_capacity;503 unavailable. Only rate_limited includes Retry-After. No raw storage/crypto details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceTokenInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{installationId}/settings": {
+      "put": {
+        "operationId": "updateDeviceSettings",
+        "description": "Change owned label/enabled/muted settings remotely.2KiB body. Shared30 mutations/fixed60-second window; actual stop/mute changes bypass admission only if the same edit does not reenable, unmute, or rename. No-op settings preserve revision. No query parameters accepted. Duplicate, unknown, case-variant and null JSON fields are rejected. Proof/token bodies must not be logged.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "installationId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "description": "Canonical lowercase nonzero UUID."
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required for cookie-authenticated mutations; bearer-authenticated native requests do not use browser CSRF tokens."
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 21
+            },
+            "description": "One current positive signed64-bit decimal revision. Strong quoted ETag or bare decimal accepted; weak tags, wildcard, lists and noncanonical numbers rejected."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Safe owned device result; individual/inspection responses include exact revision ETag.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Device"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Safe error:400 invalid_request;401 unauthenticated;403 forbidden;404 not_found_or_inaccessible (unknown/wrong proof/wrong owner/removed);409 revision_conflict;429 rate_limited or device_capacity;503 unavailable. Only rate_limited includes Retry-After. No raw storage/crypto details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceSettingsInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{installationId}": {
+      "delete": {
+        "operationId": "removeDevice",
+        "description": "Remote removal by current authenticated owner under revision CAS, without installation proof. No body. Clears token/current binding and invalidates old delivery candidates; remains available at capacity/rate limits. No query parameters accepted. Duplicate, unknown, case-variant and null JSON fields are rejected. Proof/token bodies must not be logged.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "installationId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "description": "Canonical lowercase nonzero UUID."
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required for cookie-authenticated mutations; bearer-authenticated native requests do not use browser CSRF tokens."
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 21
+            },
+            "description": "One current positive signed64-bit decimal revision. Strong quoted ETag or bare decimal accepted; weak tags, wildcard, lists and noncanonical numbers rejected."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Binding removed/detached; no response body."
+          },
+          "default": {
+            "description": "Safe error:400 invalid_request;401 unauthenticated;403 forbidden;404 not_found_or_inaccessible (unknown/wrong proof/wrong owner/removed);409 revision_conflict;429 rate_limited or device_capacity;503 unavailable. Only rate_limited includes Retry-After. No raw storage/crypto details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{installationId}/detach": {
+      "post": {
+        "operationId": "detachInstallation",
+        "description": "Explicit sign-out detachment by current owner plus installation proof.512-byte body. Clears old binding/token, preserves opaque installation identity, and remains available at rate/capacity limits. No query parameters accepted. Duplicate, unknown, case-variant and null JSON fields are rejected. Proof/token bodies must not be logged.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "installationId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "description": "Canonical lowercase nonzero UUID."
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required for cookie-authenticated mutations; bearer-authenticated native requests do not use browser CSRF tokens."
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 21
+            },
+            "description": "One current positive signed64-bit decimal revision. Strong quoted ETag or bare decimal accepted; weak tags, wildcard, lists and noncanonical numbers rejected."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Binding removed/detached; no response body."
+          },
+          "default": {
+            "description": "Safe error:400 invalid_request;401 unauthenticated;403 forbidden;404 not_found_or_inaccessible (unknown/wrong proof/wrong owner/removed);409 revision_conflict;429 rate_limited or device_capacity;503 unavailable. Only rate_limited includes Retry-After. No raw storage/crypto details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstallationProofInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{installationId}/revocation-reservations": {
+      "post": {
+        "operationId": "reserveDeviceRevocation",
+        "description": "First phase: reserve a client-generated opaque credential ID and secret, persisted in Keychain before request. If-None-Match:* creates an unbound installation; otherwise positive If-Match. Exact same pair for the unchanged target is idempotent even after a lost receipt; revoked IDs never reassign. Acknowledge and persist receipt before bind/switch/activate. At most 500 retained IDs per installation, 5 pending and 5 per target binding. 512-byte strict JSON.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "installationId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "description": "Canonical lowercase nonzero UUID."
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required for cookie-authenticated mutations; bearer-authenticated native requests do not use browser CSRF tokens."
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "schema": {
+              "type": "string",
+              "maxLength": 21
+            },
+            "description": "Positive current revision for an existing installation. Mutually exclusive with If-None-Match:*."
+          },
+          {
+            "in": "header",
+            "name": "If-None-Match",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "*"
+              ]
+            },
+            "description": "Only for an unseen installation; creates no binding. Mutually exclusive with If-Match."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Safe owned device result; individual/inspection responses include exact revision ETag.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRevocationReceipt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Safe error:400 invalid_request;401 unauthenticated;403 forbidden;404 not_found_or_inaccessible (unknown/wrong proof/wrong owner/removed);409 revision_conflict;429 rate_limited or device_capacity;503 unavailable. Only rate_limited includes Retry-After. No raw storage/crypto details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceRevocationInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{installationId}/revocation-credentials": {
+      "post": {
+        "operationId": "activateDeviceRevocation",
+        "description": "Second phase for an existing owned binding only. Activate an acknowledged reservation without changing token/preferences/ownership. Positive If-Match; exact active pair replay is idempotent. Migration-era bindings are push-ineligible until activation. 512-byte strict JSON.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "installationId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "description": "Canonical lowercase nonzero UUID."
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required for cookie-authenticated mutations; bearer-authenticated native requests do not use browser CSRF tokens."
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "schema": {
+              "type": "string",
+              "maxLength": 21
+            },
+            "description": "Positive current revision from an acknowledged revocation reservation. Mixed or repeated conditional headers are rejected.",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Safe owned device result; individual/inspection responses include exact revision ETag.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRevocationReceipt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Safe error:400 invalid_request;401 unauthenticated;403 forbidden;404 not_found_or_inaccessible (unknown/wrong proof/wrong owner/removed);409 revision_conflict;429 rate_limited or device_capacity;503 unavailable. Only rate_limited includes Retry-After. No raw storage/crypto details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceRevocationInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/native/device-revocations": {
+      "post": {
+        "operationId": "revokeNativeDevice",
+        "security": [],
+        "description": "Detach-only native sign-out. No Authorization, Cookie, Origin, query, or conditional headers. 512-byte strict body. Known pending credentials cancel admission; known exact current targets detach atomically. Unknown/wrong/stale credentials return identical empty 204 and allocate no rows. 5-second deadline, 8 concurrent requests, per-replica 60/sec burst120. Retry 429/503; never discard queued credential on failure.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NativeDeviceRevocationInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Revocation acknowledged with no disclosure of credential existence."
+          },
+          "default": {
+            "description": "Safe error:400 invalid_request;401 unauthenticated;403 forbidden;404 not_found_or_inaccessible (unknown/wrong proof/wrong owner/removed);409 revision_conflict;429 rate_limited or device_capacity;503 unavailable. Only rate_limited includes Retry-After. No raw storage/crypto details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/deployments/{deploymentId}/namespaces/{namespaceId}/jobs/{jobId}/runs": {
+      "get": {
+        "operationId": "runs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deploymentId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "namespaceId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List bounded source run references"
+      }
+    },
+    "/api/v1/deployments/{deploymentId}/namespaces/{namespaceId}/jobs/{jobId}/runs/{runId}": {
+      "get": {
+        "operationId": "run",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deploymentId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "namespaceId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Read one currently authorized run"
       }
     }
   },
@@ -2948,54 +3899,62 @@
         ],
         "additionalProperties": false
       },
-      "RuleActivation": {
-        "type": "object",
-        "properties": {
-          "deploymentId": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "deploymentId",
-          "status"
-        ],
-        "additionalProperties": false
-      },
       "RuleInput": {
         "type": "object",
         "properties": {
           "name": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "Trimmed, nonempty UTF-8 name, at most120 encoded bytes; no control characters."
           },
           "enabled": {
             "type": "boolean"
           },
           "scope": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "watched_jobs",
+              "my_jobs",
+              "namespace_jobs"
+            ]
           },
           "namespaces": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Scope"
-            }
+            },
+            "maxItems": 320,
+            "minItems": 1
           },
           "jobs": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/JobRef"
-            }
+            },
+            "maxItems": 100
           },
           "outcomeMode": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "selected",
+              "all_terminal"
+            ]
           },
           "outcomes": {
             "type": "array",
             "items": {
-              "type": "string"
-            }
+              "type": "string",
+              "enum": [
+                "success",
+                "failure",
+                "cancelled",
+                "timed_out",
+                "aborted",
+                "lost"
+              ]
+            },
+            "maxItems": 6
           }
         },
         "required": [
@@ -3007,53 +3966,92 @@
           "outcomeMode",
           "outcomes"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Complete personal intent. Maximum64KiB request. All arrays required, including empty arrays. Explicit namespaces span at most32 deployments; watched_jobs requires1\u2013100 job references within selected namespaces. selected requires individual outcomes; all_terminal preserves future unknown outcomes. Server canonicalizes ordering/duplicates. No actor, owner, activation or checkpoint fields accepted."
       },
       "Rule": {
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
           },
           "revision": {
             "type": "string",
-            "pattern": "^[0-9]+$"
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Canonical positive signed64-bit decimal string."
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "Trimmed, nonempty UTF-8 name, at most120 encoded bytes; no control characters."
           },
           "enabled": {
             "type": "boolean"
           },
           "scope": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "watched_jobs",
+              "my_jobs",
+              "namespace_jobs"
+            ]
           },
-          "namespaces": {
+          "outcomeMode": {
+            "type": "string",
+            "enum": [
+              "selected",
+              "all_terminal"
+            ]
+          },
+          "outcomes": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Scope"
-            }
+              "type": "string",
+              "enum": [
+                "success",
+                "failure",
+                "cancelled",
+                "timed_out",
+                "aborted",
+                "lost"
+              ]
+            },
+            "maxItems": 6
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleScope"
+            },
+            "maxItems": 320
           },
           "jobs": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/JobRef"
-            }
+            },
+            "maxItems": 100
           },
-          "outcomeMode": {
-            "type": "string"
+          "inaccessibleScopes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 320
           },
-          "outcomes": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+          "unavailableScopes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 320
           },
-          "activation": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/RuleActivation"
-            }
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "required": [
@@ -3062,12 +4060,17 @@
           "name",
           "enabled",
           "scope",
-          "namespaces",
-          "jobs",
           "outcomeMode",
-          "outcomes"
+          "outcomes",
+          "scopes",
+          "jobs",
+          "inaccessibleScopes",
+          "unavailableScopes",
+          "createdAt",
+          "updatedAt"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Currently authorized projection of a personal rule. Hidden namespace and job references are omitted; counts distinguish inaccessible and unavailable scopes. Never contains account/directory/principal IDs, activation IDs, feed cursors or private boundaries. Use enabled-only operation to stop a rule with hidden references."
       },
       "InboxItem": {
         "type": "object",
@@ -3078,6 +4081,12 @@
           "job": {
             "$ref": "#/components/schemas/JobRef"
           },
+          "controlInstanceId": {
+            "type": "string"
+          },
+          "eventId": {
+            "type": "string"
+          },
           "outcome": {
             "type": "string"
           },
@@ -3085,31 +4094,61 @@
             "type": "string",
             "format": "date-time"
           },
+          "observedCompletedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
           "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
             "type": "string",
             "format": "date-time"
           },
           "read": {
             "type": "boolean"
           },
+          "readAt": {
+            "type": "string",
+            "format": "date-time"
+          },
           "matchedRules": {
             "type": "array",
             "items": {
-              "type": "string"
-            }
+              "$ref": "#/components/schemas/InboxMatch"
+            },
+            "minItems": 1,
+            "maxItems": 100
           },
-          "deliveryStatus": {
+          "jobName": {
             "type": "string"
+          },
+          "jobAvailability": {
+            "type": "string",
+            "enum": [
+              "available",
+              "missing",
+              "unavailable"
+            ]
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/InboxDelivery"
           }
         },
         "required": [
           "id",
           "job",
+          "controlInstanceId",
+          "eventId",
           "outcome",
           "eventAt",
           "createdAt",
+          "expiresAt",
           "read",
-          "matchedRules"
+          "matchedRules",
+          "jobAvailability",
+          "delivery"
         ],
         "additionalProperties": false
       },
@@ -3128,44 +4167,101 @@
       "Device": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string"
+          "installationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Canonical lowercase nonzero UUID."
           },
-          "name": {
-            "type": "string"
+          "revision": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Canonical positive signed64-bit decimal; never convert through a floating-point number."
           },
-          "platform": {
-            "type": "string"
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "1\u2013120 UTF-8 bytes, trimmed, without control characters."
+          },
+          "topic": {
+            "type": "string",
+            "maxLength": 255,
+            "pattern": "^[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)+$",
+            "description": "Must match an operator-configured topic/environment pair."
+          },
+          "environment": {
+            "type": "string",
+            "enum": [
+              "sandbox",
+              "production"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "bound"
+            ]
           },
           "enabled": {
             "type": "boolean"
           },
+          "muted": {
+            "type": "boolean"
+          },
           "permission": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "not_determined",
+              "denied",
+              "authorized",
+              "provisional",
+              "ephemeral"
+            ]
+          },
+          "tokenStatus": {
+            "type": "string",
+            "enum": [
+              "current",
+              "invalid",
+              "absent"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
           },
           "lastSeenAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "revocationReady": {
+            "type": "boolean",
+            "description": "True only after an acknowledged revocation reservation is activated for this binding. Upgrade-era bindings without a credential cannot deliver push."
           }
         },
         "required": [
-          "id",
-          "name",
-          "enabled"
+          "installationId",
+          "revision",
+          "label",
+          "topic",
+          "environment",
+          "state",
+          "enabled",
+          "muted",
+          "permission",
+          "tokenStatus",
+          "createdAt",
+          "updatedAt",
+          "lastSeenAt",
+          "revocationReady"
         ],
-        "additionalProperties": false
-      },
-      "DeviceUpdate": {
-        "type": "object",
-        "properties": {
-          "enabled": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "enabled"
-        ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Safe currently owned binding. No account IDs, binding IDs, private token versions, token material or installation proof. Last seen is informational; no inactivity expiry."
       },
       "JobPage": {
         "type": "object",
@@ -3366,32 +4462,19 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Rule"
-            }
+            },
+            "maxItems": 20
           },
           "nextCursor": {
-            "type": "string"
-          },
-          "completeness": {
-            "type": "string"
-          },
-          "sources": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SourceStatus"
-            }
-          },
-          "fetchedAt": {
             "type": "string",
-            "format": "date-time"
+            "maxLength": 128
           }
         },
         "required": [
-          "items",
-          "completeness",
-          "sources",
-          "fetchedAt"
+          "items"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Complete bounded traversal of current owned rules, at most20 per page. Follow nextCursor; cursor binds account and limit, expires after10 minutes, and every page reauthorizes current scopes. Concurrent edits are reflected when their page is read; refresh to see additions ordered before the current cursor. Response at most2MiB."
       },
       "InboxItemPage": {
         "type": "object",
@@ -3400,19 +4483,33 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/InboxItem"
-            }
+            },
+            "maxItems": 50
           },
           "nextCursor": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 128
+          },
+          "unreadCount": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
           },
           "completeness": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "complete",
+              "partial"
+            ]
           },
-          "sources": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SourceStatus"
-            }
+          "unavailableSources": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 32
+          },
+          "inaccessibleScopes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 320
           },
           "fetchedAt": {
             "type": "string",
@@ -3421,8 +4518,10 @@
         },
         "required": [
           "items",
+          "unreadCount",
           "completeness",
-          "sources",
+          "unavailableSources",
+          "inaccessibleScopes",
           "fetchedAt"
         ],
         "additionalProperties": false
@@ -3434,32 +4533,15 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Device"
-            }
-          },
-          "nextCursor": {
-            "type": "string"
-          },
-          "completeness": {
-            "type": "string"
-          },
-          "sources": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SourceStatus"
-            }
-          },
-          "fetchedAt": {
-            "type": "string",
-            "format": "date-time"
+            },
+            "maxItems": 50
           }
         },
         "required": [
-          "items",
-          "completeness",
-          "sources",
-          "fetchedAt"
+          "items"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Complete current owned list ordered by installation UUID; at most50 bindings/account, no pagination. Encoded response bounded128KiB."
       },
       "Lifecycle": {
         "type": "object",
@@ -4466,6 +5548,635 @@
         ],
         "additionalProperties": false,
         "description": "Projection of a reauthorized, fully verified original evidence/report pair; advice is text and never executes actions."
+      },
+      "RuleScope": {
+        "type": "object",
+        "properties": {
+          "deploymentId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          },
+          "namespaceId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "pending",
+              "disabled",
+              "inaccessible",
+              "unavailable"
+            ]
+          },
+          "activatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Original source-clock activation time, present only while active."
+          }
+        },
+        "required": [
+          "deploymentId",
+          "namespaceId",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "RuleEnabledInput": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "additionalProperties": false
+      },
+      "InstallationState": {
+        "type": "object",
+        "properties": {
+          "installationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Canonical lowercase nonzero UUID."
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Canonical positive signed64-bit decimal; never convert through a floating-point number."
+          },
+          "hasBinding": {
+            "type": "boolean"
+          },
+          "boundToCurrentAccount": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "installationId",
+          "revision",
+          "hasBinding",
+          "boundToCurrentAccount"
+        ],
+        "additionalProperties": false,
+        "description": "Privacy-limited result requiring current authenticated actor plus installation proof. Never identifies the previous owner or their device settings."
+      },
+      "InstallationProofInput": {
+        "type": "object",
+        "properties": {
+          "installationSecret": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "writeOnly": true,
+            "description": "Canonical unpadded base64url encoding of32 cryptographically random bytes generated and retained in Keychain for this installation. Never put in URL, analytics or logs; never returned."
+          }
+        },
+        "required": [
+          "installationSecret"
+        ],
+        "additionalProperties": false
+      },
+      "DeviceBindInput": {
+        "type": "object",
+        "properties": {
+          "installationSecret": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "writeOnly": true,
+            "description": "Canonical unpadded base64url encoding of32 cryptographically random bytes generated and retained in Keychain for this installation. Never put in URL, analytics or logs; never returned."
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "1\u2013120 UTF-8 bytes, trimmed, without control characters."
+          },
+          "topic": {
+            "type": "string",
+            "maxLength": 255,
+            "pattern": "^[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)+$",
+            "description": "Must match an operator-configured topic/environment pair."
+          },
+          "environment": {
+            "type": "string",
+            "enum": [
+              "sandbox",
+              "production"
+            ]
+          },
+          "token": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 1024,
+            "pattern": "^(?:[0-9a-f]{2}){1,512}$",
+            "writeOnly": true,
+            "description": "APNs token bytes as canonical lowercase hexadecimal. Variable token lengths supported; encrypted at rest and never returned or logged."
+          },
+          "permission": {
+            "type": "string",
+            "enum": [
+              "not_determined",
+              "denied",
+              "authorized",
+              "provisional",
+              "ephemeral"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "muted": {
+            "type": "boolean"
+          },
+          "confirmBind": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "revocationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Canonical lowercase nonzero UUID."
+          },
+          "revocationCredential": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "writeOnly": true,
+            "description": "Canonical unpadded base64url of 32 random bytes. Persist in Keychain before reservation. Detach-only authority for one immutable reservation target. Never returned or logged."
+          }
+        },
+        "required": [
+          "installationSecret",
+          "label",
+          "topic",
+          "environment",
+          "token",
+          "permission",
+          "enabled",
+          "muted",
+          "confirmBind",
+          "revocationId",
+          "revocationCredential"
+        ],
+        "additionalProperties": false,
+        "description": "Explicit user-confirmed attachment/reattachment. Normal startup must use token refresh; this operation can reactivate a remotely removed installation only with explicit intent and proof."
+      },
+      "DeviceSwitchInput": {
+        "type": "object",
+        "properties": {
+          "installationSecret": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "writeOnly": true,
+            "description": "Canonical unpadded base64url encoding of32 cryptographically random bytes generated and retained in Keychain for this installation. Never put in URL, analytics or logs; never returned."
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "1\u2013120 UTF-8 bytes, trimmed, without control characters."
+          },
+          "topic": {
+            "type": "string",
+            "maxLength": 255,
+            "pattern": "^[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)+$",
+            "description": "Must match an operator-configured topic/environment pair."
+          },
+          "environment": {
+            "type": "string",
+            "enum": [
+              "sandbox",
+              "production"
+            ]
+          },
+          "token": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 1024,
+            "pattern": "^(?:[0-9a-f]{2}){1,512}$",
+            "writeOnly": true,
+            "description": "APNs token bytes as canonical lowercase hexadecimal. Variable token lengths supported; encrypted at rest and never returned or logged."
+          },
+          "permission": {
+            "type": "string",
+            "enum": [
+              "not_determined",
+              "denied",
+              "authorized",
+              "provisional",
+              "ephemeral"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "muted": {
+            "type": "boolean"
+          },
+          "confirmSwitch": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "revocationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Canonical lowercase nonzero UUID."
+          },
+          "revocationCredential": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "writeOnly": true,
+            "description": "Canonical unpadded base64url of 32 random bytes. Persist in Keychain before reservation. Detach-only authority for one immutable reservation target. Never returned or logged."
+          }
+        },
+        "required": [
+          "installationSecret",
+          "label",
+          "topic",
+          "environment",
+          "token",
+          "permission",
+          "enabled",
+          "muted",
+          "confirmSwitch",
+          "revocationId",
+          "revocationCredential"
+        ],
+        "additionalProperties": false,
+        "description": "Explicit user-confirmed atomic account switch with installation proof and current revision. New actor must be authenticated; previous credentials are not required. Old binding/token/attempt fences are retired."
+      },
+      "DeviceTokenInput": {
+        "type": "object",
+        "properties": {
+          "installationSecret": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "writeOnly": true,
+            "description": "Canonical unpadded base64url encoding of32 cryptographically random bytes generated and retained in Keychain for this installation. Never put in URL, analytics or logs; never returned."
+          },
+          "token": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 1024,
+            "pattern": "^(?:[0-9a-f]{2}){1,512}$",
+            "writeOnly": true,
+            "description": "APNs token bytes as canonical lowercase hexadecimal. Variable token lengths supported; encrypted at rest and never returned or logged."
+          },
+          "permission": {
+            "type": "string",
+            "enum": [
+              "not_determined",
+              "denied",
+              "authorized",
+              "provisional",
+              "ephemeral"
+            ]
+          }
+        },
+        "required": [
+          "installationSecret",
+          "token",
+          "permission"
+        ],
+        "additionalProperties": false,
+        "description": "Normal startup/token rotation for the current bound account. Cannot rebind detached/removed installations; preserves server enabled/muted settings. Even identical token bytes advance the private token version and registration time."
+      },
+      "DeviceSettingsInput": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "1\u2013120 UTF-8 bytes, trimmed, without control characters."
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "muted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "label",
+          "enabled",
+          "muted"
+        ],
+        "additionalProperties": false,
+        "description": "Owner-controlled remote settings; no installation proof or APNs token required. No-op settings do not create a revision/audit record."
+      },
+      "DeviceRevocationInput": {
+        "type": "object",
+        "properties": {
+          "installationSecret": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "writeOnly": true,
+            "description": "Canonical unpadded base64url encoding of32 cryptographically random bytes generated and retained in Keychain for this installation. Never put in URL, analytics or logs; never returned."
+          },
+          "revocationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Canonical lowercase nonzero UUID."
+          },
+          "revocationCredential": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "writeOnly": true,
+            "description": "Canonical unpadded base64url of 32 random bytes. Persist in Keychain before reservation. Detach-only authority for one immutable reservation target. Never returned or logged."
+          }
+        },
+        "required": [
+          "installationSecret",
+          "revocationId",
+          "revocationCredential"
+        ],
+        "additionalProperties": false
+      },
+      "DeviceRevocationReceipt": {
+        "type": "object",
+        "properties": {
+          "installationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Canonical lowercase nonzero UUID."
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Canonical positive signed64-bit decimal; never convert through a floating-point number."
+          },
+          "revocationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Canonical lowercase nonzero UUID."
+          },
+          "intent": {
+            "type": "string",
+            "enum": [
+              "bind",
+              "switch",
+              "existing"
+            ]
+          }
+        },
+        "required": [
+          "installationId",
+          "revision",
+          "revocationId",
+          "intent"
+        ],
+        "additionalProperties": false
+      },
+      "NativeDeviceRevocationInput": {
+        "type": "object",
+        "properties": {
+          "revocationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Canonical lowercase nonzero UUID."
+          },
+          "revocationCredential": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "writeOnly": true,
+            "description": "Canonical unpadded base64url of 32 random bytes. Persist in Keychain before reservation. Detach-only authority for one immutable reservation target. Never returned or logged."
+          }
+        },
+        "required": [
+          "revocationId",
+          "revocationCredential"
+        ],
+        "additionalProperties": false
+      },
+      "InboxMatch": {
+        "type": "object",
+        "properties": {
+          "ruleId": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "watched_jobs",
+              "my_jobs",
+              "namespace_jobs"
+            ]
+          },
+          "outcomeMode": {
+            "type": "string",
+            "enum": [
+              "selected",
+              "all_terminal"
+            ]
+          },
+          "outcomes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 6
+          }
+        },
+        "required": [
+          "ruleId",
+          "revision",
+          "name",
+          "scope",
+          "outcomeMode",
+          "outcomes"
+        ],
+        "additionalProperties": false
+      },
+      "InboxDelivery": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
+          },
+          "byState": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)$"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "byState"
+        ],
+        "additionalProperties": false
+      },
+      "JobRun": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "number",
+          "phase",
+          "desiredState",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "desiredState": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "executionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "executionPhase": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "targetGenerationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "backend": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "string"
+          }
+        }
+      },
+      "RunPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobRun"
+            }
+          },
+          "nextCursor": {
+            "type": "string"
+          },
+          "completeness": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceStatus"
+            }
+          },
+          "fetchedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "total": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "required": [
+          "items",
+          "completeness",
+          "sources",
+          "fetchedAt",
+          "total"
+        ],
+        "additionalProperties": false
+      },
+      "RunDetail": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "run",
+          "sources",
+          "completeness",
+          "fetchedAt"
+        ],
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/JobRun"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceStatus"
+            }
+          },
+          "completeness": {
+            "type": "string"
+          },
+          "fetchedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
       }
     }
   }

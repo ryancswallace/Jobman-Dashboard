@@ -17,6 +17,8 @@ struct ReportsView: View {
     @State private var loadGeneration = UUID()
     @State private var error: String?
 
+    init(ref: JobRef, selectedRunID: String? = nil) { self.ref = ref; _runID = State(initialValue: selectedRunID ?? "") }
+
     var body: some View {
         List {
             Section("Generate deterministic diagnosis") {

@@ -14,6 +14,8 @@ import (
 	"github.com/ryancswallace/jobman-dashboard/internal/monitoring"
 )
 
+var ErrSourceIdentityConflict = errors.New("deployment identity cannot be reassigned or configuration/recovery epoch rolled backward")
+
 func newID() (string, error) {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {
@@ -206,7 +208,7 @@ func (s *Store) VerifySourceIdentity(ctx context.Context, deployment, instance, 
 	 WHERE dashboard_source_identities.control_instance_id=excluded.control_instance_id AND dashboard_source_identities.configuration_revision<=excluded.configuration_revision
 	 AND dashboard_source_identities.recovery_epoch::bigint<=excluded.recovery_epoch::bigint`, deployment, instance, epoch, revision)
 	if err == nil && tag.RowsAffected() != 1 {
-		return errors.New("deployment identity cannot be reassigned or configuration/recovery epoch rolled backward")
+		return ErrSourceIdentityConflict
 	}
 	return err
 }

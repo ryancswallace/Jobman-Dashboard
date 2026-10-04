@@ -1,0 +1,43 @@
+[Unit]
+Description=Jobman storage-local read-only log broker
+Wants=network-online.target
+After=network-online.target remote-fs.target
+
+[Service]
+Type=simple
+User=jobman-log-broker
+Group=jobman-log-broker
+WorkingDirectory=/opt/jobman-dashboard/current
+ExecStartPre=/opt/jobman-dashboard/current/bin/jobman-log-broker --mode check-config --config /etc/jobman-log-broker/config.json
+ExecStart=/opt/jobman-dashboard/current/bin/jobman-log-broker --config /etc/jobman-log-broker/config.json
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=90s
+KillMode=control-group
+UMask=0077
+RuntimeDirectory=jobman-log-broker
+RuntimeDirectoryMode=0700
+StateDirectory=jobman-log-broker
+StateDirectoryMode=0700
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectKernelLogs=true
+ProtectClock=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+InaccessiblePaths=-/etc/jobman-dashboard-api -/etc/jobman-dashboard-worker -/var/lib/jobman-dashboard
+LimitNOFILE=4096
+TasksMax=512
+
+[Install]
+WantedBy=multi-user.target

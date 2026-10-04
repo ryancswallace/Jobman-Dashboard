@@ -81,3 +81,29 @@ public enum DashboardRoute: Hashable, Sendable {
         }
     }
 }
+
+public extension DashboardRoute {
+    /// Pasted links must use the already configured HTTPS origin. The link never
+    /// changes servers, carries credentials, or supplies any authorization.
+    init?(canonicalURL url: URL, connection: DashboardConnection) {
+        guard let parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let expected = URLComponents(url: connection.baseURL, resolvingAgainstBaseURL: false),
+              url.absoluteString.utf8.count <= 4096, parts.scheme?.lowercased() == "https",
+              parts.host?.lowercased() == expected.host?.lowercased(),
+              (parts.port ?? 443) == (expected.port ?? 443), parts.user == nil, parts.password == nil,
+              parts.query == nil, parts.fragment == nil else { return nil }
+        let components = parts.path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+        func valid(_ value: String) -> Bool {
+            !value.isEmpty && value.utf8.count <= 256 && value != "." && value != ".." &&
+            value.unicodeScalars.allSatisfy { CharacterSet.alphanumerics.union(.init(charactersIn: "-._~")).contains($0) }
+        }
+        // Round-trip canonical escaping rejects encoded separators and aliases.
+        guard components.first == "", "/" + components.dropFirst().map(APIPath.component).joined(separator: "/") == parts.percentEncodedPath else { return nil }
+        if components.count == 7, components[1] == "deployments", components[3] == "namespaces", components[5] == "jobs",
+           [components[2], components[4], components[6]].allSatisfy(valid) {
+            self = .job(.init(deploymentId: components[2], namespaceId: components[4], jobId: components[6]))
+        } else if components.count == 3, components[1] == "inbox", valid(components[2]) {
+            self = .inbox(components[2])
+        } else { return nil }
+    }
+}

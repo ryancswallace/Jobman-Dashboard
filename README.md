@@ -1,8 +1,15 @@
 # Jobman Dashboard
 
-Private web and native iPhone monitoring for Jobman Control. **Under implementation; not a supported release or production deployment.** The full scope includes source-qualified monitoring, direct AD role unions, arrays/collections/graphs, safe logs, deterministic diagnosis, and background notifications.
+Private web and native iPhone monitoring for Jobman Control. **Engineering prerelease; integrated and external acceptance remains open.** The applications implement source-qualified monitoring, direct AD role unions, arrays/collections/graphs, safe logs, deterministic diagnosis, and notification rules/history. Actual AD FS, APNs and company-managed iPhone acceptance are required before the initial release is complete.
 
 See [requirements](docs/REQUIREMENTS.md), [design](docs/DESIGN.md), and the live [implementation status](docs/IMPLEMENTATION_STATUS.md) for coverage and remaining acceptance gates.
+
+The [engineering candidate](https://github.com/ryancswallace/Jobman-Dashboard/releases/tag/v0.1.0-rc.1)
+contains reproducible Linux amd64/arm64 services and web assets. Follow
+[private installation](docs/LINUX_INSTALLATION.md) and the
+[operations runbook](docs/OPERATIONS.md); native signing/distribution is a separate
+gate. Actual [subprocess](docs/LAB_EXECUTION.md) and [split-runtime](docs/LAB_SPLIT.md)
+Lab evidence identifies the exact tested revisions and limitations.
 
 ## Development
 
@@ -13,7 +20,7 @@ make web
 make dev
 ```
 
-Open `http://127.0.0.1:8088`. This explicitly starts a **synthetic fixture environment**, restricted to a loopback IP. Fixture identities and data are not organization authentication. Configured HTTPS mode now provides OIDC authentication, durable web sessions, current-authorized Control adapters and personal preferences; see [authentication and configuration](docs/AUTHENTICATION.md). Its actual AD FS and Control directory integration gates remain open. The current monitoring backend implements bootstrap, overview, jobs, and job detail; other implemented client screens report unavailable while their services are being integrated.
+Open `http://127.0.0.1:8088`. This explicitly starts a **synthetic fixture environment**, restricted to a loopback IP. Fixture identities and data are not organization authentication. Configured HTTPS mode provides OIDC authentication, durable web sessions, current-authorized Control adapters, logs, artifacts, targets, workload groups, diagnosis, notification rules/history and personal preferences; see [authentication and configuration](docs/AUTHENTICATION.md). Optional services require their explicit private configuration; an unavailable service is displayed as unavailable. Actual AD FS and corporate directory acceptance remain open.
 
 For live web editing, run the fixture backend plus `npm run dev --prefix web`; the Vite configuration proxies same-origin API calls. Never expose the fixture server on a public or organization interface.
 

@@ -348,6 +348,9 @@ export function WorkloadDetailPage() {
                           ) : kind === "graph" ? (
                             <button
                               className="text-button"
+                              aria-current={
+                                selected === node.id ? "true" : undefined
+                              }
                               onClick={() => setSelected(node.id)}
                             >
                               {node.name ?? node.id}
@@ -394,6 +397,9 @@ export function WorkloadDetailPage() {
                             )}
                             <button
                               className="text-button"
+                              aria-current={
+                                selected === node.id ? "true" : undefined
+                              }
                               onClick={() => setSelected(node.id)}
                             >
                               Inspect dependencies

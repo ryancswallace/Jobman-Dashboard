@@ -22,8 +22,23 @@ func (c Config) PrivateFilePaths() map[string]string {
 		"oidc.webClientSecretFile": c.OIDC.WebClientSecretFile,
 		"encryption.keyFile":       c.Encryption.KeyFile,
 	}
+	if c.Observability != nil && c.Observability.OperatorConfigFile != "" {
+		paths["observability.operatorConfigFile"] = c.Observability.OperatorConfigFile
+	}
 	if c.Reports.RedactionFile != "" {
 		paths["reports.redactionFile"] = c.Reports.RedactionFile
+	}
+	if c.Reports.PolicyKeyFile != "" {
+		paths["reports.policyKeyFile"] = c.Reports.PolicyKeyFile
+	}
+	if c.LogCursorKeyFile != "" {
+		paths["logCursorKeyFile"] = c.LogCursorKeyFile
+	}
+	if ring := c.Notifications.TokenEncryption; ring != nil {
+		paths["notifications.tokenEncryption.current.keyFile"] = ring.Current.KeyFile
+		for index, key := range ring.Previous {
+			paths[fmt.Sprintf("notifications.tokenEncryption.previous[%d].keyFile", index)] = key.KeyFile
+		}
 	}
 	for index, source := range c.Controls {
 		paths[fmt.Sprintf("controls[%d].clientKeyFile", index)] = source.ClientKeyFile
@@ -32,6 +47,12 @@ func (c Config) PrivateFilePaths() map[string]string {
 	for index, broker := range c.LogBrokers {
 		paths[fmt.Sprintf("logBrokers[%d].clientKeyFile", index)] = broker.ClientKeyFile
 		paths[fmt.Sprintf("logBrokers[%d].delegationKeyFile", index)] = broker.DelegationKeyFile
+	}
+	for index, key := range c.Notifications.PreviousTokenKeys {
+		paths[fmt.Sprintf("notifications.previousTokenKeys[%d].keyFile", index)] = key.KeyFile
+	}
+	for index, provider := range c.Notifications.APNs {
+		paths[fmt.Sprintf("notifications.apns[%d].privateKeyFile", index)] = provider.PrivateKeyFile
 	}
 	return paths
 }

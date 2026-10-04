@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ryancswallace/jobman-dashboard/internal/api"
+	"github.com/ryancswallace/jobman-dashboard/internal/buildinfo"
 	"github.com/ryancswallace/jobman-dashboard/internal/fixtures"
 	"github.com/ryancswallace/jobman-dashboard/internal/httpapi"
 	"github.com/ryancswallace/jobman-dashboard/internal/monitoring"
@@ -26,23 +27,39 @@ func main() {
 	}
 }
 func run() error {
+	if len(os.Args) == 2 && os.Args[1] == "version" {
+		return buildinfo.Write(os.Stdout)
+	}
+	if len(os.Args) > 1 && os.Args[1] == "keys" {
+		return runKeyOperator(os.Args[2:], os.Stdout)
+	}
+	if len(os.Args) > 1 && os.Args[1] == "status" {
+		return runStatusOperator(os.Args[2:], os.Stdout)
+	}
+	if len(os.Args) > 1 && os.Args[1] == "events" {
+		return runEventOperator(os.Args[2:], os.Stdout)
+	}
 	fs := flag.NewFlagSet("jobman-dashboard", flag.ContinueOnError)
 	fixture := fs.Bool("fixture", false, "serve synthetic development data, loopback only")
 	configPath := fs.String("config", "", "absolute production JSON configuration path")
-	mode := fs.String("mode", "serve", "serve, check-config, or migrate")
+	mode := fs.String("mode", "serve", "serve, api, worker, check-config, or migrate")
+	checkMode := fs.String("check-mode", "serve", "configuration role for check-config: serve, api, or worker")
 	migrationURL := fs.String("migration-database-url-file", "", "private migration identity database URL file (migrate mode only)")
 	listen := fs.String("listen", "127.0.0.1:8088", "HTTP bind address")
 	web := fs.String("web", "web/dist", "compiled static web directory")
 	if err := fs.Parse(os.Args[1:]); err != nil {
 		return err
 	}
+	if fs.NArg() != 0 {
+		return errors.New("unexpected positional arguments")
+	}
 	if !*fixture {
 		if *configPath == "" {
 			return fmt.Errorf("production requires --config; synthetic development requires explicit --fixture")
 		}
-		return runConfigured(*configPath, *mode, *migrationURL)
+		return runConfiguredMode(*configPath, *mode, *migrationURL, *checkMode)
 	}
-	if *configPath != "" || *mode != "serve" || *migrationURL != "" {
+	if *configPath != "" || *mode != "serve" || *migrationURL != "" || *checkMode != "serve" {
 		return fmt.Errorf("fixture mode cannot be combined with production configuration or migrations")
 	}
 	host, _, err := net.SplitHostPort(*listen)

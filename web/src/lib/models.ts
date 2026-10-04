@@ -203,34 +203,13 @@ export interface LogChunk {
   text?: string;
   stream: string;
   runId?: string;
+  runNumber?: string;
   startOffset: string;
   endOffset: string;
   nextCursor?: string;
   state: string;
   truncated?: boolean;
   capturedAt?: string;
-}
-export interface AlertRule {
-  id: string;
-  revision: string;
-  name: string;
-  enabled: boolean;
-  scope: "watched_jobs" | "my_jobs" | "namespace_jobs";
-  namespaces: NamespaceRef[];
-  jobs: JobRef[];
-  outcomeMode: "selected" | "all_terminal";
-  outcomes: string[];
-  activation?: { deploymentId: string; status: string }[];
-}
-export interface InboxItem {
-  id: string;
-  job: JobRef;
-  outcome: string;
-  eventAt: string;
-  createdAt: string;
-  read: boolean;
-  matchedRules: string[];
-  deliveryStatus?: string;
 }
 export interface Device {
   id: string;

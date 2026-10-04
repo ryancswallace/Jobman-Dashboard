@@ -14,6 +14,7 @@ enum NativeFixtures {
 
     static func data(path: String, query: [URLQueryItem] = []) throws -> Data { try JSONSerialization.data(withJSONObject: response(path: path, query: query)) }
     static func response(path: String, query: [URLQueryItem] = []) -> [String: Any] {
+        if NativeRuleFixtures.enabled || NativeInboxFixtures.enabled, path == "/api/v1/bootstrap" { return NativeRuleFixtures.bootstrap() }
         func value(_ name: String) -> String? { query.first { $0.name == name }?.value }
         let stream = value("stream") ?? "stdout"
         let now = Date()
@@ -29,16 +30,31 @@ enum NativeFixtures {
                 ["id":id, "name":"Synthetic \(id.capitalized)", "status":"available", "namespaces":[["id":"research", "name":"Research", "roles":["viewer","operator"], "capabilities":["jobs.read","logs.read","reports.read"], "authorizationVersion":"1", "authorizationCheckedAt":date(now), "authorizationExpiresAt":date(now.addingTimeInterval(120))]]]
             }
             return ["apiVersion":"jobman.dashboard/v1", "account":["id":"fixture-account", "displayName":"Synthetic researcher"], "deployments":deployments,
-                    "preferences":["revision":"1", "timezone":"UTC", "appearance":"system", "refreshSeconds":5],
+                    "preferences":["revision":"1", "timezone":"UTC", "appearance":"system", "refreshSeconds":ProcessInfo.processInfo.arguments.contains("--dashboard-manual-refresh-fixtures") ? 0 : 5],
                     "limits":["defaultPageSize":50,"maxPageSize":200,"logReadBytes":262144,"logBufferBytes":2097152,"graphNodes":200,"graphEdges":500], "completeness":"complete", "fixtureMode":true]
         }
-        if path == "/api/v1/overview" { return ["active":3,"awaitingExecution":2,"running":1,"evidenceAttention":0,"missingCompletionTime":0,"terminal":["success":7,"failure":1,"cancelled":0,"timed_out":0,"aborted":0,"lost":0,"unknown":0],"window":["from":date(now.addingTimeInterval(-86400)),"to":date(now)],"sources":sources,"completeness":"complete","fetchedAt":date(now)] }
-        if path == "/api/v1/jobs" { return page([job(),job("west")]) }
+        if path == "/api/v1/overview" { return ["active":ProcessInfo.processInfo.arguments.contains("--dashboard-delayed-job-page") ? (value("windowHours") == "168" ? 168 : 24) : 3,"awaitingExecution":2,"running":1,"evidenceAttention":0,"missingCompletionTime":0,"terminal":["success":7,"failure":1,"cancelled":0,"timed_out":0,"aborted":0,"lost":0,"unknown":0],"window":["from":date(now.addingTimeInterval(value("windowHours") == "168" ? -604800 : -86400)),"to":date(now)],"sources":sources,"completeness":"complete","fetchedAt":date(now)] }
+        if path == "/api/v1/jobs" {
+            var result = page([job(),job("west")])
+            if ProcessInfo.processInfo.arguments.contains("--dashboard-delayed-job-page"), value("cursor") == nil { result["nextCursor"] = "window-pending" }
+            return result
+        }
+        let selectedRunNumber = value("runNumber")
+        let runId = "93000000-0000-4000-8000-000000000002"
+        let executionId = "94000000-0000-4000-8000-000000000002"
+        if path.hasSuffix("/runs") {
+            let second = value("cursor") != nil
+            let run: [String: Any] = ["id":second ? "93000000-0000-4000-8000-000000000001" : runId,
+                "number":second ? "1" : "9007199254740993", "phase":"terminal", "desiredState":"run", "outcome":"failure",
+                "createdAt":date(now.addingTimeInterval(-1800)), "updatedAt":date(now), "executionId":executionId, "executionPhase":"terminal", "targetId":"95000000-0000-4000-8000-000000000001", "targetGenerationId":"96000000-0000-4000-8000-000000000001", "backend":"slurm"]
+            var result = page([run]); result["sources"] = [sources[0]]; result["total"] = "2"
+            if !second { result["nextCursor"] = "runs-older" }; return result
+        }
         if path.hasSuffix("/logs") {
             let bytes = Data("Synthetic \(stream) log fixture\nAlignment exited with status 2.\nNo production data is shown.\n".utf8)
-            return ["bytesBase64":bytes.base64EncodedString(),"executionId":"execution-fixture","runId":"run-fixture","stream":stream,"startOffset":"0","endOffset":String(bytes.count),"state":"active","nextCursor":"expired-fixture-cursor","runNumber":"9007199254740993","capturedAt":date(now)]
+            return ["bytesBase64":bytes.base64EncodedString(),"executionId":selectedRunNumber == nil ? "execution-fixture" : executionId,"runId":selectedRunNumber == nil ? "run-fixture" : runId,"stream":stream,"startOffset":"0","endOffset":String(bytes.count),"state":"active","nextCursor":"expired-fixture-cursor","runNumber":selectedRunNumber ?? "9007199254740993","capturedAt":date(now)]
         }
-        if path.hasSuffix("/artifacts") { return page([["id":"artifact-fixture","name":"synthetic-summary.txt","sizeBytes":"120","checksum":"synthetic-checksum","availability":"metadata_only","publishedAt":date(now),"runNumber":"9007199254740993","runId":"run-fixture","executionId":"execution-fixture","targetGenerationId":"generation-fixture"]]) }
+        if path.hasSuffix("/artifacts") { return page([["id":"artifact-fixture","name":"synthetic-summary.txt","sizeBytes":"120","checksum":"synthetic-checksum","availability":"metadata_only","publishedAt":date(now),"runNumber":selectedRunNumber ?? "9007199254740993","runId":selectedRunNumber == nil ? "run-fixture" : runId,"executionId":selectedRunNumber == nil ? "execution-fixture" : executionId,"targetGenerationId":"generation-fixture"]]) }
         if path.contains("/reports") { return NativeReportFixtures.response(path: path, query: query, timestamp: date(now)) }
         if path.contains("/jobs/") { return ["job":job(path.contains("/west/") ? "west":"east", path.split(separator: "/").last.map(String.init) ?? "job-042"),"fetchedAt":date(now)] }
         if path == "/api/v1/targets" || path.contains("/targets/") {
@@ -98,21 +114,42 @@ enum NativeFixtures {
             else { result["workload"] = workload; result["children"] = visible }
             return result
         }
-        if path == "/api/v1/rules" { return page([["id":"rule-fixture","revision":"1","name":"Synthetic failures","enabled":true,"scope":"namespace_jobs","namespaces":[["deploymentId":"east","namespaceId":"research"]],"jobs":[],"outcomeMode":"selected","outcomes":["failure","timed_out","aborted","lost"],"activation":[["deploymentId":"east","status":"active"]]]]) }
-        let inbox: [String: Any] = ["id":"inbox-fixture","job":jobRef,"outcome":"failure","eventAt":date(now),"createdAt":date(now),"read":false,"matchedRules":["Synthetic failures"],"deliveryStatus":"fixture only"]
-        if path == "/api/v1/inbox" { return page([inbox]) }
-        if path.hasPrefix("/api/v1/inbox/") { return inbox }
-        if path == "/api/v1/devices" { return page([["id":"device-fixture","name":"Synthetic iPhone","enabled":false,"permission":"not_requested"]]) }
+        if path == "/api/v1/rules" { return ["items": []] }
+        if path == "/api/v1/devices" { return ["items": []] }
         return ["code":"not_found_or_inaccessible","message":"No synthetic fixture is defined for this request."]
     }
 }
 
 private final class FixtureProtocol: URLProtocol, @unchecked Sendable {
+    private let responseLock = NSRecursiveLock()
+    private var delayedResponse: DispatchWorkItem?
+    private var stopped = false
     override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "dashboard-fixtures.example.test" }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
         do {
+            if let (status, data) = try NativeDeviceFixtures.server.response(request) ?? NativeInboxFixtures.server.response(request) ?? NativeRuleFixtures.server.response(request) {
+                let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                if payload?["fixtureDelay"] as? Bool == true {
+                    let work = DispatchWorkItem { [weak self] in self?.respond(status: status, data: data) }
+                    responseLock.withLock { delayedResponse = work }
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 20, execute: work)
+                } else { respond(status: status, data: data) }
+                return
+            }
+            if let data = try NativeRefreshFixtures.server.response(request) { respond(status: 200, data: data); return }
             let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems ?? []
+            if NativeGraphFixtures.enabled, request.httpMethod == "GET",
+               let response = try NativeGraphFixtures.response(path: request.url!.path, query: query) {
+                respond(status: 200, data: try JSONSerialization.data(withJSONObject: response)); return
+            }
+            if ProcessInfo.processInfo.arguments.contains("--dashboard-delayed-job-page"), request.url!.path == "/api/v1/jobs", query.contains(where: { $0.name == "cursor" && $0.value == "window-pending" }) {
+                let data = try NativeFixtures.data(path: request.url!.path, query: query)
+                let work = DispatchWorkItem { [weak self] in self?.respond(status: 200, data: data) }
+                responseLock.withLock { delayedResponse = work }
+                DispatchQueue.global().asyncAfter(deadline: .now() + 15, execute: work)
+                return
+            }
             let expired = request.url!.path.hasSuffix("/logs") && query.contains { $0.name == "cursor" }
             let targetChanged = request.url!.path.hasSuffix("/partitions") && query.contains { $0.name == "cursor" && $0.value == "target-generation-changed" }
             let deniedCitation = request.url!.path.hasSuffix("/citations/citation-denied")
@@ -128,6 +165,15 @@ private final class FixtureProtocol: URLProtocol, @unchecked Sendable {
             client?.urlProtocolDidFinishLoading(self)
         } catch { client?.urlProtocol(self, didFailWithError: error) }
     }
-    override func stopLoading() {}
+    private func respond(status: Int, data: Data) {
+        responseLock.withLock {
+            guard !stopped else { return }
+            client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1", headerFields: ["Content-Type":"application/json"])!, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+            delayedResponse = nil
+        }
+    }
+    override func stopLoading() { responseLock.withLock { stopped = true; delayedResponse?.cancel(); delayedResponse = nil } }
 }
 #endif

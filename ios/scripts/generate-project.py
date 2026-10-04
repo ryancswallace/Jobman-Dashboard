@@ -28,7 +28,9 @@ def sources(folder):
 apprefs, appbuilds = sources("App")
 testrefs, testbuilds = sources("UITests")
 privacy = obj("privacyref", 'isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>";')
-apprefs.append(privacy)
+assets = obj("assetsref", 'isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>";')
+assetsbuild = obj("assetsbuild", f"isa = PBXBuildFile; fileRef = {assets};")
+apprefs.extend([privacy, assets])
 privacybuild = obj("privacybuild", f"isa = PBXBuildFile; fileRef = {privacy};")
 product = obj("product", 'isa = PBXFileReference; explicitFileType = wrapper.application; path = JobmanDashboard.app; sourceTree = BUILT_PRODUCTS_DIR;')
 testproduct = obj("testproduct", 'isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = DashboardUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR;')
@@ -47,13 +49,13 @@ def phase(name, kind, files):
     return obj(name, f'isa = PBX{kind}BuildPhase; buildActionMask = 2147483647; files = ({", ".join(files)}); runOnlyForDeploymentPostprocessing = 0;')
 
 
-appphases = [phase("sources", "Sources", appbuilds), phase("frameworks", "Frameworks", [packagelink]), phase("resources", "Resources", [privacybuild])]
+appphases = [phase("sources", "Sources", appbuilds), phase("frameworks", "Frameworks", [packagelink]), phase("resources", "Resources", [privacybuild, assetsbuild])]
 testphases = [phase("testsources", "Sources", testbuilds), phase("testframeworks", "Frameworks", [])]
 projectconfigs, targetconfigs, testconfigs = [], [], []
 for index, mode in enumerate(["Debug", "Release"]):
     active_arch = "YES" if mode == "Debug" else "NO"
     projectconfigs.append(obj("projectconfig:" + mode, f"isa = XCBuildConfiguration; buildSettings = {{ CLANG_ENABLE_MODULES = YES; SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 18.0; SWIFT_VERSION = 6.0; SWIFT_STRICT_CONCURRENCY = complete; ONLY_ACTIVE_ARCH = {active_arch}; }}; name = {mode};"))
-    settings = 'CODE_SIGN_STYLE = Automatic; CODE_SIGN_ENTITLEMENTS = Config/Dashboard.entitlements; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = Config/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = org.jobman.dashboard; PRODUCT_NAME = "$(TARGET_NAME)"; TARGETED_DEVICE_FAMILY = 1; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SUPPORTS_MACCATALYST = NO; SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO; CURRENT_PROJECT_VERSION = 1; MARKETING_VERSION = 0.1.0; ENABLE_USER_SCRIPT_SANDBOXING = YES;'
+    settings = 'ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CODE_SIGN_ENTITLEMENTS = Config/Dashboard.entitlements; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = Config/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = org.jobman.dashboard; PRODUCT_NAME = "$(TARGET_NAME)"; TARGETED_DEVICE_FAMILY = 1; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SUPPORTS_MACCATALYST = NO; SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO; CURRENT_PROJECT_VERSION = 1; MARKETING_VERSION = 0.1.0; ENABLE_USER_SCRIPT_SANDBOXING = YES;'
     settings += ' SWIFT_OPTIMIZATION_LEVEL = "-Onone"; DEBUG_INFORMATION_FORMAT = dwarf;' if mode == "Debug" else ' SWIFT_COMPILATION_MODE = wholemodule; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";'
     targetconfigs.append(obj("targetconfig:" + mode, f"isa = XCBuildConfiguration; baseConfigurationReference = {configs[index]}; buildSettings = {{ {settings} }}; name = {mode};"))
     testconfigs.append(obj("testconfig:" + mode, f'isa = XCBuildConfiguration; buildSettings = {{ CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = org.jobman.dashboard.uitests; PRODUCT_NAME = "$(TARGET_NAME)"; TEST_TARGET_NAME = JobmanDashboard; TARGETED_DEVICE_FAMILY = 1; }}; name = {mode};'))

@@ -11,7 +11,7 @@ public struct AuthenticatedTransport: DashboardHTTPTransport {
         return try await transport.data(path: request.path,
                                         query: request.query.keys.sorted().map { .init(name: $0, value: request.query[$0]) },
                                         token: token, method: request.method, body: request.body,
-                                        revision: request.headers["If-Match"], idempotencyKey: idempotency)
+                                        revision: request.headers["If-Match"], ifNoneMatch: request.headers["If-None-Match"], idempotencyKey: idempotency)
     }
 }
 

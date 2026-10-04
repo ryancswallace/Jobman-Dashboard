@@ -204,9 +204,9 @@ func TestDiscoveryBindsDirectoryIdentityWhileAllowingCanonicalAliases(t *testing
 				}
 				respond(w, v)
 			}))
-			_, err := c.Discover(context.Background(), testActor)
+			discovered, err := c.Discover(context.Background(), testActor)
 			if mode == "canonical-alias" {
-				if err != nil {
+				if err != nil || discovered.PrincipalID != principalID {
 					t.Fatalf("verified alias rejected: %v", err)
 				}
 			} else if !errors.Is(err, monitoring.ErrAuthority) {
@@ -288,5 +288,36 @@ func TestSummaryRejectsMalformedCountsAndWindow(t *testing.T) {
 				t.Fatalf("wrong summary: %+v %v", result, err)
 			}
 		})
+	}
+}
+
+func TestDiscoveryTransportDenialsAreNotVerifiedGrantRemoval(t *testing.T) {
+	for _, route := range []string{"/v1/capabilities", "/v1/me"} {
+		for _, status := range []int{http.StatusForbidden, http.StatusNotFound} {
+			t.Run(route+"/"+http.StatusText(status), func(t *testing.T) {
+				c := testClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.Path == route {
+						w.WriteHeader(status)
+						return
+					}
+					respond(w, capabilities(time.Now().UTC()))
+				}))
+				if _, err := c.Discover(context.Background(), testActor); !errors.Is(err, monitoring.ErrAuthority) {
+					t.Fatalf("transport denial was treated as current grant removal: %v", err)
+				}
+			})
+		}
+	}
+	c := testClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/capabilities" {
+			respond(w, capabilities(time.Now().UTC()))
+			return
+		}
+		v := grants(time.Now().UTC(), "1")
+		v["namespaces"] = []any{}
+		respond(w, v)
+	}))
+	if d, err := c.Discover(context.Background(), testActor); err != nil || len(d.Deployment.Namespaces) != 0 {
+		t.Fatal("verified empty grant set was hidden", d, err)
 	}
 }

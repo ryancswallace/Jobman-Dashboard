@@ -1,0 +1,43 @@
+[Unit]
+Description=Jobman Dashboard configured background workers
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=jobman-dashboard-worker
+Group=jobman-dashboard-worker
+SupplementaryGroups=jobman-dashboard-report-readers
+WorkingDirectory=/opt/jobman-dashboard/current
+ExecStartPre=/opt/jobman-dashboard/current/bin/jobman-dashboard --mode check-config --check-mode worker --config /etc/jobman-dashboard-worker/config.json
+ExecStart=/opt/jobman-dashboard/current/bin/jobman-dashboard --mode worker --config /etc/jobman-dashboard-worker/config.json
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=90s
+KillMode=control-group
+UMask=0077
+RuntimeDirectory=jobman-dashboard-worker
+RuntimeDirectoryMode=0700
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectKernelLogs=true
+ProtectClock=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+ReadWritePaths=-/var/lib/jobman-dashboard/reports
+InaccessiblePaths=-/etc/jobman-dashboard-api -/etc/jobman-log-broker
+LimitNOFILE=4096
+TasksMax=512
+
+[Install]
+WantedBy=multi-user.target

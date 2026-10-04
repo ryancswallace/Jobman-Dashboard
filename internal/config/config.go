@@ -22,6 +22,7 @@ const MaxConfigBytes int64 = 256 << 10
 const MaxSecretBytes int64 = 1 << 20
 
 type Config struct {
+	Observability         *Observability     `json:"observability,omitempty"`
 	ConfigurationRevision int64              `json:"configurationRevision"`
 	PublicOrigin          string             `json:"publicOrigin"`
 	Listen                string             `json:"listen"`
@@ -30,15 +31,25 @@ type Config struct {
 	DatabaseURLFile       string             `json:"databaseURLFile"`
 	OIDC                  OIDC               `json:"oidc"`
 	Encryption            Encryption         `json:"encryption"`
+	LogCursorKeyFile      string             `json:"logCursorKeyFile,omitempty"`
 	Controls              []Control          `json:"controls"`
 	LogBrokers            []RemoteBroker     `json:"logBrokers"`
 	LogMappings           []RemoteLogMapping `json:"logMappings"`
 	Reports               Reports            `json:"reports"`
+	Events                Events             `json:"events"`
+	Notifications         Notifications      `json:"notifications"`
+}
+
+type Events struct {
+	Enabled      bool `json:"enabled"`
+	DeliveryHold bool `json:"deliveryHold"`
 }
 
 type Reports struct {
-	ObjectRoot    string `json:"objectRoot"`
-	RedactionFile string `json:"redactionFile"`
+	ObjectAccess  *ReportObjectAccess `json:"objectAccess,omitempty"`
+	ObjectRoot    string              `json:"objectRoot"`
+	RedactionFile string              `json:"redactionFile"`
+	PolicyKeyFile string              `json:"policyKeyFile,omitempty"`
 }
 
 type ServerTLS struct {
@@ -137,6 +148,11 @@ func DecodeDocument(reader io.Reader, destination any) error {
 }
 
 func checkKeys(decoder *json.Decoder, schema reflect.Type, path string) error {
+	// Optional structures are omitted when unused. Their presence still requires
+	// a nonnull value with the same exact field/type checks as a value structure.
+	for schema.Kind() == reflect.Pointer {
+		schema = schema.Elem()
+	}
 	token, err := decoder.Token()
 	if err != nil || token == nil {
 		return fmt.Errorf("%s must not be null and must match its JSON type", path)
@@ -149,7 +165,8 @@ func checkKeys(decoder *json.Decoder, schema reflect.Type, path string) error {
 		fields := map[string]reflect.Type{}
 		for i := 0; i < schema.NumField(); i++ {
 			field := schema.Field(i)
-			fields[field.Tag.Get("json")] = field.Type
+			name := strings.SplitN(field.Tag.Get("json"), ",", 2)[0]
+			fields[name] = field.Type
 		}
 		seen := map[string]bool{}
 		for decoder.More() {
@@ -191,6 +208,18 @@ func checkKeys(decoder *json.Decoder, schema reflect.Type, path string) error {
 		if _, err := strconv.ParseInt(string(value), 10, 64); err != nil {
 			return fmt.Errorf("%s must be a signed 64-bit integer", path)
 		}
+	case reflect.Uint32:
+		value, ok := token.(json.Number)
+		if !ok {
+			return fmt.Errorf("%s must be an unsigned 32-bit integer", path)
+		}
+		if _, err := strconv.ParseUint(string(value), 10, 32); err != nil {
+			return fmt.Errorf("%s must be an unsigned 32-bit integer", path)
+		}
+	case reflect.Bool:
+		if _, ok := token.(bool); !ok {
+			return fmt.Errorf("%s must be a boolean", path)
+		}
 	default:
 		return errors.New("configuration schema contains an unsupported type")
 	}
@@ -198,6 +227,9 @@ func checkKeys(decoder *json.Decoder, schema reflect.Type, path string) error {
 }
 
 func (c Config) Validate() error {
+	if err := c.Observability.Validate(); err != nil {
+		return err
+	}
 	if c.ConfigurationRevision < 1 {
 		return errors.New("configurationRevision must be a positive signed 64-bit integer")
 	}
@@ -219,6 +251,9 @@ func (c Config) Validate() error {
 			return fmt.Errorf("%s must be a clean absolute file-system path", field)
 		}
 	}
+	if err := c.Reports.ValidateObjectAccess(); err != nil {
+		return err
+	}
 	if c.Reports.ObjectRoot != "" {
 		if !absolutePath(c.Reports.ObjectRoot) || c.Reports.ObjectRoot == "/" || c.Reports.ObjectRoot == c.WebRoot || strings.HasPrefix(c.Reports.ObjectRoot, c.WebRoot+"/") || strings.HasPrefix(c.WebRoot, c.Reports.ObjectRoot+"/") {
 			return errors.New("reports.objectRoot must be a clean private path outside webRoot")
@@ -228,6 +263,12 @@ func (c Config) Validate() error {
 		}
 	} else if c.Reports.RedactionFile != "" {
 		return errors.New("reports.redactionFile requires reports.objectRoot")
+	}
+	if c.Reports.PolicyKeyFile != "" && (c.Reports.RedactionFile == "" || !absolutePath(c.Reports.PolicyKeyFile)) {
+		return errors.New("reports.policyKeyFile requires a redaction policy and clean absolute private path")
+	}
+	if c.LogCursorKeyFile != "" && (!absolutePath(c.LogCursorKeyFile) || len(c.LogBrokers) == 0) {
+		return errors.New("logCursorKeyFile requires configured log brokers and a clean absolute private path")
 	}
 	if _, err := httpsURL(c.OIDC.Issuer, false); err != nil {
 		return errors.New("oidc.issuer must be an HTTPS URL without credentials, query or fragment")
@@ -270,6 +311,9 @@ func (c Config) Validate() error {
 		return err
 	}
 	if err := validateRemoteLogs(c.Controls, c.LogBrokers, c.LogMappings); err != nil {
+		return err
+	}
+	if err := validateNotifications(c.Notifications, c.Encryption, c.Events); err != nil {
 		return err
 	}
 	return c.validatePrivatePaths()

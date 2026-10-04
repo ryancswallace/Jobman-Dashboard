@@ -14,6 +14,7 @@ import (
 
 	"github.com/ryancswallace/jobman-dashboard/internal/api"
 	"github.com/ryancswallace/jobman-dashboard/internal/monitoring"
+	"github.com/ryancswallace/jobman-dashboard/internal/observability"
 )
 
 // Manifest queries may select a run or the current run. TailBytes and Offset
@@ -62,11 +63,13 @@ type Mapping struct {
 type mappingKey struct{ deployment, generation, store, version string }
 
 type Broker struct {
-	sources map[string]ManifestSource
-	chunks  ChunkReader
-	key     []byte
-	now     func() time.Time
-	gate    chan struct{}
+	observer        *observability.Registry
+	observationMode string
+	sources         map[string]ManifestSource
+	chunks          ChunkReader
+	key             []byte
+	now             func() time.Time
+	gate            chan struct{}
 }
 
 // ChunkReader implementations receive source-authorized identity, never a
@@ -149,8 +152,11 @@ type position struct {
 	ExpiresAt                                                int64
 }
 
-func (b *Broker) Read(ctx context.Context, a monitoring.Actor, r Request) (api.LogRange, error) {
-	var result api.LogRange
+func (b *Broker) Read(ctx context.Context, a monitoring.Actor, r Request) (result api.LogRange, resultErr error) {
+	observedStart := time.Now()
+	defer func() {
+		b.observer.Observe("logs", "read", r.Scope.DeploymentID, b.observationMode, logObservation(result.State, resultErr), time.Since(observedStart))
+	}()
 	select {
 	case b.gate <- struct{}{}:
 		defer func() { <-b.gate }()

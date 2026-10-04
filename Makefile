@@ -2,9 +2,11 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 export GOTOOLCHAIN := go$(shell cat go.version)
+# Repository gates and artifacts always consume the pinned public module graph.
+export GOWORK := off
 unexport GOROOT
 
-.PHONY: help format format-check contracts contracts-check test test-db vet build web ios-core ios-simulator check dev
+.PHONY: help format format-check contracts contracts-check package-check candidate test test-db vet build web ios-core ios-simulator check dev
 
 help:
 	@echo 'Dashboard: make check, make web, make ios-core, make ios-simulator, make dev'
@@ -23,6 +25,13 @@ contracts:
 contracts-check:
 	python3 scripts/generate-contracts.py --check
 	python3 -m unittest discover -s contracts -p 'test_*.py'
+
+package-check:
+	python3 -m unittest discover -s scripts -p 'test_release.py'
+
+candidate:
+	@test -n "$$VERSION" -a -n "$$OUTPUT_DIR" || (echo 'Set VERSION=vX.Y.Z-rc.N and OUTPUT_DIR to a new absolute directory.'; exit 1)
+	python3 scripts/build-release.py --version "$$VERSION" --output-directory "$$OUTPUT_DIR"
 
 test:
 	go test -race -shuffle=on ./...
@@ -49,7 +58,7 @@ ios-core:
 ios-simulator:
 	./ios/scripts/build-simulator.sh
 
-check: contracts-check format-check vet test build
+check: contracts-check package-check format-check vet test build
 
 dev:
 	go run ./cmd/jobman-dashboard --fixture

@@ -39,6 +39,7 @@ type labNativeSession struct {
 	accessToken string
 	idToken     string
 	root        string
+	subject     string
 }
 
 func labNativeSignIn(t *testing.T, user, directoryID string) labNativeSession {
@@ -186,5 +187,5 @@ func labNativeSignIn(t *testing.T, user, directoryID string) labNativeSession {
 		t.Fatal("Authorization code replay accepted")
 	}
 	t.Log("PASS: verified TLS, native S256 code exchange, signed API/client/GUID identity, nonce, ID-token rejection and code replay denial; synthetic Keycloak only")
-	return labNativeSession{transport: transport, accessToken: token.AccessToken, idToken: id, root: root}
+	return labNativeSession{transport: transport, accessToken: token.AccessToken, idToken: id, root: root, subject: actor.Subject}
 }

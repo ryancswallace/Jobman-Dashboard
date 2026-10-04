@@ -46,8 +46,10 @@ private let jobJSON = #"{"deploymentId":"east","namespaceId":"team","id":"same-i
     let query = try DashboardScope.namespace(a).queryItems(authorized: [a, b])
     let decoded = try JSONDecoder().decode([NamespaceRef].self, from: Data(query[0].value!.utf8))
     #expect(decoded == [a])
-    let rule = AlertRule(name: "Explicit", namespaces: [a])
-    let value = try JSONSerialization.jsonObject(with: JSONEncoder().encode(rule.input)) as! [String: Any]
+    var rule = RuleDraft()
+    rule.name = "Explicit"
+    rule.namespaces = [.init(deploymentId: "10000000-0000-4000-8000-000000000001", namespaceId: "20000000-0000-4000-8000-000000000001")]
+    let value = try JSONSerialization.jsonObject(with: JSONEncoder().encode(rule.input())) as! [String: Any]
     #expect(value["id"] == nil)
     #expect(value["revision"] == nil)
     #expect(value["activation"] == nil)

@@ -4,15 +4,20 @@ import SwiftUI
 struct LogView: View {
     @Environment(DashboardStore.self) private var store
     let ref: JobRef
+    var run: DashboardAPI.JobRun? = nil
     @State private var stream = "stdout"
     @State private var read = LogReadState()
     @State private var generation = UUID()
     @State private var error: String?
     @State private var following = false
-    @State private var loading = false
+    @State private var requests = ReadRequestGate()
+    private var loading: Bool { requests.busy }
     @State private var search = ""
+    @State private var fetchedAt: String?
+    @State private var capturedAt: String?
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if let run { Text("Selected run \(run.number) · \(run.id)").font(.caption) }
             Picker("Stream", selection: $stream) { Text("stdout").tag("stdout"); Text("stderr").tag("stderr") }.pickerStyle(.segmented).disabled(loading)
             HStack {
                 Toggle("Follow", isOn: $following).toggleStyle(.switch).disabled(read.requiresRefresh || (read.cursor == nil && read.state == "complete"))
@@ -26,6 +31,8 @@ struct LogView: View {
             if read.buffer.evicted { Text("Earlier loaded output was removed to keep the 2 MiB display limit.").font(.caption) }
             if read.truncated { Text("Source output is truncated.").font(.caption) }
             if let error { ErrorMessage(error: error) }
+            TimestampRow(label: "Last successful fetch", value: fetchedAt)
+            TimestampRow(label: "Source capture", value: capturedAt)
             if loading && read.buffer.byteCount == 0 { ProgressView("Reading verified log bytes…") }
             ScrollView([.vertical, .horizontal]) {
                 Text(read.buffer.text.isEmpty ? (read.state == "complete" ? "Empty complete stream" : "No captured output in this range") : read.buffer.text)
@@ -34,7 +41,7 @@ struct LogView: View {
             }
             .simultaneousGesture(DragGesture().onChanged { _ in following = false })
         }.padding().navigationTitle("Logs").navigationBarTitleDisplayMode(.inline)
-            .task(id: stream) { await refresh() }
+            .task(id: stream + store.foregroundGeneration.uuidString) { await refresh() }
             .task(id: following) {
                 while following && !Task.isCancelled {
                     try? await Task.sleep(for: .seconds(5))
@@ -44,23 +51,26 @@ struct LogView: View {
             .onDisappear { following = false; generation = UUID(); read.reset() }
     }
     private func refresh() async {
-        generation = UUID(); read.reset(); error = nil; following = false
-        await load()
+        generation = UUID(); read.reset(); error = nil; following = false; fetchedAt = nil; capturedAt = nil
+        await load(replacing: true)
     }
-    private func load() async {
-        guard !loading, !read.requiresRefresh else { return }
-        loading = true; defer { loading = false }
+    private func load(replacing: Bool = false) async {
+        guard !read.requiresRefresh, let token = requests.begin(replacing: replacing) else { return }
+        defer { requests.finish(token) }
         let ticket = generation, requestedStream = stream
         do {
             var query: [URLQueryItem] = [.init(name: "stream", value: requestedStream), .init(name: "limitBytes", value: "262144")]
+            query += run?.logQuery ?? []
             if let cursor = read.cursor { query.append(.init(name: "cursor", value: cursor)) }
             let chunk: LogChunk = try await store.request(path: APIPath.job(ref) + "/logs", query: query)
-            guard generation == ticket, requestedStream == stream else { return }
+            guard requests.accepts(token), generation == ticket, requestedStream == stream else { return }
+            try run?.validate(log: chunk)
             try read.accept(chunk, job: ref, stream: requestedStream)
+            fetchedAt = ISO8601DateFormatter().string(from: Date()); capturedAt = chunk.capturedAt
             error = nil
             if read.cursor == nil { following = false }
         } catch is CancellationError {} catch {
-            guard generation == ticket, requestedStream == stream else { return }
+            guard requests.accepts(token), generation == ticket, requestedStream == stream else { return }
             read.failed(error); self.error = error.localizedDescription; following = false
         }
     }
@@ -68,10 +78,11 @@ struct LogView: View {
 
 struct ArtifactsView: View {
     let ref: JobRef
+    var run: DashboardAPI.JobRun? = nil
     var body: some View {
         List {
             Section { Text("Published metadata only. File downloads are outside this release.").font(.footnote).foregroundStyle(.secondary) }
-            PagedRows<Artifact, ArtifactRow>(path: APIPath.job(ref) + "/artifacts", scoped: false) { ArtifactRow(artifact: $0) }
+            PagedRows<Artifact, ArtifactRow>(path: APIPath.job(ref) + "/artifacts", extraQuery: run?.logQuery ?? [], scoped: false, validate: { try run?.validate(artifacts: $0.items) }) { ArtifactRow(artifact: $0) }
         }.navigationTitle("Artifacts")
     }
 }

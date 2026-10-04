@@ -40,62 +40,140 @@ export async function request<T>(
   if (options.revision) headers.set("If-Match", options.revision);
   if (options.idempotencyKey)
     headers.set("Idempotency-Key", options.idempotencyKey);
-  let response: Response;
+  const controller = new AbortController();
+  let timedOut = false;
+  const parentAbort = () => controller.abort();
+  if (options.signal?.aborted)
+    throw new DOMException("The request was cancelled.", "AbortError");
+  options.signal?.addEventListener("abort", parentAbort, { once: true });
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, 30000);
+  let interrupt!: () => void;
+  const interrupted = new Promise<never>((_, reject) => {
+    interrupt = () =>
+      reject(new DOMException("The request was cancelled.", "AbortError"));
+    controller.signal.addEventListener("abort", interrupt, { once: true });
+  });
+  const bounded = <Value>(work: Promise<Value>) =>
+    Promise.race([work, interrupted]);
+  let response: Response | undefined;
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+  let consumed = false;
   try {
-    response = await fetch(path, {
-      method: options.method ?? "GET",
-      body:
-        options.body === undefined ? undefined : JSON.stringify(options.body),
-      headers,
-      signal: options.signal,
-      credentials: "same-origin",
-      cache: "no-store",
-      redirect: "error",
-    });
+    response = await bounded(
+      fetch(path, {
+        method: options.method ?? "GET",
+        body:
+          options.body === undefined ? undefined : JSON.stringify(options.body),
+        headers,
+        signal: controller.signal,
+        credentials: "same-origin",
+        cache: "no-store",
+        redirect: "error",
+      }),
+    );
+    const contentType = response.headers.get("Content-Type") ?? "";
+    if (response.status === 204) return undefined as T;
+    if (!contentType.includes("application/json"))
+      throw new APIError(
+        "invalid_response",
+        "Dashboard returned an unexpected response. Try again or contact your operator.",
+        response.status,
+      );
+    const maximumBytes = 4 * 1024 * 1024;
+    const declared = response.headers.get("Content-Length");
+    if (
+      declared &&
+      /^\d+$/.test(declared) &&
+      BigInt(declared) > BigInt(maximumBytes)
+    )
+      throw new APIError(
+        "response_too_large",
+        "Dashboard returned more data than this view can safely load.",
+        response.status,
+      );
+    reader = response.body?.getReader();
+    const parts: string[] = [];
+    const decoder = new TextDecoder("utf-8", { fatal: true });
+    let bytes = 0;
+    while (reader) {
+      const part = await bounded(reader.read());
+      if (part.done) {
+        consumed = true;
+        break;
+      }
+      bytes += part.value.byteLength;
+      if (bytes > maximumBytes)
+        throw new APIError(
+          "response_too_large",
+          "Dashboard returned more data than this view can safely load.",
+          response.status,
+        );
+      parts.push(decoder.decode(part.value, { stream: true }));
+    }
+    parts.push(decoder.decode());
+    let data: unknown;
+    try {
+      data = JSON.parse(parts.join(""));
+    } catch {
+      throw new APIError(
+        "invalid_response",
+        "Dashboard returned an unreadable response.",
+        response.status,
+      );
+    }
+    if (!response.ok) {
+      const envelope = data as {
+        error?: { code?: string; message?: string; requestId?: string };
+        code?: string;
+        message?: string;
+        requestId?: string;
+      };
+      const error = envelope.error ?? envelope;
+      throw new APIError(
+        error.code ??
+          (response.status === 401 ? "unauthenticated" : "request_failed"),
+        error.message ?? "Dashboard could not complete this request.",
+        response.status,
+        error.requestId,
+      );
+    }
+    return data as T;
   } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError")
-      throw error;
+    if (timedOut)
+      throw new APIError(
+        "request_timeout",
+        options.method && options.method !== "GET"
+          ? "Dashboard did not finish within 30 seconds. Your change may have been saved; check the current state before retrying."
+          : "Dashboard did not finish within 30 seconds. Check your private-network or VPN connection and try again.",
+      );
+    if (
+      controller.signal.aborted ||
+      (error instanceof DOMException && error.name === "AbortError")
+    )
+      throw new DOMException("The request was cancelled.", "AbortError");
+    if (error instanceof APIError) throw error;
     throw new APIError(
-      "network_unavailable",
-      "Dashboard could not be reached. Check your private-network or VPN connection.",
+      response ? "invalid_response" : "network_unavailable",
+      response
+        ? "Dashboard returned an unreadable response."
+        : "Dashboard could not be reached. Check your private-network or VPN connection.",
     );
+  } finally {
+    clearTimeout(timer);
+    options.signal?.removeEventListener("abort", parentAbort);
+    controller.signal.removeEventListener("abort", interrupt);
+    if (!consumed) {
+      controller.abort();
+      // Cancellation must not extend the overall deadline if a stream stalls.
+      if (reader) void reader.cancel().catch(() => {});
+      else if (response?.body) void response.body.cancel().catch(() => {});
+    }
   }
-  const contentType = response.headers.get("Content-Type") ?? "";
-  if (response.status === 204) return undefined as T;
-  if (!contentType.includes("application/json"))
-    throw new APIError(
-      "invalid_response",
-      "Dashboard returned an unexpected response. Try again or contact your operator.",
-      response.status,
-    );
-  let data: unknown;
-  try {
-    data = await response.json();
-  } catch {
-    throw new APIError(
-      "invalid_response",
-      "Dashboard returned an unreadable response.",
-      response.status,
-    );
-  }
-  if (!response.ok) {
-    const envelope = data as {
-      error?: { code?: string; message?: string; requestId?: string };
-      code?: string;
-      message?: string;
-      requestId?: string;
-    };
-    const error = envelope.error ?? envelope;
-    throw new APIError(
-      error.code ??
-        (response.status === 401 ? "unauthenticated" : "request_failed"),
-      error.message ?? "Dashboard could not complete this request.",
-      response.status,
-      error.requestId,
-    );
-  }
-  return data as T;
 }
+
 export function resourcePath(
   ref: { deploymentId: string; namespaceId: string },
   kind: string,

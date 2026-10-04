@@ -11,6 +11,7 @@ import (
 	"errors"
 	"flag"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -20,6 +21,7 @@ import (
 	"time"
 
 	"github.com/ryancswallace/jobman-dashboard/internal/auth"
+	"github.com/ryancswallace/jobman-dashboard/internal/buildinfo"
 	"github.com/ryancswallace/jobman-dashboard/internal/config"
 	"github.com/ryancswallace/jobman-dashboard/internal/control"
 	"github.com/ryancswallace/jobman-dashboard/internal/logs"
@@ -40,6 +42,9 @@ func main() {
 	}
 }
 func run() error {
+	if len(os.Args) == 2 && os.Args[1] == "version" {
+		return buildinfo.Write(os.Stdout)
+	}
 	fs := flag.NewFlagSet("jobman-log-broker", flag.ContinueOnError)
 	path := fs.String("config", "", "absolute broker JSON configuration path")
 	mode := fs.String("mode", "serve", "serve or check-config")
@@ -53,6 +58,15 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	ids := make([]string, len(c.Controls))
+	for i, source := range c.Controls {
+		ids[i] = source.ID
+	}
+	observed, err := runtimeconfig.NewObservations(c.Observability, "broker", c.ConfigurationRevision, ids, "")
+	if err != nil {
+		return err
+	}
+	defer observed.Close()
 	cert, err := runtimeconfig.Certificate(c.ServerTLS.CertificateFile, c.ServerTLS.KeyFile)
 	if err != nil {
 		return err
@@ -78,6 +92,7 @@ func run() error {
 		return err
 	}
 	sources := make(map[string]logs.ManifestSource)
+	workerSources := make(map[string]logs.ManifestSource)
 	var pins *operations.SourceIdentities
 	if *mode == "serve" {
 		pins, err = operations.OpenSourceIdentities(c.StateDirectory)
@@ -91,6 +106,7 @@ func run() error {
 		if err != nil {
 			return err
 		}
+		cfg.Observer = observed.Registry
 		if pins != nil {
 			cfg.VerifyIdentity = func(ctx context.Context, instance, epoch string) error {
 				return pins.Verify(ctx, entry.ID, instance, epoch, c.ConfigurationRevision)
@@ -102,6 +118,13 @@ func run() error {
 		}
 		defer client.Close()
 		sources[entry.ID] = client
+		cfg.ActorMode = auth.DelegationWorker
+		workerClient, err := control.New(cfg)
+		if err != nil {
+			return err
+		}
+		defer workerClient.Close()
+		workerSources[entry.ID] = workerClient
 	}
 	executable, err := os.Executable()
 	if err != nil {
@@ -115,11 +138,11 @@ func run() error {
 	for _, m := range c.LogRoots {
 		mappings = append(mappings, logs.Mapping{DeploymentID: m.DeploymentID, TargetGenerationID: m.TargetGenerationID, StoreName: m.StoreName, StoreVersion: m.StoreVersion, Root: m.Root})
 	}
-	local, err := logs.NewLocalChunks(mappings, reader)
+	local, err := logs.NewLocalChunks(mappings, logs.ObservedReader{Reader: reader, Observer: observed.Registry})
 	if err != nil {
 		return err
 	}
-	service, err := logs.NewService(sources, local, verifier)
+	service, err := logs.NewServiceWithModes(sources, workerSources, local, verifier)
 	if err != nil {
 		return err
 	}
@@ -129,11 +152,20 @@ func run() error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	server := &http.Server{Addr: c.Listen, Handler: service.Handler(), TLSConfig: &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{cert}, ClientAuth: tls.RequireAndVerifyClientCert, ClientCAs: roots}, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
+	server := &http.Server{Addr: c.Listen, Handler: observed.Registry.HTTP(service.Handler()), TLSConfig: &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{cert}, ClientAuth: tls.RequireAndVerifyClientCert, ClientCAs: roots}, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
+	if err = observed.Listen(ctx, func(ctx context.Context) error { return ctx.Err() }); err != nil {
+		return err
+	}
+	listener, err := net.Listen("tcp", c.Listen)
+	if err != nil {
+		return err
+	}
+	defer listener.Close()
+	observed.Started()
 	done := make(chan error, 1)
 	go func() {
 		slog.Info("storage log broker starting", "listen", c.Listen)
-		done <- server.ListenAndServeTLS("", "")
+		done <- server.ServeTLS(listener, "", "")
 	}()
 	select {
 	case err := <-done:
@@ -142,6 +174,7 @@ func run() error {
 		}
 		return err
 	case <-ctx.Done():
+		observed.Draining()
 		shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		return server.Shutdown(shutdown)

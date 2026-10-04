@@ -34,14 +34,28 @@ type Server struct {
 	Preferences PreferenceStore
 	Logs        LogService
 	Reports     ReportService
+	Rules       RuleService
+	Devices     DeviceService
+	Inbox       InboxService
 }
 type actorKey struct{}
 
+// Cancel dynamic dependency work before the production server's 20-second
+// socket write deadline. A socket deadline alone does not cancel SQL queries.
+const dynamicRequestTimeout = 15 * time.Second
+
 func (s *Server) Handler() http.Handler {
+	return s.handler(dynamicRequestTimeout)
+}
+
+func (s *Server) handler(requestTimeout time.Duration) http.Handler {
 	mux := http.NewServeMux()
 	s.registerGroupRoutes(mux)
 	s.registerTargetRoutes(mux)
 	s.registerReportRoutes(mux)
+	s.registerRuleRoutes(mux)
+	s.registerDeviceRoutes(mux)
+	s.registerInboxRoutes(mux)
 	if s.AuthRoutes != nil {
 		s.AuthRoutes.RegisterRoutes(mux)
 	}
@@ -52,6 +66,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/v1/preferences", s.updatePreferences)
 	mux.HandleFunc("GET /api/v1/deployments/{deployment}/namespaces/{namespace}/jobs/{job}/logs", s.logs)
 	mux.HandleFunc("GET /api/v1/deployments/{deployment}/namespaces/{namespace}/jobs/{job}/artifacts", s.artifacts)
+	mux.HandleFunc("GET /api/v1/deployments/{deployment}/namespaces/{namespace}/jobs/{job}/runs", s.runs)
+	mux.HandleFunc("GET /api/v1/deployments/{deployment}/namespaces/{namespace}/jobs/{job}/runs/{run}", s.run)
 	mux.HandleFunc("GET /api/v1/deployments/{deployment}/namespaces/{namespace}/jobs/{job}", s.job)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, &api.Error{Code: "not_found_or_inaccessible", Message: "This API operation is not available."})
@@ -98,6 +114,11 @@ func (s *Server) Handler() http.Handler {
 		if s.FixtureMode {
 			w.Header().Set("X-Jobman-Fixture-Mode", "true")
 		}
+		if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/auth/") {
+			ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
+			defer cancel()
+			r = r.WithContext(ctx)
+		}
 		if len(r.URL.RawQuery) > 96<<10 {
 			writeError(w, r, &api.Error{Code: "invalid_request", Message: "The query is too large."})
 			return
@@ -108,6 +129,11 @@ func (s *Server) Handler() http.Handler {
 				return
 			}
 			a, err := s.Auth.Authenticate(r)
+			if r.Context().Err() != nil {
+				// An expired dependency budget does not revoke the user's session
+				// or establish that their credentials are invalid.
+				err = monitoring.ErrSource
+			}
 			if err != nil {
 				writeError(w, r, err)
 				return
@@ -148,8 +174,10 @@ func writeError(w http.ResponseWriter, _ *http.Request, err error) {
 		status = 409
 	case "invalid_request":
 		status = 400
-	case "invalid_settings":
+	case "invalid_settings", "unsupported_outcome":
 		status = 422
+	case "rule_capacity", "device_capacity":
+		status = 429
 	case "rate_limited":
 		status = 429
 		w.Header().Set("Retry-After", "5")

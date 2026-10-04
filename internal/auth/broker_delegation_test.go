@@ -185,3 +185,24 @@ func TestBrokerDelegationExpiryBoundaryCannotReviveUsedAssertion(t *testing.T) {
 		})
 	}
 }
+
+func TestBrokerDelegationExposesOnlySignedVerifiedMode(t *testing.T) {
+	for _, mode := range []string{"interactive", "worker"} {
+		t.Run(mode, func(t *testing.T) {
+			verifier, signer, request, scope, actor := brokerVerifierFixture(t)
+			header, err := signer.Authorize(actor, "logs.read", scope.NamespaceID, mode)
+			if err != nil {
+				t.Fatal(err)
+			}
+			request.Header.Set("Authorization", header)
+			request.Header.Set("X-Actor-Mode", "untrusted-override")
+			result, err := verifier.AuthenticateDelegation(request, scope)
+			if err != nil || string(result.Mode) != mode || result.Actor.DirectoryID != actor.DirectoryID {
+				t.Fatalf("verified provenance lost: %+v %v", result, err)
+			}
+			if _, err = verifier.AuthenticateDelegation(request, scope); err == nil {
+				t.Fatal("mode-returning verifier bypassed replay protection")
+			}
+		})
+	}
+}
