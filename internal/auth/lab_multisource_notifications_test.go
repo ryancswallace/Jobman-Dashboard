@@ -3,11 +3,13 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/url"
 	"os"
 	"os/exec"
@@ -37,6 +39,84 @@ type labMultiNotificationBarrier struct {
 	JobID             string `json:"jobId"`
 	EventID           string `json:"eventId"`
 	Settled           bool   `json:"settled"`
+}
+
+// Only a fixed diagnostic vocabulary may cross the subprocess boundary. Never
+// print command errors, stderr, decoded values or helper error strings: these
+// processes handle private database material. Success DTOs remain unchanged.
+func labMultiNotificationFailure(raw []byte) (string, bool) {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	token := func(want json.Token) bool {
+		value, err := decoder.Token()
+		return err == nil && value == want
+	}
+	if !token(json.Delim('{')) || !token("scenarioFailure") || !token(json.Delim('{')) {
+		return "", false
+	}
+	values := map[string]string{}
+	for decoder.More() {
+		key, err := decoder.Token()
+		name, ok := key.(string)
+		if err != nil || !ok || (name != "stage" && name != "code") || values[name] != "" {
+			return "", false
+		}
+		var value string
+		if decoder.Decode(&value) != nil || value == "" {
+			return "", false
+		}
+		values[name] = value
+	}
+	if !token(json.Delim('}')) || !token(json.Delim('}')) {
+		return "", false
+	}
+	if _, err := decoder.Token(); err != io.EOF {
+		return "", false
+	}
+	stages := []string{"host_input", "host_transport", "host_decode", "host_validate", "host_receipt", "guest_preflight", "guest_material", "helper_run", "guest_cleanup", "guest_postflight", "guest_barrier"}
+	if !slices.Contains(stages, values["stage"]) || !slices.Contains([]string{"failed", "invalid_result"}, values["code"]) {
+		return "", false
+	}
+	return "scenario stage=" + values["stage"] + " code=" + values["code"], true
+}
+
+func labMultiNotificationResult(runError error, output, diagnostic *labBoundedNotificationOutput, target any) error {
+	if output.overflow || diagnostic.overflow {
+		return errors.New("scenario output_limit; retain immutable and pending receipts")
+	}
+	if runError != nil {
+		if failure, ok := labMultiNotificationFailure(diagnostic.Bytes()); ok {
+			return errors.New(failure + "; retain immutable and pending receipts")
+		}
+		return errors.New("scenario command_failed; retain immutable and pending receipts")
+	}
+	if diagnostic.Len() != 0 {
+		return errors.New("scenario unexpected_stderr; retain immutable and pending receipts")
+	}
+	if _, ok := labMultiNotificationFailure(output.Bytes()); ok || json.Unmarshal(output.Bytes(), target) != nil {
+		return errors.New("scenario invalid_success_json; retain immutable and pending receipts")
+	}
+	return nil
+}
+
+// Persist intent in this test process before invoking the mutating helper.
+// An uncertain response must never make cleanup replay that cancellation.
+// The deliberately verified idempotency check remains an explicit separate call.
+type labMultiNotificationAttempts map[string]bool
+
+func (attempted labMultiNotificationAttempts) once(key string, call func() error) error {
+	if attempted[key] {
+		return errors.New("scenario cancellation_already_attempted; retain immutable and pending receipts")
+	}
+	attempted[key] = true
+	return call()
+}
+
+func labMultiNotificationSameEvent(a, b labNotificationEvent) bool {
+	if !a.RecordedAt.Equal(b.RecordedAt) {
+		return false
+	}
+	a.RecordedAt, b.RecordedAt = time.Time{}, time.Time{}
+	return a == b
 }
 
 func labMultiNotificationPins(profile string) (notifications.NamespaceRef, string, string) {
@@ -130,12 +210,9 @@ func TestLabTwoControlTerminalNotifications(t *testing.T) {
 			args = append(args, selected)
 		}
 		command := exec.CommandContext(callCtx, "python3", args...)
-		var output labBoundedNotificationOutput
-		command.Stdout = &output
-		if command.Run() != nil || output.overflow || json.Unmarshal(output.Bytes(), target) != nil {
-			return errors.New("scenario failed; retain immutable and pending receipts")
-		}
-		return nil
+		var output, diagnostic labBoundedNotificationOutput
+		command.Stdout, command.Stderr = &output, &diagnostic
+		return labMultiNotificationResult(command.Run(), &output, &diagnostic, target)
 	}
 	request := func(method, path string, user int, revision string, input, target any, want int) {
 		t.Helper()
@@ -153,6 +230,7 @@ func TestLabTwoControlTerminalNotifications(t *testing.T) {
 	created := []ownedRule{}
 	uncertainRuleAdmission := false
 	completed := map[string]bool{}
+	attempted := labMultiNotificationAttempts{}
 	// Delete only admitted test-owned rules, using fresh CAS. If cleanup cannot
 	// prove they stopped, leave remaining jobs accepted and report their receipts.
 	t.Cleanup(func() {
@@ -183,12 +261,19 @@ func TestLabTwoControlTerminalNotifications(t *testing.T) {
 		}
 		for i, f := range fixtures {
 			for _, selected := range []string{"first", "stopped"} {
-				if completed[f.Receipt+selected] {
+				key := f.Receipt + selected
+				if completed[key] {
+					continue
+				}
+				if attempted[key] {
+					t.Logf("Uncertain cancellation retained without retry for %s receipt %s case %s", profiles[i], f.Receipt, selected)
 					continue
 				}
 				var event labNotificationEvent
-				if scenario(cleanup, &event, profiles[i], "complete", f.Receipt, selected) != nil || labValidateMultiNotificationEvent(event, f, selected) != nil {
-					t.Errorf("Explicit cleanup needed for %s receipt %s case %s", profiles[i], f.Receipt, selected)
+				if err := attempted.once(key, func() error { return scenario(cleanup, &event, profiles[i], "complete", f.Receipt, selected) }); err != nil {
+					t.Errorf("Explicit cleanup needed for %s receipt %s case %s: %s", profiles[i], f.Receipt, selected, err)
+				} else if labValidateMultiNotificationEvent(event, f, selected) != nil {
+					t.Errorf("Cleanup event validation differs for %s receipt %s case %s", profiles[i], f.Receipt, selected)
 				}
 			}
 		}
@@ -201,8 +286,11 @@ func TestLabTwoControlTerminalNotifications(t *testing.T) {
 		receipt := hex.EncodeToString(nonce[:])
 		t.Logf("Synthetic %s scenario receipt %s (retain on uncertainty)", profile, receipt)
 		var f labMultiNotificationFixture
-		if scenario(ctx, &f, profile, "prepare", receipt, "") != nil || labValidateMultiNotificationFixture(f, profile, receipt) != nil {
-			t.Fatal("Scenario preparation failed; inspect the logged receipt before any retry")
+		if err := scenario(ctx, &f, profile, "prepare", receipt, ""); err != nil {
+			t.Fatalf("Scenario preparation failed: %s", err)
+		}
+		if labValidateMultiNotificationFixture(f, profile, receipt) != nil {
+			t.Fatal("Scenario fixture validation differs; inspect the logged receipt before any retry")
 		}
 		fixtures = append(fixtures, f)
 	}
@@ -276,19 +364,28 @@ func TestLabTwoControlTerminalNotifications(t *testing.T) {
 		t.Helper()
 		f := fixtures[source]
 		var event, repeat labNotificationEvent
-		if scenario(ctx, &event, profiles[source], "complete", f.Receipt, selected) != nil || labValidateMultiNotificationEvent(event, f, selected) != nil {
-			t.Fatal("Normal Control cancellation did not preserve exact original event")
+		if err := attempted.once(f.Receipt+selected, func() error { return scenario(ctx, &event, profiles[source], "complete", f.Receipt, selected) }); err != nil {
+			t.Fatalf("Normal Control cancellation command failed: %s", err)
+		}
+		if labValidateMultiNotificationEvent(event, f, selected) != nil {
+			t.Fatal("Normal Control cancellation event validation differs")
 		}
 		completed[f.Receipt+selected] = true
-		if scenario(ctx, &repeat, profiles[source], "complete", f.Receipt, selected) != nil || repeat != event {
+		if err := scenario(ctx, &repeat, profiles[source], "complete", f.Receipt, selected); err != nil {
+			t.Fatalf("Idempotent cancellation command failed: %s", err)
+		}
+		if !labMultiNotificationSameEvent(repeat, event) {
 			t.Fatal("Idempotent normal cancellation changed original event identity")
 		}
 		barrierCtx, done := context.WithTimeout(ctx, 90*time.Second)
 		defer done()
 		for {
 			var barrier labMultiNotificationBarrier
-			if scenario(barrierCtx, &barrier, profiles[source], "settled", f.Receipt, selected) != nil || !barrier.matches(event) {
-				t.Fatal("Exact source event barrier failed")
+			if err := scenario(barrierCtx, &barrier, profiles[source], "settled", f.Receipt, selected); err != nil {
+				t.Fatalf("Exact source event barrier command failed: %s", err)
+			}
+			if !barrier.matches(event) {
+				t.Fatal("Exact source event barrier identity differs")
 			}
 			if barrier.Settled {
 				break
@@ -475,5 +572,116 @@ func TestLabMultiNotificationContributionGuards(t *testing.T) {
 	item.Job.DeploymentID = labSecondaryDeployment
 	if labMultiNotificationMatches(item, event, owned, want) == nil {
 		t.Fatal("cross-source inbox accepted")
+	}
+}
+
+func TestLabMultiNotificationDiagnostics(t *testing.T) {
+	const canary = "private-database-password-canary"
+	for _, stage := range []string{"host_input", "host_transport", "host_decode", "host_validate", "host_receipt", "guest_preflight", "guest_material", "helper_run", "guest_cleanup", "guest_postflight", "guest_barrier"} {
+		for _, code := range []string{"failed", "invalid_result"} {
+			frame, _ := json.Marshal(map[string]any{"scenarioFailure": map[string]string{"stage": stage, "code": code}})
+			var output, diagnostic labBoundedNotificationOutput
+			_, _ = diagnostic.Write(frame)
+			err := labMultiNotificationResult(errors.New(canary), &output, &diagnostic, &labNotificationEvent{})
+			want := "scenario stage=" + stage + " code=" + code + "; retain immutable and pending receipts"
+			if err == nil || err.Error() != want {
+				t.Fatal("Fixed failure stage was lost")
+			}
+		}
+	}
+	for _, raw := range []string{
+		canary,
+		`{"scenarioFailure":{"stage":"helper_run","code":"` + canary + `"}}`,
+		`{"scenarioFailure":{"stage":"` + canary + `","code":"failed"}}`,
+		`{"scenarioFailure":{"stage":"helper_run","code":"failed","secret":"` + canary + `"}}`,
+		`{"scenarioFailure":{"stage":"helper_run","code":"failed"},"secret":"` + canary + `"}`,
+		`{"scenarioFailure":{"stage":"helper_run","stage":"host_receipt","code":"failed"}}`,
+		`{"scenarioFailure":{"stage":"helper_run","code":null}}`,
+		`{"scenarioFailure":{"stage":"helper_run","code":"failed"}} {}`,
+	} {
+		var output, diagnostic labBoundedNotificationOutput
+		_, _ = diagnostic.Write([]byte(raw))
+		err := labMultiNotificationResult(errors.New(canary), &output, &diagnostic, &labNotificationEvent{})
+		if err == nil || err.Error() != "scenario command_failed; retain immutable and pending receipts" {
+			t.Fatal("Unrecognized diagnostic escaped its fixed failure code")
+		}
+	}
+	for _, stderr := range []bool{false, true} {
+		var output, diagnostic labBoundedNotificationOutput
+		if stderr {
+			diagnostic.overflow = true
+		} else {
+			output.overflow = true
+		}
+		err := labMultiNotificationResult(errors.New(canary), &output, &diagnostic, &labNotificationEvent{})
+		if err == nil || err.Error() != "scenario output_limit; retain immutable and pending receipts" {
+			t.Fatal("Bounded output failure was lost")
+		}
+	}
+	var output, diagnostic labBoundedNotificationOutput
+	_, _ = output.Write([]byte(`{"receipt":"success-unchanged"}`))
+	var event labNotificationEvent
+	if labMultiNotificationResult(nil, &output, &diagnostic, &event) != nil || event.Receipt != "success-unchanged" {
+		t.Fatal("Success DTO changed")
+	}
+	_, _ = diagnostic.Write([]byte(canary))
+	if err := labMultiNotificationResult(nil, &output, &diagnostic, &event); err == nil || err.Error() != "scenario unexpected_stderr; retain immutable and pending receipts" {
+		t.Fatal("Unexpected stderr was exposed or ignored")
+	}
+	diagnostic.Reset()
+	for _, raw := range []string{canary, `{"scenarioFailure":{"stage":"helper_run","code":"failed"}}`} {
+		output.Reset()
+		_, _ = output.Write([]byte(raw))
+		if err := labMultiNotificationResult(nil, &output, &diagnostic, &event); err == nil || err.Error() != "scenario invalid_success_json; retain immutable and pending receipts" {
+			t.Fatal("Failure payload admitted as success")
+		}
+	}
+}
+
+func TestLabMultiNotificationEventTimeEquality(t *testing.T) {
+	event := labNotificationEvent{EventID: "77000000-0000-4000-8000-000000000001", JobRevision: "2", RecordedAt: time.Unix(1791108000, 123456000).UTC()}
+	repeat := event
+	repeat.RecordedAt = repeat.RecordedAt.In(time.FixedZone("synthetic offset", 2*60*60))
+	if repeat == event || !labMultiNotificationSameEvent(event, repeat) {
+		t.Fatal("Equivalent timestamp instants must compare independently of location pointers")
+	}
+	repeat.RecordedAt = repeat.RecordedAt.Add(time.Nanosecond)
+	if labMultiNotificationSameEvent(event, repeat) {
+		t.Fatal("Changed original event time accepted")
+	}
+	repeat = event
+	repeat.JobRevision = "3"
+	if labMultiNotificationSameEvent(event, repeat) {
+		t.Fatal("Changed original event revision accepted")
+	}
+}
+
+func TestLabMultiNotificationUncertainCancellationNeverRetries(t *testing.T) {
+	attempted := labMultiNotificationAttempts{}
+	calls := 0
+	uncertain := errors.New("synthetic lost response")
+	call := func() error { calls++; return uncertain }
+	if err := attempted.once("primary-first", func() error {
+		if !attempted["primary-first"] {
+			t.Fatal("Cancellation was invoked before recording intent")
+		}
+		return call()
+	}); err != uncertain || !attempted["primary-first"] || calls != 1 {
+		t.Fatal("Cancellation attempt was not retained before uncertain result")
+	}
+	if err := attempted.once("primary-first", call); err == nil || calls != 1 {
+		t.Fatal("Uncertain cancellation could be replayed by cleanup")
+	}
+	if err := attempted.once("primary-stopped", call); err != uncertain || calls != 2 || !attempted["primary-stopped"] {
+		t.Fatal("Never-attempted cleanup case did not get exactly one attempt")
+	}
+	if err := attempted.once("primary-stopped", call); err == nil || calls != 2 {
+		t.Fatal("Uncertain cleanup cancellation was repeated")
+	}
+	if err := attempted.once("secondary-first", func() error { calls++; return nil }); err != nil || !attempted["secondary-first"] || calls != 3 {
+		t.Fatal("Successful response lost the original attempted fence")
+	}
+	if err := attempted.once("secondary-first", call); err == nil || calls != 3 {
+		t.Fatal("Validation failure after successful command could permit cleanup replay")
 	}
 }
