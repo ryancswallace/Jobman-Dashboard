@@ -103,6 +103,39 @@ private func graphData(_ suffix: String = "", _ query: [URLQueryItem] = []) thro
     #expect(both.total == "11" && both.items.count == 11)
 }
 
+@Test func ceilingFixtureDependencyHistoryKeeps64ReplayPagesAndExplicitRestart() throws {
+    let decoder = JSONDecoder(), node = NativeGraphFixtures.nodeID(0)
+    let detail = try decoder.decode(WorkloadDetail.self, from: graphData())
+    func load(_ cursor: String?) throws -> Page<GraphEdge> {
+        var query: [URLQueryItem] = [.init(name: "nodeId", value: node), .init(name: "direction", value: "outgoing"), .init(name: "limit", value: "100")]
+        if let cursor { query.append(.init(name: "cursor", value: cursor)) }
+        let page = try decoder.decode(Page<GraphEdge>.self, from: graphData("/dependencies", query))
+        try detail.workload.validate(edges: page.items, node: node, direction: "outgoing", sources: page.sources)
+        return page
+    }
+    var history = InboxPageHistory(), current: String?, page = try load(nil), pages = 1
+    while let next = page.nextCursor {
+        let replacement = try load(next)
+        history.record(current); current = next; page = replacement; pages += 1
+        #expect(history.count <= 64 && page.items.count <= 100 && pages <= 100)
+    }
+    #expect(pages == 100 && history.count == 64 && history.discardedPages == 35)
+    // A cancelled/failed previous read discards only the tentative copy.
+    var cancelled = history; _ = cancelled.previous()
+    #expect(history.count == 64 && cancelled.count == 63)
+    for index in stride(from: 98, through: 35, by: -1) {
+        var retained = history
+        let previous = retained.previous(), replacement = try load(previous)
+        #expect(replacement.items.first?.toJobId == NativeGraphFixtures.nodeID(index * 100 + 1))
+        history = retained; current = previous; page = replacement
+    }
+    #expect(!history.canGoBack && history.discardedPages == 35 && current != nil)
+    // Refresh explicitly starts a new traversal and clears the old window.
+    page = try load(nil); current = nil; history.reset()
+    #expect(page.items.first?.toJobId == NativeGraphFixtures.nodeID(1))
+    #expect(history.count == 0 && history.discardedPages == 0 && !history.canGoBack)
+}
+
 @Test func ceilingFixtureRejectsCrossQueryCursorsAndOversizedBounds() throws {
     let node = NativeGraphFixtures.nodeID(0)
     let first = try JSONDecoder().decode(WorkloadDetail.self, from: graphData())

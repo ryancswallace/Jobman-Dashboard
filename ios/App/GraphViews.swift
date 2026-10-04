@@ -102,7 +102,7 @@ private struct GraphEdgeRows: View {
     let direction: String
     @State private var page: Page<GraphEdge>?
     @State private var currentCursor: String?
-    @State private var history: [String?] = []
+    @State private var history = InboxPageHistory()
     @State private var error: String?
     @State private var requests = ReadRequestGate()
     private var loading: Bool { requests.busy }
@@ -110,8 +110,12 @@ private struct GraphEdgeRows: View {
         Section("\(direction.isEmpty ? "All connected" : direction.capitalized) dependencies") {
             if let page {
                 Text("\(page.items.count) edges on this page; \(page.total ?? "unavailable") matching edges at source").font(.caption).accessibilityIdentifier("edgePageTotal")
-                if !history.isEmpty { Button("Previous dependency page") { Task { await previous() } }.disabled(loading) }
+                if history.canGoBack { Button("Previous dependency page") { Task { await previous() } }.disabled(loading) }
                 if let cursor = page.nextCursor { Button("Next dependency page") { Task { await next(cursor) } }.disabled(loading) }
+                if history.discardedPages > 0 {
+                    Text("Only the most recent \(InboxPageHistory.capacity) previous pages are retained. Refresh dependencies to return to the first page.")
+                        .font(.footnote).accessibilityIdentifier("graphHistoryWindow")
+                }
                 ForEach(page.items) { edge in
                     DisclosureGroup("\(edge.from) → \(edge.to)") {
                         LabeledContent("Predicate", value: edge.predicate)
@@ -130,12 +134,17 @@ private struct GraphEdgeRows: View {
             }
             if loading { ProgressView("Loading dependencies…") }
             if let error { ErrorMessage(error: error) }
-            Button("Refresh dependencies") { Task { if await load() { history = [] } } }.disabled(loading)
+            Button("Refresh dependencies") { Task { if await load() { history.reset() } } }.disabled(loading)
         }.task(id: store.foregroundGeneration) { await load(currentCursor, replacing: true) }
     }
     private func reference(_ id: String) -> JobRef { .init(deploymentId: workload.deploymentId, namespaceId: workload.namespaceId, jobId: id) }
-    private func next(_ cursor: String) async { let previous = currentCursor; if await load(cursor) { history.append(previous) } }
-    private func previous() async { guard let previous = history.last else { return }; if await load(previous) { history.removeLast() } }
+    private func next(_ cursor: String) async { let previous = currentCursor; if await load(cursor) { history.record(previous) } }
+    private func previous() async {
+        guard history.canGoBack else { return }
+        var retained = history
+        let previous = retained.previous()
+        if await load(previous) { history = retained }
+    }
     @discardableResult private func load(_ cursor: String? = nil, replacing: Bool = false) async -> Bool {
         guard let token = requests.begin(replacing: replacing) else { return false }; defer { requests.finish(token) }
         do {
