@@ -113,6 +113,32 @@ func labWatchdogLoad(t *testing.T) labWatchdogDriver {
 	return d
 }
 
+// LabWatchdogDenialContract is an integration-test seam for the real HTTP
+// handler regression. Logs expose a capability denial; reports and inbox
+// ownership hide inaccessible records. Never accept either status interchangeably.
+func LabWatchdogDenialContract(path string, status int, body []byte) bool {
+	u, err := url.ParseRequestURI(path)
+	if err != nil || u.IsAbs() || u.Host != "" {
+		return false
+	}
+	parts := strings.Split(u.Path, "/")
+	scopedJob := len(parts) >= 9 && parts[1] == "api" && parts[2] == "v1" && parts[3] == "deployments" &&
+		parts[5] == "namespaces" && parts[7] == "jobs" &&
+		uuid(parts[4]) && uuid(parts[6]) && uuid(parts[8])
+	isLog := scopedJob && len(parts) == 10 && parts[9] == "logs"
+	isReport := scopedJob && len(parts) == 11 && parts[9] == "reports" && uuid(parts[10])
+	isInbox := len(parts) == 5 && parts[1] == "api" && parts[2] == "v1" && parts[3] == "inbox" && uuid(parts[4])
+	problem, ok := labFaultDecodeError(body)
+	id, idErr := hex.DecodeString(problem.RequestID)
+	if !ok || idErr != nil || len(id) != 16 || hex.EncodeToString(id) != problem.RequestID {
+		return false
+	}
+	if isLog {
+		return status == http.StatusForbidden && problem.Code == "forbidden" && problem.Message == "This scope is not currently authorized."
+	}
+	return (isReport || isInbox) && status == http.StatusNotFound && problem.Code == "not_found_or_inaccessible" && problem.Message == "The resource is absent or inaccessible."
+}
+
 // Only bounded, sanitized HTTP503 can be retried during read recovery. No
 // service action, sign-in, rule change or source mutation is performed here.
 func labWatchdogRead(ctx context.Context, client *http.Client, token, path string, want int, target any, recovery bool) error {
@@ -128,9 +154,7 @@ func labWatchdogRead(ctx context.Context, client *http.Client, token, path strin
 		}
 		if value.status == want {
 			if want >= 400 {
-				problem, ok := labFaultDecodeError(value.body)
-				id, idErr := hex.DecodeString(problem.RequestID)
-				if !ok || want != 404 || problem.Code != "not_found_or_inaccessible" || problem.Message != "The resource is absent or inaccessible." || idErr != nil || len(id) != 16 || hex.EncodeToString(id) != problem.RequestID {
+				if !LabWatchdogDenialContract(path, want, value.body) {
 					return errors.New("watchdog denial contract changed")
 				}
 			} else if target != nil && json.Unmarshal(value.body, target) != nil {
@@ -277,7 +301,7 @@ func TestLabRestoreWatchdogIntervention(t *testing.T) {
 		read(1-i, "/api/v1/inbox/"+inboxes[i].ID, 404, nil, false)
 	}
 	read(1, reportPath, 404, nil, false)
-	read(1, jobPath+"/logs?stream=stderr", 404, nil, false)
+	read(1, jobPath+"/logs?stream=stderr", 403, nil, false)
 	if time.Until(deadline) < 4*time.Minute {
 		t.Fatal("insufficient timer and read-recovery budget; no stop attempted")
 	}
@@ -348,7 +372,7 @@ func TestLabRestoreWatchdogIntervention(t *testing.T) {
 		t.Fatal("original NFS bytes changed")
 	}
 	read(1, reportPath, 404, nil, false)
-	read(1, jobPath+"/logs?stream=stderr", 404, nil, false)
+	read(1, jobPath+"/logs?stream=stderr", 403, nil, false)
 	must(driver.call(ctx, "close", &observed))
 	evidence.Passed = true
 	evidence.Stage = "accepted"
