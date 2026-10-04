@@ -72,6 +72,8 @@ func labInstallScope(scope string) (origin, client, listen string, err error) {
 		return labInstallOrigin, labInstallClient, "10.77.0.10:48443", nil
 	case "v2":
 		return "https://dashboard.lab.test:49443", "jobman-dashboard-install-web-v2", "10.77.0.10:49443", nil
+	case "v3":
+		return "https://dashboard.lab.test:50443", "jobman-dashboard-install-web-v3", "10.77.0.10:50443", nil
 	default:
 		return "", "", "", errors.New("installation scope invalid")
 	}
@@ -158,8 +160,8 @@ func (d labInstallDriver) run(ctx context.Context, phase, selected string) error
 	if _, err := labInstallLoad(d.root, d.implementationRoot, d.staging, d.planSHA, d.implementationSHA); err != nil {
 		return err
 	}
-	if d.plan.Scope == "v2" && d.adapterPath != "" {
-		return errors.New("v2 installation cannot adopt v1 continuation")
+	if (d.plan.Scope == "v2" || d.plan.Scope == "v3") && d.adapterPath != "" {
+		return errors.New("later installation cannot adopt v1 continuation")
 	}
 	entry := filepath.Join(d.implementationRoot, "scripts/install-dashboard-fresh.py")
 	if _, err := d.withAdapter(d.adapterPath, d.adapterSHA); err != nil {
@@ -172,13 +174,13 @@ func (d labInstallDriver) run(ctx context.Context, phase, selected string) error
 	if d.adapterPath != "" {
 		args = append(args, "--implementation-root", d.implementationRoot, "--expected-adapter-sha256", d.adapterSHA)
 	}
-	if d.plan.Scope == "v2" {
+	if d.plan.Scope == "v2" || d.plan.Scope == "v3" {
 		previous := filepath.Join(d.staging, "previous-attempt.json")
 		raw, err := labRestorePrivate(previous, 8<<20)
 		if err != nil {
 			return errors.New("prior aborted installation evidence unavailable")
 		}
-		args = append(args, "--scope", "v2", "--previous-attempt", previous, "--expected-previous-attempt-sha256", labInstallDigest(raw))
+		args = append(args, "--scope", d.plan.Scope, "--previous-attempt", previous, "--expected-previous-attempt-sha256", labInstallDigest(raw))
 	}
 	if phase == "verify" {
 		if selected != "baseline" && selected != "upgrade" && selected != "rollback" {
@@ -818,31 +820,33 @@ func TestLabInstallationImplementationPins(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(staging, "previous-attempt.json"), previousRaw, 0600); err != nil {
 		t.Fatal(err)
 	}
-	v2 := p
-	v2.Scope = "v2"
-	v2.Configs.API.PublicOrigin, v2.Configs.API.Listen, v2.Configs.API.OIDC.WebClientID = "https://dashboard.lab.test:49443", "10.77.0.10:49443", "jobman-dashboard-install-web-v2"
-	v2.ImplementationSHA256 = map[string]string{}
-	for k, v := range p.ImplementationSHA256 {
-		v2.ImplementationSHA256[k] = v
-	}
 	entry := filepath.Join(scripts, "install-dashboard-fresh.py")
 	originalEntry, err := os.ReadFile(entry)
 	if err != nil {
 		t.Fatal(err)
 	}
-	v2Entry := []byte("import json,sys\nassert sys.argv[sys.argv.index('--scope')+1] == 'v2'\nassert sys.argv[sys.argv.index('--previous-attempt')+1] == " + strconv.Quote(filepath.Join(staging, "previous-attempt.json")) + "\nassert sys.argv[sys.argv.index('--expected-previous-attempt-sha256')+1] == " + strconv.Quote(labInstallDigest(previousRaw)) + "\nprint(json.dumps({'completed':True,'phase':'stop','operationId':'" + p.OperationID + "'}))\n")
-	if err := os.WriteFile(entry, v2Entry, 0600); err != nil {
-		t.Fatal(err)
-	}
-	v2.ImplementationSHA256["install-dashboard-fresh.py"] = labInstallDigest(v2Entry)
-	v2Raw, _ := json.Marshal(v2)
-	v2Set, _ := json.MarshalIndent(v2.ImplementationSHA256, "", "  ")
-	if err := os.WriteFile(filepath.Join(staging, "plan.json"), v2Raw, 0600); err != nil {
-		t.Fatal(err)
-	}
-	v2Driver, err := labInstallLoad(labRoot, root, staging, labInstallDigest(v2Raw), labInstallDigest(append(v2Set, '\n')))
-	if err != nil || v2Driver.run(t.Context(), "stop", "") != nil {
-		t.Fatal("v2 scope and private receipt were not passed", err)
+	for _, scope := range []string{"v2", "v3"} {
+		scoped := p
+		scoped.Scope = scope
+		scoped.Configs.API.PublicOrigin, scoped.Configs.API.OIDC.WebClientID, scoped.Configs.API.Listen, _ = labInstallScope(scope)
+		scoped.ImplementationSHA256 = map[string]string{}
+		for k, v := range p.ImplementationSHA256 {
+			scoped.ImplementationSHA256[k] = v
+		}
+		scopedEntry := []byte("import json,sys\nassert sys.argv[sys.argv.index('--scope')+1] == " + strconv.Quote(scope) + "\nassert sys.argv[sys.argv.index('--previous-attempt')+1] == " + strconv.Quote(filepath.Join(staging, "previous-attempt.json")) + "\nassert sys.argv[sys.argv.index('--expected-previous-attempt-sha256')+1] == " + strconv.Quote(labInstallDigest(previousRaw)) + "\nprint(json.dumps({'completed':True,'phase':'stop','operationId':'" + p.OperationID + "'}))\n")
+		if err := os.WriteFile(entry, scopedEntry, 0600); err != nil {
+			t.Fatal(err)
+		}
+		scoped.ImplementationSHA256["install-dashboard-fresh.py"] = labInstallDigest(scopedEntry)
+		scopedRaw, _ := json.Marshal(scoped)
+		scopedSet, _ := json.MarshalIndent(scoped.ImplementationSHA256, "", "  ")
+		if err := os.WriteFile(filepath.Join(staging, "plan.json"), scopedRaw, 0600); err != nil {
+			t.Fatal(err)
+		}
+		scopedDriver, err := labInstallLoad(labRoot, root, staging, labInstallDigest(scopedRaw), labInstallDigest(append(scopedSet, '\n')))
+		if err != nil || scopedDriver.run(t.Context(), "stop", "") != nil {
+			t.Fatal("scoped scope and private receipt were not passed", err)
+		}
 	}
 	if err := os.WriteFile(entry, originalEntry, 0600); err != nil {
 		t.Fatal(err)
@@ -915,6 +919,57 @@ func TestLabInstallationAdapterAdmission(t *testing.T) {
 	}
 	if _, err := driver.withAdapter(path, digest); err == nil {
 		t.Fatal("non-private adapter accepted")
+	}
+}
+
+func TestLabInstallationV3ScopeRejectsPriorOriginsAndClients(t *testing.T) {
+	origin, clientID, listen, err := labInstallScope("v3")
+	if err != nil || origin != "https://dashboard.lab.test:50443" || clientID != "jobman-dashboard-install-web-v3" || listen != "10.77.0.10:50443" {
+		t.Fatal("v3 fixed scope differs")
+	}
+	calls := 0
+	client := &http.Client{Transport: labInstallRoundTrip(func(r *http.Request) (*http.Response, error) {
+		calls++
+		if r.URL.Host != "dashboard.lab.test:50443" {
+			t.Fatal("old scope reached transport")
+		}
+		return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader("ok"))}, nil
+	})}
+	for _, prior := range []string{"v1", "v2"} {
+		old, _, _, _ := labInstallScope(prior)
+		if _, err := labInstallExchange(t.Context(), client, "GET", old+"/healthz", nil, nil, "v3"); err == nil {
+			t.Fatal("old origin accepted")
+		}
+	}
+	if calls != 0 {
+		t.Fatal("cross-scope request reached transport")
+	}
+	if _, err := labInstallExchange(t.Context(), client, "GET", origin+"/healthz", nil, nil, "v3"); err != nil || calls != 1 {
+		t.Fatal("v3 refused", err)
+	}
+	if _, _, _, err := labInstallScope("v4"); err == nil {
+		t.Fatal("arbitrary later scope allowed")
+	}
+	state := strings.Repeat("s", 43)
+	q := url.Values{"client_id": {clientID}, "redirect_uri": {origin + "/auth/callback"}, "response_type": {"code"}, "code_challenge_method": {"S256"}, "code_challenge": {strings.Repeat("c", 43)}, "nonce": {strings.Repeat("n", 43)}, "state": {state}, "resource": {"jobman-dashboard-api"}, "scope": {"openid profile"}}
+	header := func() http.Header {
+		return http.Header{"Location": {labWebIssuerOrigin + "/realms/jobman-lab/protocol/openid-connect/auth?" + q.Encode()}}
+	}
+	if _, err := labInstallAuthorization(header(), state, "v3"); err != nil {
+		t.Fatal(err)
+	}
+	for _, prior := range []string{"v1", "v2"} {
+		oldOrigin, oldClient, _, _ := labInstallScope(prior)
+		q.Set("client_id", oldClient)
+		if _, err := labInstallAuthorization(header(), state, "v3"); err == nil {
+			t.Fatal("old client accepted")
+		}
+		q.Set("client_id", clientID)
+		q.Set("redirect_uri", oldOrigin+"/auth/callback")
+		if _, err := labInstallAuthorization(header(), state, "v3"); err == nil {
+			t.Fatal("old callback accepted")
+		}
+		q.Set("redirect_uri", origin+"/auth/callback")
 	}
 }
 
