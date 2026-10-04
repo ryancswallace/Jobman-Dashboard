@@ -1,9 +1,11 @@
 # Bounded dependency-failure acceptance
 
 Status: directory outage and same-session recovery acceptance passed on rc.3 in
-124.35 seconds after a reviewed recovery-verifier repair. The original failed
-attempt and subsequent passing result are retained separately. Broker and database
-acceptance remain open. Root coordinates every Lab invocation after the exact
+124.35 seconds after a reviewed recovery-verifier repair. Broker stop/start and
+exact-process pause/recovery acceptance also pass in16.83 seconds, including
+authorized log recovery after the startup fence. Original failed attempts and
+subsequent passing results are retained separately. Database acceptance remains
+open. Root coordinates every Lab invocation after the exact
 driver, plan, and recovery actions have been reviewed. This supplements T02, T05, and T11
 in [the design](DESIGN.md); it does not replace healthy scale acceptance.
 
