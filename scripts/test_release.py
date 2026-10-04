@@ -12,12 +12,33 @@ spec.loader.exec_module(release)
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_curated_docs_include_current_behavior_and_release_gates(self):
+        self.assertTrue({"RUN_SELECTION.md", "RELEASE_GAP_AUDIT.md", "FINAL_CANDIDATE.md"}.issubset(release.RUNBOOKS))
+        self.assertEqual(len(release.RUNBOOKS), len(set(release.RUNBOOKS)))
+        for name in release.RUNBOOKS:
+            self.assertEqual(Path(name).name, name)
+            self.assertTrue((release.ROOT / "docs" / name).is_file(), name)
+
     def test_only_actual_compiled_dependencies_have_source_checksum_claims(self):
         module = {"Path": "example.org/dependency", "Version": "v1.2.3", "Sum": "h1:" + "a" * 43 + "="}
         self.assertEqual(release.binary_dependencies({"Deps": [module]}), [module])
         for invalid in [{}, {"Deps": [module | {"Sum": ""}]}, {"Deps": [module | {"Replace": {"Path": "/private/local"}}]}, {"Deps": [module | {"Version": "(devel)"}]}]:
             with self.assertRaises(ValueError):
                 release.binary_dependencies(invalid)
+
+    def test_first_party_stable_gate_does_not_reject_transitive_pseudo_versions(self):
+        modules = [{"Path": name, "Version": "v1.2.3", "Sum": "h1:" + "a" * 43 + "="} for name in release.FIRST_PARTY]
+        modules.append({"Path": "example.org/transitive", "Version": "v0.0.0-20260101000000-abcdef012345", "Sum": "h1:" + "b" * 43 + "="})
+        result = release.upstream_release_pins({"dashboard": modules})
+        self.assertTrue(result["stableVersions"])
+        self.assertFalse(result["controlCompatibilityVerified"])
+        self.assertFalse(result["finalReleaseEligible"])
+        for version in ("v1.2.4-0.20260101000000-abcdef012345", "v1.2.3-rc.1", "v1.2.3+incompatible", "v01.2.3"):
+            changed = [dict(m) for m in modules]; changed[0]["Version"] = version
+            self.assertFalse(release.upstream_release_pins({"dashboard": changed})["stableVersions"])
+        with self.assertRaises(ValueError): release.upstream_release_pins({"broker": [modules[0]]})
+        with self.assertRaises(ValueError):
+            release.upstream_release_pins({"dashboard": modules, "broker": [modules[0] | {"Version": "v1.2.4"}]})
 
     def test_ambient_build_overrides_and_secrets_are_not_inherited(self):
         with tempfile.TemporaryDirectory() as temp:

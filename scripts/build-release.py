@@ -22,6 +22,8 @@ import tempfile
 ROOT = Path(__file__).resolve().parent.parent
 VERSION = re.compile(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-rc\.([1-9][0-9]*)\Z")
 ARCHITECTURES = ("amd64", "arm64")
+FIRST_PARTY = ("github.com/ryancswallace/jobman", "github.com/ryancswallace/jobman-diagnose")
+STABLE_VERSION = re.compile(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\Z")
 MODULE = "github.com/ryancswallace/jobman-dashboard/internal/buildinfo"
 RUNBOOKS = (
     "AUTHENTICATION.md", "PROCESS_MODES.md", "PURPOSE_KEYS.md", "OPERATOR_STATUS.md", "PROCESS_OBSERVABILITY.md",
@@ -33,6 +35,7 @@ RUNBOOKS = (
     "LAB_RESTORE.md", "LAB_MIXED_LOAD.md",
     "ARTIFACT_METADATA.md", "TARGETS.md", "EVENT_SOURCE.md", "INBOX.md",
     "NOTIFICATION_PIPELINE.md", "NOTIFICATION_RULES.md", "ACCESSIBILITY.md",
+    "RUN_SELECTION.md", "RELEASE_GAP_AUDIT.md", "FINAL_CANDIDATE.md",
 )
 
 
@@ -150,6 +153,23 @@ def binary_dependencies(info):
     return sorted(result, key=lambda item: item["Path"])
 
 
+def upstream_release_pins(dependencies):
+    """Candidate provenance only; immutable pseudo-versions are not final tags."""
+    found = {}
+    for modules in dependencies.values():
+        for module in modules:
+            if module["Path"] in FIRST_PARTY:
+                previous = found.setdefault(module["Path"], module)
+                if previous != module:
+                    raise ValueError("first-party executable dependencies disagree")
+    if set(found) != set(FIRST_PARTY):
+        raise ValueError("candidate must record both first-party compiled dependencies")
+    return {"dependencies": [found[name] for name in FIRST_PARTY],
+            "stableVersions": all(STABLE_VERSION.fullmatch(found[name]["Version"]) is not None for name in FIRST_PARTY),
+            "controlCompatibilityVerified": False,
+            "finalReleaseEligible": False}
+
+
 def build(version, architectures, output):
     if not VERSION.fullmatch(version) or not architectures or len(set(architectures)) != len(architectures) or any(a not in ARCHITECTURES for a in architectures):
         raise ValueError("use vX.Y.Z-rc.N and unique linux architectures amd64/arm64")
@@ -217,7 +237,7 @@ def build(version, architectures, output):
             for name in RUNBOOKS:
                 shutil.copyfile(source / "docs" / name, bundle / "docs" / name)
             shutil.copyfile(source / "README.md", bundle / "README.md")
-            metadata = {"formatVersion": 1, "releaseState": "candidate", "version": version, "revision": revision, "sourceDateEpoch": epoch, "os": "linux", "architecture": architecture, "isa": "v1" if architecture == "amd64" else "v8.0", "toolchains": versions, "goModules": dependencies, "webLockSHA256": digest(source / "web/package-lock.json")}
+            metadata = {"formatVersion": 1, "releaseState": "candidate", "version": version, "revision": revision, "sourceDateEpoch": epoch, "os": "linux", "architecture": architecture, "isa": "v1" if architecture == "amd64" else "v8.0", "toolchains": versions, "goModules": dependencies, "upstreamReleasePins": upstream_release_pins(dependencies), "webLockSHA256": digest(source / "web/package-lock.json")}
             (bundle / "build.json").write_text(json.dumps(metadata, sort_keys=True, indent=2) + "\n")
             write_checksums(bundle)
             write_archive(bundle, output / (bundle.name + ".tar.gz"), epoch)

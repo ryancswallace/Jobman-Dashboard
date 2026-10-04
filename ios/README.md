@@ -33,7 +33,8 @@ the source logos are unchanged. Regenerate from this directory with:
 xcrun swift -module-cache-path /private/tmp/jobman-dashboard-icon-module-cache scripts/render-app-icon.swift App/Assets.xcassets/AppIcon.appiconset/AppIcon.png
 ```
 
-Create a Release **unsigned** device archive without signing credentials:
+Create a Release **unsigned** device archive without signing credentials from a
+clean committed checkout (see [final candidate gates](../docs/FINAL_CANDIDATE.md)):
 
 ```sh
 python3 scripts/test-package-app.py
@@ -42,7 +43,11 @@ python3 scripts/package-app.py unsigned --version 0.1.0 --build 1 --output /priv
 
 The output must be a new absolute directory. It retains the exact command,
 intent, build log, archive, and completion receipt with executable/Info.plist
-hashes. An unsigned archive verifies compilation/packaging; it cannot be installed
+hashes. Unsigned builds use committed Git-archive bytes, exclude ignored local
+configuration, and record source SHA/archive hash plus Xcode, Swift and iPhoneOS
+SDK versions. `archive-files.json` and the generated unsigned tar are hashed in
+the completion receipt; CI retains those exact artifacts. This is provenance,
+not a claim of byte reproducibility. An unsigned archive verifies compilation/packaging; it cannot be installed
 on a physical iPhone. Failed builds retain their evidence and require a new output
 directory. `--dry-run` checks inputs and prints the local command without building.
 

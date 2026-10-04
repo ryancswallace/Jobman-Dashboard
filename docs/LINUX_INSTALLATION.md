@@ -11,6 +11,11 @@ Each service can expose its own private operator socket using
 separate mode0700 runtime directories. Configure an explicit socket path inside
 the corresponding directory; metrics never share the browser listener.
 
+See [final candidate gates](FINAL_CANDIDATE.md) for the exact-source packaging
+sequence, compatible upstream tags and unsigned native provenance. The bundled
+[run-selection contract](RUN_SELECTION.md) and [release gap audit](RELEASE_GAP_AUDIT.md)
+retain the behavior and acceptance boundaries used for review.
+
 ## Build and verify an exact candidate
 
 Use a clean committed checkout, the exact versions in `go.version`, `node.version`

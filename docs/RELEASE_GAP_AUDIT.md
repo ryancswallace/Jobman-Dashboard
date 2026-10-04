@@ -27,3 +27,7 @@ tests; their remaining system evidence is recorded in the status document.
 This audit is not a claim that every production acceptance gate for those
 requirements has passed. Upstream protected reviews, released dependency pins,
 and a final clean candidate still govern release completion.
+
+The [final candidate procedure](FINAL_CANDIDATE.md) carries this audit in the
+curated release documentation and keeps upstream, native and external acceptance
+gates explicit. Packaging this audit does not itself close any finding.

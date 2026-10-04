@@ -98,7 +98,6 @@ jobs:
           NATIVE_BUILD: ${{ inputs.nativeBuild }}
         run: |
           python3 ios/scripts/package-app.py unsigned --version "$NATIVE_VERSION" --build "$NATIVE_BUILD" --output "$RUNNER_TEMP/native-package"
-          tar -czf "$RUNNER_TEMP/native-package/JobmanDashboard-unsigned.xcarchive.tar.gz" -C "$RUNNER_TEMP/native-package" JobmanDashboard.xcarchive
       - name: Retain unsigned native archive and provenance
         if: github.event_name == 'workflow_dispatch' && (inputs.nativeArchive || inputs.candidateVersion != '')
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -108,6 +107,7 @@ jobs:
             ${{ runner.temp }}/native-package/JobmanDashboard-unsigned.xcarchive.tar.gz
             ${{ runner.temp }}/native-package/build-intent.json
             ${{ runner.temp }}/native-package/build-receipt.json
+            ${{ runner.temp }}/native-package/archive-files.json
             ${{ runner.temp }}/native-package/xcodebuild.log
           if-no-files-found: error
           retention-days: 30
