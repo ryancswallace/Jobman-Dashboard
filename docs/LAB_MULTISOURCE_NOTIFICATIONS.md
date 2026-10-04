@@ -2,8 +2,8 @@
 
 This opt-in test exercises both deployed Control sources through normal job
 admission and cancellation, durable publication and service-only ingestion,
-personal rules, and the authenticated inbox. It is prepared for independent
-review; **no live result is claimed by this document**.
+personal rules, and the authenticated inbox. The reviewed v5 run passed against
+the deployed two-Control Lab on 2026-10-04; the retained evidence is recorded below.
 
 The scenario is synthetic and performs no subprocess or Slurm execution. It
 establishes no APNs, physical-phone, real AD FS or managed-device acceptance.
@@ -188,3 +188,27 @@ python3 ../jobman-lab/scripts/test-dashboard-multisource-notification-scenario.p
 These tests validate fixed source identity, actual event/barrier provenance,
 source/owner rule contamination, current checkpoint SQL fields, read-only barrier
 transactions and private helper transport. They are not deployed acceptance.
+
+## Deployed v5 evidence
+
+The root operator invoked the frozen v5 packet once and the full scenario passed
+in 33.49 seconds. The Dashboard test binary came from commit
+`01f4bd4ad4deaad725c12c9413ec97b820412882`; the deployed runtime remained RC3
+`9b1c65e31db8a849ebe2dfa00caf4474bef8e7d2`, configuration 8, with both reviewed 04bd
+Control sources. The packet is retained at
+`/private/tmp/jobman-notification-fresh-01f4bd4-zidtfuj6`, including
+`live-result.json` and the verbose log (SHA256
+`ace4afa2b418b29d175537d18e0b0934a7e924629ec6149d7e9b2980b4b66ce4`).
+
+Fresh receipt IDs were `15bbb7d91b8f78d601de7a64731321d2` and
+`e25bda7d53d7659defe7bfb0a957c0b8`. The test verified original source event and
+inbox identities for both accounts on both deployments, inverted ownership,
+aggregate and single-source agreement, account/read isolation, stopped-rule
+suppression, and cleanup of only its owned rules. All 15 original host receipt
+files from the four earlier attempts retained their recorded hashes.
+
+This success does not explain the earlier v4 read-only barrier failure. The
+reviewed read-only probes later passed, and the exact pending-response bootstrap
+regression passed; that historical cause remains unresolved. All earlier source
+jobs, host receipts and failure evidence remain retained. This is synthetic
+terminal-event acceptance, with no APNs or physical-device claim.
