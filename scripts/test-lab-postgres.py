@@ -24,7 +24,7 @@ ca = quote(str(lab / ".lab/certs/lab-ca.crt"), safe="")
 url = f"postgres://jobman_dashboard_ddl:{quote(password, safe='')}@10.77.0.20:5432/jobman_dashboard?sslmode=verify-full&sslrootcert={ca}"
 env = os.environ.copy()
 env.pop("GOROOT", None)
-env.update(JOBMAN_DASHBOARD_TEST_DATABASE_URL=url, GOTOOLCHAIN="go1.26.6")
+env.update(JOBMAN_DASHBOARD_TEST_DATABASE_URL=url, GOTOOLCHAIN="go1.26.6", GOWORK="off")
 env.setdefault("GOCACHE", "/private/tmp/jobman-dashboard-go-cache" if sys.platform == "darwin" else "/tmp/jobman-dashboard-go-cache")
 result = subprocess.run(["go", "test", "-race", "-count=1", "-v", "./internal/store"], cwd=root, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 output = result.stdout.replace(url, "[REDACTED_LAB_DATABASE]").replace(password, "[REDACTED]")

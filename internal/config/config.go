@@ -34,6 +34,11 @@ type Config struct {
 	LogBrokers            []RemoteBroker     `json:"logBrokers"`
 	LogMappings           []RemoteLogMapping `json:"logMappings"`
 	Reports               Reports            `json:"reports"`
+	Events                Events             `json:"events"`
+}
+
+type Events struct {
+	Enabled bool `json:"enabled"`
 }
 
 type Reports struct {
@@ -190,6 +195,10 @@ func checkKeys(decoder *json.Decoder, schema reflect.Type, path string) error {
 		}
 		if _, err := strconv.ParseInt(string(value), 10, 64); err != nil {
 			return fmt.Errorf("%s must be a signed 64-bit integer", path)
+		}
+	case reflect.Bool:
+		if _, ok := token.(bool); !ok {
+			return fmt.Errorf("%s must be a boolean", path)
 		}
 	default:
 		return errors.New("configuration schema contains an unsupported type")

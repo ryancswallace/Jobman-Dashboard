@@ -2,6 +2,8 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 export GOTOOLCHAIN := go$(shell cat go.version)
+# Repository gates and artifacts always consume the pinned public module graph.
+export GOWORK := off
 unexport GOROOT
 
 .PHONY: help format format-check contracts contracts-check test test-db vet build web ios-core ios-simulator check dev

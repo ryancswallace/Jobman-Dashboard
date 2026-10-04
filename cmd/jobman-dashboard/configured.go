@@ -22,6 +22,7 @@ import (
 	"github.com/ryancswallace/jobman-dashboard/internal/auth"
 	"github.com/ryancswallace/jobman-dashboard/internal/config"
 	"github.com/ryancswallace/jobman-dashboard/internal/control"
+	"github.com/ryancswallace/jobman-dashboard/internal/events"
 	"github.com/ryancswallace/jobman-dashboard/internal/httpapi"
 	"github.com/ryancswallace/jobman-dashboard/internal/logs"
 	"github.com/ryancswallace/jobman-dashboard/internal/monitoring"
@@ -207,6 +208,7 @@ func runConfigured(path, mode, migrationURLFile string) error {
 	sources := make([]monitoring.Source, 0, len(loaded.sources))
 	logSources := make(map[string]logs.ManifestSource)
 	reportSources := make([]reports.Source, 0, len(loaded.sources))
+	eventSources := make([]events.Source, 0, len(loaded.sources))
 	for _, entry := range loaded.sources {
 		entry.VerifyIdentity = func(ctx context.Context, instance, epoch string) error {
 			return db.VerifySourceIdentity(ctx, entry.DeploymentID, instance, epoch, c.ConfigurationRevision)
@@ -219,6 +221,21 @@ func runConfigured(path, mode, migrationURLFile string) error {
 		sources = append(sources, client)
 		logSources[entry.DeploymentID] = client
 		reportSources = append(reportSources, client)
+		if c.Events.Enabled {
+			entry.VerifyIdentity = func(ctx context.Context, instance, epoch string) error {
+				err := db.VerifySourceIdentity(ctx, entry.DeploymentID, instance, epoch, c.ConfigurationRevision)
+				if errors.Is(err, store.ErrSourceIdentityConflict) {
+					return &events.RecoveryError{Reason: events.SourceChanged}
+				}
+				return err
+			}
+			eventSource, err := control.NewEventSource(entry)
+			if err != nil {
+				return err
+			}
+			defer eventSource.Close()
+			eventSources = append(eventSources, eventSource)
+		}
 	}
 	engine, err := monitoring.New(sources, db)
 	if err != nil {
@@ -269,6 +286,15 @@ func runConfigured(path, mode, migrationURLFile string) error {
 		go func() { defer close(workersDone); reportService.Run(ctx) }()
 		defer func() { stop(); <-workersDone }()
 	}
+	if c.Events.Enabled {
+		ingestor, err := events.NewIngestor(eventSources, db)
+		if err != nil {
+			return err
+		}
+		ingestionDone := make(chan struct{})
+		go func() { defer close(ingestionDone); ingestor.Run(ctx) }()
+		defer func() { stop(); <-ingestionDone }()
+	}
 	maintenanceDone := make(chan struct{})
 	defer func() { stop(); <-maintenanceDone }()
 	go func() {
@@ -290,6 +316,11 @@ func runConfigured(path, mode, migrationURLFile string) error {
 				if reportService != nil {
 					if err := reportService.Prune(maintenance); err != nil {
 						slog.Warn("diagnosis retention pass failed")
+					}
+				}
+				for _, source := range eventSources {
+					if _, err := db.PruneSourceEvents(maintenance, source.SourceID()); err != nil {
+						slog.Warn("event retention pass failed", "deploymentId", source.SourceID())
 					}
 				}
 				cancel()
