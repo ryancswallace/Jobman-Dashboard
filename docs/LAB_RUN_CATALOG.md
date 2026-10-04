@@ -1,8 +1,11 @@
 # Read-only actual run catalog acceptance
 
 `TestLabActualRunCatalog` is an opt-in HTTP acceptance harness for a Dashboard
-candidate and a Control source advertising `bounded-run-catalog`. No live result
-has been claimed for this harness. It reads retained, previously accepted actual
+candidate and a Control source advertising `bounded-run-catalog`. The first live
+run passed against RC6 source`633b5e3` and Control`63641e9`:57 bounded requests,
+selected subprocess/Slurm evidence and access denials. Its immutable receipt and
+limits are recorded in [implementation status](IMPLEMENTATION_STATUS.md).
+It reads retained, previously accepted actual
 subprocess and Slurm executions through ordinary authenticated HTTPS APIs.
 It never submits, cancels, retries, imports or changes a workload. It does not
 create reports, alert rules or delivery bindings.

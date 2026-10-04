@@ -10,9 +10,9 @@ authorizes a production installation or company app distribution.
 
 | Component | Exact candidate | Delivery / evidence |
 | --- | --- | --- |
-| Dashboard API, worker, broker and web | `v0.1.0-rc.6`; `633b5e3fdc08cc973e9f318faefccc298c713295` | [Passing candidate CI37225710875](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37225710875); publication and exact Lab upgrade pending |
+| Dashboard API, worker, broker and web | `v0.1.0-rc.6`; `633b5e3fdc08cc973e9f318faefccc298c713295` | [Passing candidate CI37225710875](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37225710875); exact Lab upgrade, large-graph traversal and recorded-run GET acceptance pass; publication pending |
 | Native iPhone app | Marketing version`0.1.0`, build`8`; same Dashboard source | Same passing CI; verified unsigned arm64 iPhoneOS archive; signing/device acceptance pending |
-| Jobman Control | `63641e922a4452bd6d63d6c41c5726b49fbfa6cf` | [PR29](https://github.com/ryancswallace/Jobman-Control/pull/29); full CI and PostgreSQL run-catalog tests pass; exact Lab upgrade pending |
+| Jobman Control | `63641e922a4452bd6d63d6c41c5726b49fbfa6cf` | [PR29](https://github.com/ryancswallace/Jobman-Control/pull/29); full CI, PostgreSQL run-catalog tests and both Lab source upgrades pass |
 | Jobman producer ACL/Slurm integration | `7eae7cc7164a308ca8d12de9011610ef6177a7a0` | [PR54](https://github.com/ryancswallace/Jobman/pull/54); CI and independent review pass; formal approval remains |
 | Jobman Diagnose integration | `883f563b981e7fbd6ab6cbdb16d4489bbaf757fd` | [PR11](https://github.com/ryancswallace/Jobman-Diagnose/pull/11); CI and independent review pass; formal approval remains |
 
@@ -50,7 +50,9 @@ restore, rotation and access revocation. Keep previous immutable packages and
 current keys/configuration when planning a compatible upgrade or rollback.
 
 After obtaining an approved package, verify its outer checksum before extraction
-and its inner checksum before executing binaries on the matching architecture:
+and its inner checksum before executing binaries on the matching architecture.
+Extract the verified archive as an ordinary user into a new, empty staging
+directory, preserving the package directory name, before the `cd` below:
 
 ```sh
 sha256sum -c SHA256SUMS
@@ -104,7 +106,10 @@ upgrade/rollback, actual150-second recovery-watchdog intervention, and bounded
 directory, broker, database, slow-Control and hard-NFS fault recovery. Original
 failed attempts remain identifiable in the status document.
 
-Exact RC6 graph/run-catalog and upgrade acceptance are still being completed.
+The packaged API and worker also refused a synthetic newer-schema ledger, with
+unchanged database and configuration; the status document retains the two harness
+failures and independently reviewed continuations that established this result.
+Exact RC6 upgrade, recorded-run GET acceptance and complete large-graph traversal pass. The final web refresh-preference correction passes173 tests and independent review; the next candidate package is being prepared.
 The current Control executor supports one run per submitted job. Actual retained
 jobs therefore demonstrate single-run source integration; real PostgreSQL and
 client fixtures separately test selection among multiple recorded runs. No retry

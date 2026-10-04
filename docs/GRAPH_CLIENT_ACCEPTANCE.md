@@ -62,7 +62,25 @@ actual verified-TLS Lab PostgreSQL disposable-schema tests: complete traversal
 existing role-creation tests were skipped under that bounded test identity.
 Evidence is `/private/tmp/jobman-group-cursor-real-postgres.log`, SHA-256
 `9935433a816875094596e33be5c4ea0f76185dd78d47ec9887dc0f549eb1b1b3`.
-This is database/engine evidence, not a replacement for the pending live rerun.
+This is database/engine evidence; the separately completed live result follows.
+
+## Recorded live HTTP result
+
+The exact RC6 source`633b5e3` and both Control`63641e9` deployments passed the
+reviewed third HTTP attempt in51.31 seconds. The test traversed all200 child
+pages and1,000 dependency pages, checked the exact10,000-node/100,000-edge
+relation, replayed64 retained Back pages and the terminal page per traversal,
+and verified immutable successors, evicted409, bounded induced neighborhoods
+and account/query/scope denials. All148 pinned inputs remained unchanged.
+
+Receipt `/private/tmp/jobman-dashboard-graph-http-v3-3s63wjy0/result.json` has
+SHA-256`fa637416da143337fffa2206b01899b5e4c2724912c8cddbd44044e1328d59fb`;
+the863-byte log SHA is
+`f825bd82cd3758a55ab694b168df6929bdee47827c69bbf4acb75a490ac553fd`.
+Both earlier failed attempts remain preserved. This acceptance reused the
+existing inert graph; it did not create or execute workloads. It establishes
+actual authenticated HTTPS/source/database navigation, separately from the
+component/simulator evidence and outstanding rendered-browser/device checks.
 
 ## Existing source evidence
 
