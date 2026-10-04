@@ -39,6 +39,7 @@ type actorKey struct{}
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	s.registerGroupRoutes(mux)
+	s.registerTargetRoutes(mux)
 	if s.AuthRoutes != nil {
 		s.AuthRoutes.RegisterRoutes(mux)
 	}
@@ -48,6 +49,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/overview", s.overview)
 	mux.HandleFunc("PUT /api/v1/preferences", s.updatePreferences)
 	mux.HandleFunc("GET /api/v1/deployments/{deployment}/namespaces/{namespace}/jobs/{job}/logs", s.logs)
+	mux.HandleFunc("GET /api/v1/deployments/{deployment}/namespaces/{namespace}/jobs/{job}/artifacts", s.artifacts)
 	mux.HandleFunc("GET /api/v1/deployments/{deployment}/namespaces/{namespace}/jobs/{job}", s.job)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, &api.Error{Code: "not_found_or_inaccessible", Message: "This API operation is not available."})
@@ -140,7 +142,7 @@ func writeError(w http.ResponseWriter, _ *http.Request, err error) {
 		status = 403
 	case "not_found_or_inaccessible":
 		status = 404
-	case "cursor_expired", "revision_conflict":
+	case "cursor_expired", "revision_conflict", "target_changed":
 		status = 409
 	case "invalid_request":
 		status = 400

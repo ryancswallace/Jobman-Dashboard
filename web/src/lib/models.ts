@@ -119,15 +119,8 @@ export interface Overview {
   missingCompletionTime: string;
   window: { from: string; to: string };
 }
-export interface Target extends NamespaceRef {
-  targetId: string;
-  name: string;
-  state: string;
-  provider?: string;
-  backend?: string;
-  generation?: string;
-  capabilities: string[];
-}
+export type Target =
+  import("../../../contracts/typescript/dashboard.generated").Target;
 export interface Workload extends NamespaceRef {
   id: string;
   name?: string;

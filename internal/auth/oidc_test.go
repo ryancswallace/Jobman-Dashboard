@@ -222,12 +222,16 @@ func TestBrowserCodeFlowSessionCSRFAndLogout(t *testing.T) {
 
 func TestNativeTokensRequireAudienceClientAndDirectory(t *testing.T) {
 	f := newOIDCFixture(t)
-	for _, mode := range []string{"valid", "id-token", "wrong-client", "missing-directory", "nil-directory", "future-nbf", "forged", "mixed-cookie"} {
+	for _, mode := range []string{"valid", "id-token", "id-token-with-api-audience", "web-audience", "wrong-client", "missing-directory", "nil-directory", "future-nbf", "forged", "mixed-cookie"} {
 		t.Run(mode, func(t *testing.T) {
 			claims := f.claims("dashboard-api", "native-subject", "native")
 			switch mode {
 			case "id-token":
 				claims["aud"] = "native"
+			case "id-token-with-api-audience":
+				claims["aud"] = []string{"native", "dashboard-api"}
+			case "web-audience":
+				claims["aud"] = []string{"web", "dashboard-api"}
 			case "wrong-client":
 				claims["appid"] = "web"
 			case "missing-directory":

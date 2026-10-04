@@ -1,0 +1,49 @@
+.target-details .panel > h2 {
+  margin: 0;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--line);
+  font-size: 16px;
+}
+.target-details .panel > p,
+.target-details .panel > details {
+  padding: 16px 24px;
+  margin: 0;
+}
+.target-details .facts-grid {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 16px 24px;
+  padding: 24px;
+  margin: 0;
+  font-size: 13px;
+}
+.target-details dt {
+  color: var(--muted);
+}
+.target-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.target-details .partition-list {
+  max-height: 20rem;
+  overflow: auto;
+  padding: 0 24px 12px 44px;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.target-details summary {
+  cursor: pointer;
+}
+@media (max-width: 640px) {
+  .target-details .facts-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+  .target-details dd {
+    margin-bottom: 12px;
+  }
+}
+
+.target-catalog > details {
+  padding: 16px 24px;
+}

@@ -61,6 +61,8 @@ public struct Page<Item: Decodable & Sendable>: Decodable, Sendable {
     public let completeness: String
     public let sources: [SourceStatus]
     public let fetchedAt: String
+    public let total: String?
+    public let totals: [DashboardAPI.WorkloadTotal]?
 }
 public struct Overview: Decodable, Sendable {
     public struct Window: Decodable, Sendable { public let from: String; public let to: String }

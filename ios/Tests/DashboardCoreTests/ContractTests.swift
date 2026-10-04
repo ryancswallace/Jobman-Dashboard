@@ -31,7 +31,7 @@ private let jobJSON = #"{"deploymentId":"east","namespaceId":"team","id":"same-i
 }
 
 @Test func duplicateWorkloadIDsRemainSeparateAcrossDeployments() throws {
-    let first = #"{"id":"same","kind":"graph","deploymentId":"east","namespaceId":"team","createdAt":"2026-10-03T12:00:00Z","totalChildren":"10000","counts":{"running":"1"}}"#
+    let first = #"{"id":"same","kind":"graph","deploymentId":"east","namespaceId":"team","createdAt":"2026-10-03T12:00:00Z","totalChildren":"10000","counts":{"running":"1"},"revision":"1","asOf":"2026-10-03T12:00:00Z"}"#
     let second = first.replacingOccurrences(of: "east", with: "west")
     let a = try JSONDecoder().decode(Workload.self, from: Data(first.utf8))
     let b = try JSONDecoder().decode(Workload.self, from: Data(second.utf8))

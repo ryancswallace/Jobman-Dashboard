@@ -61,3 +61,31 @@ public struct LogBuffer: Sendable {
 
     public mutating func clear() { self = LogBuffer() }
 }
+
+/// Cursor, decoder bytes and execution identity advance together or not at all.
+public struct LogReadState: Sendable {
+    public private(set) var buffer = LogBuffer()
+    public private(set) var cursor: String?
+    public private(set) var state = ""
+    public private(set) var truncated = false
+    public private(set) var requiresRefresh = false
+    public init() {}
+    public mutating func reset() { self = LogReadState() }
+    public mutating func failed(_ error: any Error) {
+        if let error = error as? DashboardError,
+           [.cursorExpired, .streamChanged, .logGap].contains(error) { requiresRefresh = true }
+        if let error = error as? LogBufferError,
+           [.wrongStream, .offsetGap].contains(error) { requiresRefresh = true }
+    }
+    public mutating func accept(_ chunk: LogChunk, job: JobRef, stream: String) throws {
+        guard !requiresRefresh, let bytes = chunk.bytesBase64,
+              let offset = UInt64(chunk.startOffset), let end = UInt64(chunk.endOffset),
+              let data = Data(base64Encoded: bytes), end >= offset, end - offset == UInt64(data.count),
+              chunk.stream == stream else { throw DashboardError.invalidResponse }
+        let identity = [job.deploymentId, job.namespaceId, job.jobId, chunk.runId ?? "unavailable",
+                        chunk.executionId ?? "unavailable", stream].map(APIPath.component).joined(separator: "/")
+        var next = buffer
+        try next.append(base64: bytes, streamIdentity: identity, offset: offset)
+        buffer = next; cursor = chunk.nextCursor; state = chunk.state; truncated = chunk.truncated ?? false
+    }
+}

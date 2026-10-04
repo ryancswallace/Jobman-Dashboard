@@ -210,9 +210,9 @@ struct WorkloadDetailView: View {
     let workload: Workload
     @State private var detail: WorkloadDetail?
     @State private var children: [WorkloadChild] = []
+    @State private var page: Page<WorkloadChild>?
     @State private var cursor: String?
     @State private var error: String?
-    @State private var showDiagram = true
     @State private var loading = false
     @State private var currentCursor: String?
     @State private var pageHistory: [String?] = []
@@ -222,54 +222,86 @@ struct WorkloadDetailView: View {
             Section("Complete source summary") {
                 Text("\(workload.deploymentId) / \(workload.namespaceId)")
                 LabeledContent("Children", value: summary.totalChildren)
+                LabeledContent("Revision", value: summary.revision)
+                TimestampRow(label: "Source observation", value: summary.asOf)
+                if let phase = summary.phase { LabeledContent("Phase", value: phase) }
+                if let outcome = summary.outcome { LabeledContent("Outcome", value: outcome) }
                 ForEach(summary.counts.keys.sorted(), id: \.self) { LabeledContent($0, value: summary.counts[$0] ?? "Unavailable") }
                 LabeledContent("Concurrency", value: summary.concurrency ?? "Unavailable")
                 LabeledContent("Failure policy", value: summary.failurePolicy ?? "Unavailable")
-                if let array = summary.arrayId { LabeledContent("Slurm array", value: array) }
-            }
-            if let error { ErrorMessage(error: error) }
-            if workload.kind == "graph" {
-                Section("Bounded graph diagram") {
-                    Toggle("Show diagram", isOn: $showDiagram)
-                    if showDiagram { DependencyDiagram(children: children, totalNodes: summary.totalChildren) }
-                    Text("The node list below provides the same navigation with VoiceOver. Readiness and dependency predicates are reported by Control.").font(.footnote)
+                if let policy = summary.unsatisfiedPolicy { LabeledContent("Unsatisfied dependency policy", value: policy) }
+                if workload.kind == "array" {
+                    LabeledContent("Array policy", value: summary.arrayPolicy ?? "Unavailable").accessibilityIdentifier("arrayPolicy")
+                    LabeledContent("Array mode", value: summary.arrayMode ?? "Unavailable").accessibilityIdentifier("arrayMode")
+                    LabeledContent("Slurm array", value: summary.arrayId ?? "Unavailable")
+                    Text("Task indices are the exact Slurm indices; child position is shown separately.").font(.footnote)
                 }
             }
-            Section(workload.kind == "graph" ? "Nodes and dependencies" : "Children") {
+            if let error { Section { ErrorMessage(error: error); Button("Refresh workload") { Task { await restart() } } } }
+            if workload.kind == "graph", let first = children.first {
+                Section("Graph exploration") {
+                    NavigationLink("Explore graph neighborhood") { GraphExplorer(workload: workload, initialCenter: first.id) }
+                    Text("Choose a node below to explore its bounded diagram, complete dependency counts, and paged incoming or outgoing edges.").font(.footnote)
+                }
+            }
+            Section(workload.kind == "graph" ? "Nodes" : "Children") {
                 ForEach(children) { child in
                     DisclosureGroup {
+                        WorkloadChildFacts(child: child)
                         NavigationLink { JobDetailView(ref: child.job.ref) } label: { JobRow(job: child.job) }
-                        if let readiness = child.readiness { LabeledContent("Source readiness", value: readiness) }
-                        if let disposition = child.disposition { LabeledContent("Disposition", value: disposition) }
-                        ForEach(Array((child.dependencies ?? []).enumerated()), id: \.offset) { _, edge in
-                            Text("\(edge.upstreamNodeId): \(edge.predicate) — \(edge.status)")
+                        if workload.kind == "graph" {
+                            NavigationLink("Explore node \(child.id)") { GraphExplorer(workload: workload, initialCenter: child.id) }
                         }
-                    } label: { Text(child.taskIndex.map { "Task \($0) · \(child.id)" } ?? child.id) }
+                    } label: { Text(child.taskIndex.map { "Task \($0) · \(child.name ?? child.id)" } ?? child.name ?? child.id) }
                 }
-                if !pageHistory.isEmpty { Button("Previous node page") { let previous = pageHistory.removeLast(); Task { await load(cursor: previous) } }.disabled(loading) }
-                if let cursor { Button("Next node page") { pageHistory.append(currentCursor); Task { await load(cursor: cursor) } }.disabled(loading) }
+                if !pageHistory.isEmpty { Button("Previous child page") { Task { await previous() } }.disabled(loading) }
+                if let cursor { Button("Next child page") { Task { await next(cursor) } }.disabled(loading) }
                 if children.isEmpty && detail == nil && error == nil { ProgressView() }
+                if let total = page?.total ?? detail?.total { Text("\(children.count) children on this page; \(total) at source").font(.caption) }
             }
-            if let omitted = detail?.omittedNodes { Text("\(omitted) nodes outside this bounded view").font(.footnote) }
+            if let page { Section { SourceSummary(completeness: page.completeness, sources: page.sources, fetchedAt: page.fetchedAt) } }
+            else if let detail { Section { SourceSummary(completeness: detail.completeness, sources: detail.sources, fetchedAt: detail.fetchedAt) } }
         }.navigationTitle(workload.name ?? workload.kind.capitalized).task {
             await load()
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(max(5, store.bootstrap?.preferences.refreshSeconds ?? 5)))
                 if !Task.isCancelled, store.active, store.bootstrap?.preferences.refreshSeconds != 0 { await load(cursor: currentCursor) }
             }
-        }.refreshable { await load(cursor: currentCursor) }
+        }.refreshable { await restart() }
     }
-    private func load(cursor: String? = nil) async {
-        guard !loading else { return }; loading = true; defer { loading = false }
+    private func restart() async { if await load() { pageHistory = [] } }
+    private func next(_ cursor: String) async { let previous = currentCursor; if await load(cursor: cursor) { pageHistory.append(previous) } }
+    private func previous() async { guard let previous = pageHistory.last else { return }; if await load(cursor: previous) { pageHistory.removeLast() } }
+    @discardableResult private func load(cursor: String? = nil) async -> Bool {
+        guard !loading else { return false }; loading = true; defer { loading = false }
         do {
-            let result: WorkloadDetail = try await store.request(path: workload.path, query: cursor.map { [.init(name: "cursor", value: $0)] } ?? [])
-            guard result.workload.path == workload.path, result.children.count <= 200,
-                  result.children.allSatisfy({ $0.job.deploymentId == workload.deploymentId && $0.job.namespaceId == workload.namespaceId })
-            else { throw DashboardError.invalidResponse }
-            detail = result; self.cursor = result.nextCursor
-            children = Array(result.children.prefix(200)); currentCursor = cursor
-            error = nil
-        } catch is CancellationError {} catch { self.error = error.localizedDescription }
+            if let cursor {
+                let result: Page<WorkloadChild> = try await store.request(path: workload.path + "/children", query: [.init(name: "cursor", value: cursor), .init(name: "limit", value: "50")])
+                try workload.validate(children: result.items, sources: result.sources)
+                guard result.total != nil else { throw DashboardError.invalidResponse }
+                children = result.items; self.cursor = result.nextCursor; page = result
+            } else {
+                let result: WorkloadDetail = try await store.request(path: workload.path, query: [.init(name: "limit", value: "50")])
+                guard result.workload.path == workload.path else { throw DashboardError.invalidResponse }
+                try workload.validate(children: result.children, sources: result.sources)
+                detail = result; children = result.children; self.cursor = result.nextCursor; page = nil
+            }
+            currentCursor = cursor; error = nil; return true
+        } catch is CancellationError { return false } catch { self.error = error.localizedDescription; return false }
+    }
+}
+
+struct WorkloadChildFacts: View {
+    let child: WorkloadChild
+    var body: some View {
+        LabeledContent("Child position", value: child.index)
+        if let index = child.taskIndex { LabeledContent("Slurm task index", value: index).accessibilityIdentifier("slurmTaskIndex") }
+        if let readiness = child.readiness { LabeledContent("Source readiness", value: readiness) }
+        if let disposition = child.disposition { LabeledContent("Disposition", value: disposition) }
+        if let counts = child.dependencyCounts {
+            Text("Complete incoming dependency counts").font(.caption.bold())
+            ForEach(counts.keys.sorted(), id: \.self) { LabeledContent($0, value: counts[$0] ?? "Unavailable") }
+        }
     }
 }
 
@@ -317,7 +349,18 @@ struct PagedRows<Item: Decodable & Sendable & Identifiable, Row: View>: View {
             if !loaded && error == nil { ProgressView("Loading authorized items…") }
             ForEach(items, content: row)
             if evictedRows > 0 { Text("\(evictedRows) earlier rows removed from memory; reopen this view to restart.").font(.caption) }
-            if let page = lastPage { SourceSummary(completeness: page.completeness, sources: page.sources, fetchedAt: page.fetchedAt) }
+            if let page = lastPage {
+                if let total = page.total { Text("Source total: \(total)").font(.caption) }
+                if let totals = page.totals {
+                    ForEach(Array(totals.enumerated()), id: \.offset) { _, total in
+                        VStack(alignment: .leading) {
+                            Text("\(total.deploymentId) / \(total.namespaceId): \(total.total)").font(.caption)
+                            TimestampRow(label: "Source observation", value: total.asOf)
+                        }
+                    }
+                }
+                SourceSummary(completeness: page.completeness, sources: page.sources, fetchedAt: page.fetchedAt)
+            }
             if let error { ErrorMessage(error: error); Button("Retry") { Task { await load(cursor: cursor) } } }
             if busy { ProgressView() }
             else if let cursor { Button("Load next page") { Task { await load(cursor: cursor) } } }

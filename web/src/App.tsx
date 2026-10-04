@@ -5,7 +5,7 @@ import { OverviewPage } from "./pages/Overview";
 import { JobsPage } from "./pages/Jobs";
 import { JobDetailPage } from "./pages/JobDetail";
 import { WorkloadsPage, WorkloadDetailPage } from "./pages/Workloads";
-import { TargetsPage } from "./pages/Targets";
+import { TargetsPage, TargetDetailPage } from "./pages/Targets";
 import { AlertsPage } from "./pages/Alerts";
 import { InboxPage } from "./pages/Inbox";
 import { SettingsPage } from "./pages/Settings";
@@ -28,6 +28,10 @@ export function App() {
               element={<WorkloadDetailPage />}
             />
             <Route path="targets" element={<TargetsPage />} />
+            <Route
+              path="deployments/:deploymentId/namespaces/:namespaceId/targets/:targetId"
+              element={<TargetDetailPage />}
+            />
             <Route path="alerts" element={<AlertsPage />} />
             <Route path="inbox" element={<InboxPage />} />
             <Route path="settings" element={<SettingsPage />} />

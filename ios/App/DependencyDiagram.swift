@@ -2,16 +2,17 @@ import DashboardCore
 import SwiftUI
 
 struct DependencyDiagram: View {
-    let children: [WorkloadChild]
-    let totalNodes: String
+    let neighborhood: GraphNeighborhood
+    let select: (String) -> Void
+    private var children: [WorkloadChild] { neighborhood.nodes }
     @State private var layout: GraphLayout?
     @State private var error: String?
     private let width = 160.0
     private let height = 75.0
-    private var inputs: [GraphLayout.Input] { children.map { .init(id: $0.id, upstream: ($0.dependencies ?? []).map(\.upstreamNodeId)) } }
+    private var inputs: [GraphLayout.Input] { children.map { node in .init(id: node.id, upstream: neighborhood.edges.filter { $0.toJobId == node.id }.map(\.fromJobId)) } }
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Showing at most 200 nodes and 500 edges from this loaded page. Source total: \(totalNodes). Use node pages to reach all jobs.").font(.caption)
+            Text("Showing \(children.count) nodes and \(neighborhood.edges.count) edges from the selected neighborhood (limits: 200 nodes, 500 edges).").font(.caption)
             if let layout {
                 if layout.containsCycle { Label("Unexpected cycle in displayed dependencies", systemImage: "exclamationmark.triangle").font(.caption) }
                 Text("\(layout.omittedNodes) loaded nodes and \(layout.omittedEdges) dependencies outside this diagram").font(.caption)
@@ -35,7 +36,7 @@ struct DependencyDiagram: View {
                         }.accessibilityHidden(true)
                         ForEach(layout.vertices) { vertex in
                             if let child = children.first(where: { $0.id == vertex.id }) {
-                                NavigationLink { JobDetailView(ref: child.job.ref) } label: {
+                                Button { select(child.id) } label: {
                                     VStack(alignment: .leading) {
                                         Text(child.id).font(.caption.bold()).lineLimit(2)
                                         Text(child.readiness ?? child.job.phase).font(.caption2)
@@ -43,7 +44,7 @@ struct DependencyDiagram: View {
                                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
                                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(.secondary.opacity(0.5)))
                                 }.buttonStyle(.plain).position(point(vertex))
-                                    .accessibilityLabel("Node \(child.id), \(child.readiness ?? child.job.phase). Open job.")
+                                    .accessibilityLabel("Node \(child.id), \(child.readiness ?? child.job.phase). Center graph on this node.")
                             }
                         }
                     }.frame(width: Double((layout.vertices.map(\.column).max() ?? 0) + 1) * (width + 48) + 16,

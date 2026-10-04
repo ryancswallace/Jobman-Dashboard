@@ -107,6 +107,11 @@ func (c *Client) get(ctx context.Context, actor monitoring.Actor, operation, nam
 		return monitoring.ErrAuthority
 	case http.StatusServiceUnavailable:
 		return monitoring.ErrAuthority
+	case http.StatusConflict:
+		if operation == "targets.read" {
+			return monitoring.ErrTargetChanged
+		}
+		return monitoring.ErrSource
 	default:
 		return monitoring.ErrSource
 	}
@@ -179,6 +184,7 @@ type namespaceAccess struct {
 type discovery struct {
 	monitoring.Discovery
 	principalID string
+	features    []string
 }
 
 func (c *Client) Discover(ctx context.Context, actor monitoring.Actor) (monitoring.Discovery, error) {
@@ -215,7 +221,7 @@ func (c *Client) discover(ctx context.Context, actor monitoring.Actor) (discover
 			return discovery{}, monitoring.ErrAuthority
 		}
 	}
-	d := discovery{Discovery: monitoring.Discovery{InstanceID: v.InstanceID, RecoveryEpoch: v.RecoveryEpoch, ServiceTime: v.ServiceTime, Deployment: api.Deployment{ID: c.ID(), Name: c.config.Name, Status: "available", Namespaces: []api.Namespace{}}}}
+	d := discovery{features: slices.Clone(v.Features), Discovery: monitoring.Discovery{InstanceID: v.InstanceID, RecoveryEpoch: v.RecoveryEpoch, ServiceTime: v.ServiceTime, Deployment: api.Deployment{ID: c.ID(), Name: c.config.Name, Status: "available", Namespaces: []api.Namespace{}}}}
 	cursor := ""
 	seen := map[string]bool{}
 	for page := 0; page < 3; page++ {
