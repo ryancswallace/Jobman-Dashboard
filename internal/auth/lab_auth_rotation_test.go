@@ -92,6 +92,9 @@ func TestLabAPIAuthenticationMasterRotation(t *testing.T) {
 
 	// Select immutable, already accepted real subprocess evidence. No new report
 	// request or workload is needed for a key-separation acceptance check.
+	// A source-version upgrade may already mark the historical report outdated.
+	// Preserve that flag with the entire sealed projection across key rotation;
+	// report freshness is covered by the separate current-report acceptance.
 	var prior struct {
 		Synthetic       bool
 		ObservationMode string
@@ -118,7 +121,7 @@ func TestLabAPIAuthenticationMasterRotation(t *testing.T) {
 		var report api.Report
 		path := prefix + "/reports/" + prior.Reports[profile]
 		request(old.client, path, nil, &report)
-		if report.TaskID != prior.Reports[profile] || report.Detail == nil || report.State != "ready" || report.Profile != profile || report.Outdated || report.Detail.ControlInstanceID != prior.Fixture.ControlInstanceID || report.RunID != job.Job.CurrentRun.ID {
+		if report.TaskID != prior.Reports[profile] || report.Detail == nil || report.State != "ready" || report.Profile != profile || report.Detail.ControlInstanceID != prior.Fixture.ControlInstanceID || report.RunID != job.Job.CurrentRun.ID {
 			t.Fatal("Original sealed report identity differs")
 		}
 		sealed[path] = report

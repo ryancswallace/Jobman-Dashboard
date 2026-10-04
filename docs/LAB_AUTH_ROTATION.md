@@ -21,7 +21,10 @@ The test performs these checks:
    have at least three minutes of remaining lifetime before rotation.
 2. Captures two existing ready reports from a retained actual-subprocess execution,
    all bounded include-log report citations, original NFS bytes and a forward log
-   cursor. It neither submits a job nor generates a replacement report.
+   cursor. It neither submits a job nor generates a replacement report. A prior
+   Control upgrade may mark a retained report outdated; its flag, version, IDs
+   and entire projection must remain identical across authentication rotation.
+   Current-report freshness is verified separately in `LAB_REPORT_REFRESH.md`.
 3. Starts another browser login under the old key, retaining its state/cookie and
    authorization URL only in memory. The identity-provider step is deliberately
    completed after rotation, producing a fresh code; code expiry cannot masquerade
