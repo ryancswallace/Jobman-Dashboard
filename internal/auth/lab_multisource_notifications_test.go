@@ -25,6 +25,40 @@ import (
 
 const labMultiNotificationHelperCommit = "367006818e72315b01860f56f971004e17c24886"
 
+var labMultiNotificationReasonCodes = []string{
+	"common_command_deadline",
+	"common_command_error_bound",
+	"common_command_failed",
+	"common_command_output_bound",
+	"common_directory_identity",
+	"common_duplicate_json_field",
+	"common_failure",
+	"common_file_changed",
+	"common_file_identity",
+	"common_file_parent_alias",
+	"common_immutable_receipt_changed",
+	"common_invalid_json_number",
+	"failed",
+	"invalid_result",
+	"os_bad_descriptor",
+	"os_error",
+	"os_exists",
+	"os_interrupted",
+	"os_io",
+	"os_is_directory",
+	"os_no_space",
+	"os_not_directory",
+	"os_not_found",
+	"os_permission_denied",
+	"os_process_file_limit",
+	"os_quota",
+	"os_stale",
+	"os_symlink",
+	"os_system_file_limit",
+	"os_timeout",
+	"os_would_block",
+}
+
 type labMultiNotificationFixture struct {
 	labNotificationFixture
 	Profile string `json:"profile,omitempty"`
@@ -73,7 +107,7 @@ func labMultiNotificationFailure(raw []byte) (string, bool) {
 		return "", false
 	}
 	stages := []string{"host_input", "host_transport", "host_decode", "host_validate", "host_receipt", "guest_preflight", "guest_material", "helper_run", "guest_cleanup", "guest_postflight", "guest_barrier"}
-	if !slices.Contains(stages, values["stage"]) || !slices.Contains([]string{"failed", "invalid_result"}, values["code"]) {
+	if !slices.Contains(stages, values["stage"]) || !slices.Contains(labMultiNotificationReasonCodes, values["code"]) {
 		return "", false
 	}
 	return "scenario stage=" + values["stage"] + " code=" + values["code"], true
@@ -578,7 +612,7 @@ func TestLabMultiNotificationContributionGuards(t *testing.T) {
 func TestLabMultiNotificationDiagnostics(t *testing.T) {
 	const canary = "private-database-password-canary"
 	for _, stage := range []string{"host_input", "host_transport", "host_decode", "host_validate", "host_receipt", "guest_preflight", "guest_material", "helper_run", "guest_cleanup", "guest_postflight", "guest_barrier"} {
-		for _, code := range []string{"failed", "invalid_result"} {
+		for _, code := range labMultiNotificationReasonCodes {
 			frame, _ := json.Marshal(map[string]any{"scenarioFailure": map[string]string{"stage": stage, "code": code}})
 			var output, diagnostic labBoundedNotificationOutput
 			_, _ = diagnostic.Write(frame)
