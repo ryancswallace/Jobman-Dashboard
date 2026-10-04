@@ -111,6 +111,9 @@ func (c *Client) get(ctx context.Context, actor monitoring.Actor, operation, nam
 		if operation == "targets.read" {
 			return monitoring.ErrTargetChanged
 		}
+		if operation == "evidence.read" {
+			return &api.Error{Code: "snapshot_changed", Message: "The source snapshot changed. Request a new report."}
+		}
 		return monitoring.ErrSource
 	default:
 		return monitoring.ErrSource

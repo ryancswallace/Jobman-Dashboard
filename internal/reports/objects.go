@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 
 	"github.com/ryancswallace/jobman-diagnose/diagnosis"
 )
@@ -54,7 +55,11 @@ type diskPair struct {
 // ObjectStore owns one private local directory. Callers must complete current
 // authorization before returning any loaded object. No filesystem path is ever
 // returned to an API client or accepted from one.
-type ObjectStore struct{ root *os.Root }
+type ObjectStore struct {
+	root     *os.Root
+	sweepMu  sync.Mutex
+	sweepDir *os.File
+}
 
 func OpenObjects(path string) (*ObjectStore, error) {
 	if !filepath.IsAbs(path) || filepath.Clean(path) != path {
@@ -78,7 +83,15 @@ func OpenObjects(path string) (*ObjectStore, error) {
 	}
 	return &ObjectStore{root: root}, nil
 }
-func (s *ObjectStore) Close() error { return s.root.Close() }
+func (s *ObjectStore) Close() error {
+	s.sweepMu.Lock()
+	defer s.sweepMu.Unlock()
+	if s.sweepDir != nil {
+		_ = s.sweepDir.Close()
+		s.sweepDir = nil
+	}
+	return s.root.Close()
+}
 
 func encodePair(pair Pair) ([]byte, error) {
 	if pair.Validate() != nil {

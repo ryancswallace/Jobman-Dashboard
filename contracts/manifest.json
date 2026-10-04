@@ -1,7 +1,7 @@
 {
   "apiVersion": "0.1.0-alpha.1",
   "generator": "scripts/generate-contracts.py",
-  "openapiSha256": "9346d9ba68bc26e767d012650795cce185ba3b2908a16b85bdb14f75f6e1a4b7",
+  "openapiSha256": "cb3bf0b4080cd3b2ba8d9e2325fad6bf914343e87f5baa925001394a0a697ca1",
   "operations": [
     "bootstrap",
     "job",
@@ -9,6 +9,7 @@
     "logs",
     "reports",
     "requestReport",
+    "report",
     "citation",
     "target",
     "targetPartitions",
@@ -29,5 +30,5 @@
     "targets",
     "workloads"
   ],
-  "schemaCount": 58
+  "schemaCount": 70
 }

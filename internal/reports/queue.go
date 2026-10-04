@@ -17,6 +17,7 @@ import (
 
 const (
 	MaximumPending        = 512
+	MaximumRetainedTasks  = 10000
 	MaximumAccountPending = 8
 	MaximumRequesters     = 32
 	MaximumAttempts       = 3
@@ -26,13 +27,14 @@ const (
 )
 
 var (
-	ErrConflict   = errors.New("diagnosis request conflict")
-	ErrLimit      = errors.New("diagnosis queue limit reached")
-	ErrLease      = errors.New("diagnosis lease unavailable")
-	ErrInvalid    = errors.New("invalid diagnosis state")
-	ErrObject     = errors.New("stored diagnosis pair unavailable or invalid")
-	uuidPattern   = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
-	digestPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	ErrConflict     = errors.New("diagnosis request conflict")
+	ErrLimit        = errors.New("diagnosis queue limit reached")
+	ErrLease        = errors.New("diagnosis lease unavailable")
+	ErrInvalid      = errors.New("invalid diagnosis state")
+	ErrObject       = errors.New("stored diagnosis pair unavailable or invalid")
+	ErrTaskNotFound = errors.New("diagnosis task not found")
+	uuidPattern     = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	digestPattern   = regexp.MustCompile(`^[0-9a-f]{64}$`)
 )
 
 // Subject pins the source snapshot chosen before queue admission. The

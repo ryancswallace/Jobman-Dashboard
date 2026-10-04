@@ -210,39 +210,6 @@ export interface LogChunk {
   truncated?: boolean;
   capturedAt?: string;
 }
-export interface Citation {
-  id: string;
-  label: string;
-  text?: string;
-  startOffset?: string;
-  endOffset?: string;
-}
-export interface Finding {
-  id: string;
-  severity: string;
-  title: string;
-  explanation: string;
-  confidence?: number;
-  confidenceBasis?: string;
-  citations: Citation[];
-  suggestions?: string[];
-  generated?: boolean;
-}
-export interface Report {
-  id: string;
-  state: string;
-  createdAt?: string;
-  sourceRevision?: string;
-  evidenceId?: string;
-  analysisEvidenceId?: string;
-  engineVersion?: string;
-  disclosure?: string;
-  findings: Finding[];
-  missingEvidence: string[];
-  warnings?: string[];
-  retryAdvice?: string;
-  message?: string;
-}
 export interface AlertRule {
   id: string;
   revision: string;

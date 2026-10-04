@@ -3,6 +3,10 @@
   "publicOrigin": "https://dashboard.example.internal",
   "listen": "0.0.0.0:8443",
   "webRoot": "/opt/jobman-dashboard/web",
+  "reports": {
+    "objectRoot": "/var/lib/jobman-dashboard/reports",
+    "redactionFile": "/run/secrets/dashboard-report-redaction.json"
+  },
   "serverTLS": {
     "certificateFile": "/etc/jobman-dashboard/tls/server.pem",
     "keyFile": "/run/secrets/dashboard-server-key.pem"

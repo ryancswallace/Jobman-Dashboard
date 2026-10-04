@@ -14,6 +14,9 @@ public enum DashboardError: Error, Equatable, Sendable, LocalizedError {
     case logGap
     case storageUnavailable
     case invalidEvidence
+    case redactionUnavailable
+    case snapshotChanged
+    case revisionConflict
     case rateLimited
     case invalidResponse
     case responseTooLarge
@@ -35,6 +38,9 @@ public enum DashboardError: Error, Equatable, Sendable, LocalizedError {
         case .logGap: "Log bytes are no longer contiguous. Refresh to start a new stream."
         case .storageUnavailable: "Log storage is unavailable. No empty output has been assumed."
         case .invalidEvidence: "The report could not be validated against its evidence."
+        case .redactionUnavailable: "Log-tail reports require an operator-configured redaction policy. Generate a metadata report or contact your administrator."
+        case .snapshotChanged: "The source snapshot changed. Request a new report."
+        case .revisionConflict: "This request conflicts with the current revision or an earlier request. Refresh and try again."
         case .rateLimited: "Too many requests. Wait briefly before retrying."
         case .invalidResponse: "The service returned an unexpected response."
         case .responseTooLarge: "The service response exceeded the app's safe size limit."
@@ -57,6 +63,9 @@ public enum DashboardError: Error, Equatable, Sendable, LocalizedError {
         case "log_gap": .logGap
         case "storage_unavailable": .storageUnavailable
         case "invalid_evidence": .invalidEvidence
+        case "redaction_unavailable": .redactionUnavailable
+        case "snapshot_changed": .snapshotChanged
+        case "revision_conflict": .revisionConflict
         case "rate_limited": .rateLimited
         default:
             switch status {

@@ -9,7 +9,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/ryancswallace/jobman-dashboard/internal/api"
 	"github.com/ryancswallace/jobman-dashboard/internal/auth"
 	"github.com/ryancswallace/jobman-dashboard/internal/monitoring"
@@ -77,7 +76,7 @@ func TestReportQueueConcurrentDedupOwnershipAndLeaseFencing(t *testing.T) {
 	if _, err := s.EnqueueReport(ctx, alice, changed, "synthetic-request-00"); !errors.Is(err, reports.ErrConflict) {
 		t.Fatalf("idempotency did not bind subject: %v", err)
 	}
-	if _, err := s.ReportTask(ctx, "10000000-0000-4000-8000-000000000009", taskID); !errors.Is(err, pgx.ErrNoRows) {
+	if _, err := s.ReportTask(ctx, "10000000-0000-4000-8000-000000000009", taskID); !errors.Is(err, reports.ErrTaskNotFound) {
 		t.Fatal("unrelated account read shared task")
 	}
 	claim, err := s.ClaimReport(ctx)
@@ -102,10 +101,24 @@ func TestReportQueueConcurrentDedupOwnershipAndLeaseFencing(t *testing.T) {
 		t.Fatal(err)
 	}
 	object := reportObject(taskID)
-	if err = s.CompleteReport(ctx, taskID, oldLease, object); !errors.Is(err, reports.ErrLease) {
+	wrong := alice
+	wrong.DirectoryID = bob.DirectoryID
+	if err = s.CompleteReport(ctx, taskID, claim.Task.LeaseToken, object, wrong); !errors.Is(err, reports.ErrLease) {
+		t.Fatal("unverified actor published object")
+	}
+	if _, err = s.Pool.Exec(ctx, `UPDATE dashboard_accounts SET disabled_at=clock_timestamp() WHERE id=$1::uuid`, alice.Account.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.CompleteReport(ctx, taskID, claim.Task.LeaseToken, object, alice); !errors.Is(err, reports.ErrLease) {
+		t.Fatal("disabled account published object")
+	}
+	if _, err = s.Pool.Exec(ctx, `UPDATE dashboard_accounts SET disabled_at=NULL WHERE id=$1::uuid`, alice.Account.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.CompleteReport(ctx, taskID, oldLease, object, alice); !errors.Is(err, reports.ErrLease) {
 		t.Fatal("stale worker published object")
 	}
-	if err = s.CompleteReport(ctx, taskID, claim.Task.LeaseToken, object); err != nil {
+	if err = s.CompleteReport(ctx, taskID, claim.Task.LeaseToken, object, alice); err != nil {
 		t.Fatal(err)
 	}
 	task, err := s.ReportTask(ctx, bob.Account.ID, taskID)
@@ -122,7 +135,7 @@ func TestReportQueueConcurrentDedupOwnershipAndLeaseFencing(t *testing.T) {
 	if _, err = s.EnqueueReport(ctx, alice, subject, "synthetic-disabled-user"); !errors.Is(err, monitoring.ErrForbidden) {
 		t.Fatal("disabled account admitted")
 	}
-	if _, err = s.ReportTask(ctx, alice.Account.ID, taskID); !errors.Is(err, pgx.ErrNoRows) {
+	if _, err = s.ReportTask(ctx, alice.Account.ID, taskID); !errors.Is(err, reports.ErrTaskNotFound) {
 		t.Fatal("disabled account read task")
 	}
 }
@@ -202,5 +215,30 @@ func TestReportQueueLimitsRetriesAndPairedRetention(t *testing.T) {
 	var bindings int
 	if err = s.Pool.QueryRow(context.Background(), `SELECT (SELECT count(*) FROM dashboard_report_requesters WHERE task_id=$1::uuid)+(SELECT count(*) FROM dashboard_report_idempotency WHERE task_id=$1::uuid)`, task.ID).Scan(&bindings); err != nil || bindings != 0 {
 		t.Fatal("expired request bindings survived")
+	}
+}
+
+func TestReportRetainedQuotaRejectsNewWorkWithoutDeletingHistory(t *testing.T) {
+	s := testDB(t)
+	a := reportActor(t, s, 1)
+	subject := reportSubject()
+	encoded, err := json.Marshal(subject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, err := subject.Fingerprint()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.Pool.Exec(t.Context(), `INSERT INTO dashboard_report_tasks(id,deployment_id,namespace_id,job_id,equivalent_key,subject,state) SELECT gen_random_uuid(),$1::uuid,$2::uuid,$3::uuid,$4,$5,'failed' FROM generate_series(1,$6::integer)`, subject.DeploymentID, subject.NamespaceID, subject.JobID, key, encoded, reports.MaximumRetainedTasks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.EnqueueReport(t.Context(), a, subject, "synthetic-retained-quota"); !errors.Is(err, reports.ErrLimit) {
+		t.Fatal("retained object/task quota not enforced")
+	}
+	var count int
+	if err = s.Pool.QueryRow(t.Context(), `SELECT count(*) FROM dashboard_report_tasks`).Scan(&count); err != nil || count != reports.MaximumRetainedTasks {
+		t.Fatal("retention shortened to admit work")
 	}
 }

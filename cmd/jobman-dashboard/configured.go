@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -13,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
@@ -23,17 +25,21 @@ import (
 	"github.com/ryancswallace/jobman-dashboard/internal/httpapi"
 	"github.com/ryancswallace/jobman-dashboard/internal/logs"
 	"github.com/ryancswallace/jobman-dashboard/internal/monitoring"
+	"github.com/ryancswallace/jobman-dashboard/internal/reports"
 	"github.com/ryancswallace/jobman-dashboard/internal/runtimeconfig"
 	"github.com/ryancswallace/jobman-dashboard/internal/store"
 )
 
 type runtimeSecrets struct {
-	tls            tls.Certificate
-	databaseURL    string
-	identityClient *http.Client
-	identity       auth.OIDCOptions
-	sources        []control.Config
-	brokers        map[string]logs.ClientConfig
+	tls              tls.Certificate
+	databaseURL      string
+	identityClient   *http.Client
+	identity         auth.OIDCOptions
+	sources          []control.Config
+	brokers          map[string]logs.ClientConfig
+	redaction        *reports.RedactionPolicy
+	companionVersion string
+	static           *os.Root
 }
 
 func textSecret(path string) (string, error) {
@@ -94,6 +100,35 @@ func loadRuntime(c config.Config) (runtimeSecrets, error) {
 		return result, errors.New("encryption key file must contain exactly 32 private raw bytes")
 	}
 	result.identity = auth.OIDCOptions{Issuer: c.OIDC.Issuer, Audience: c.OIDC.APIAudience, WebClientID: c.OIDC.WebClientID, WebClientSecret: secret, NativeClientID: c.OIDC.NativeClientID, NativeRedirectURI: c.OIDC.NativeRedirectURI, DirectoryIDClaim: c.OIDC.DirectoryIDClaim, ClientIDClaim: c.OIDC.ClientIDClaim, PublicOrigin: c.PublicOrigin, Scopes: c.OIDC.Scopes, EncryptionKey: key, EncryptionKeyID: c.Encryption.KeyID, HTTPClient: result.identityClient}
+	if c.Reports.ObjectRoot != "" {
+		build, ok := debug.ReadBuildInfo()
+		if !ok {
+			return result, errors.New("diagnosis requires embedded dependency version information")
+		}
+		result.companionVersion, err = companionBuildVersion(build)
+		if err != nil {
+			return result, err
+		}
+		if c.Reports.RedactionFile != "" {
+			encoded, err := config.ReadSecret(c.Reports.RedactionFile, config.MaxConfigBytes)
+			if err != nil {
+				return result, errors.New("diagnosis redaction file is unavailable or not private")
+			}
+			var policy struct {
+				Values   []string `json:"values"`
+				Patterns []string `json:"patterns"`
+			}
+			if config.DecodeDocument(bytes.NewReader(encoded), &policy) != nil {
+				return result, errors.New("diagnosis redaction file is invalid")
+			}
+			mac := hmac.New(sha256.New, key)
+			mac.Write([]byte("jobman-dashboard/diagnosis-policy-key/v1"))
+			result.redaction, err = reports.NewRedactionPolicy(reports.RedactionConfig{Values: policy.Values, Patterns: policy.Patterns}, mac.Sum(nil))
+			if err != nil {
+				return result, errors.New("diagnosis redaction policy is invalid or exceeds its bounds")
+			}
+		}
+	}
 	for _, source := range c.Controls {
 		loaded, err := runtimeconfig.Source(source)
 		if err != nil {
@@ -109,11 +144,9 @@ func loadRuntime(c config.Config) (runtimeSecrets, error) {
 		}
 		result.brokers[broker.ID] = loaded
 	}
-	if stat, err := os.Stat(c.WebRoot); err != nil || !stat.IsDir() {
-		return result, errors.New("webRoot must contain the compiled web application")
-	}
-	if stat, err := os.Stat(c.WebRoot + "/index.html"); err != nil || !stat.Mode().IsRegular() {
-		return result, errors.New("webRoot has no compiled index.html")
+	result.static, err = openStatic(c)
+	if err != nil {
+		return result, err
 	}
 	return result, nil
 }
@@ -154,6 +187,7 @@ func runConfigured(path, mode, migrationURLFile string) error {
 	if err != nil {
 		return err
 	}
+	defer loaded.static.Close()
 	if mode == "check-config" {
 		slog.Info("configuration and local key material validated; network and source authorization not tested")
 		return nil
@@ -172,6 +206,7 @@ func runConfigured(path, mode, migrationURLFile string) error {
 	}
 	sources := make([]monitoring.Source, 0, len(loaded.sources))
 	logSources := make(map[string]logs.ManifestSource)
+	reportSources := make([]reports.Source, 0, len(loaded.sources))
 	for _, entry := range loaded.sources {
 		entry.VerifyIdentity = func(ctx context.Context, instance, epoch string) error {
 			return db.VerifySourceIdentity(ctx, entry.DeploymentID, instance, epoch, c.ConfigurationRevision)
@@ -183,6 +218,7 @@ func runConfigured(path, mode, migrationURLFile string) error {
 		defer client.Close()
 		sources = append(sources, client)
 		logSources[entry.DeploymentID] = client
+		reportSources = append(reportSources, client)
 	}
 	engine, err := monitoring.New(sources, db)
 	if err != nil {
@@ -214,6 +250,25 @@ func runConfigured(path, mode, migrationURLFile string) error {
 			return err
 		}
 	}
+	var reportService *reports.Service
+	if c.Reports.ObjectRoot != "" {
+		objects, err := reports.OpenObjects(c.Reports.ObjectRoot)
+		if err != nil {
+			return errors.New("private diagnosis object storage is unavailable")
+		}
+		defer objects.Close()
+		var reportLogs reports.LogService
+		if logService != nil {
+			reportLogs = logService
+		}
+		reportService, err = reports.NewService(reports.ServiceConfig{Sources: reportSources, Queue: db, Objects: objects, Logs: reportLogs, Redaction: loaded.redaction, CompanionVersion: loaded.companionVersion})
+		if err != nil {
+			return err
+		}
+		workersDone := make(chan struct{})
+		go func() { defer close(workersDone); reportService.Run(ctx) }()
+		defer func() { stop(); <-workersDone }()
+	}
 	maintenanceDone := make(chan struct{})
 	defer func() { stop(); <-maintenanceDone }()
 	go func() {
@@ -232,13 +287,21 @@ func runConfigured(path, mode, migrationURLFile string) error {
 				if _, err := db.PruneCursors(maintenance); err != nil {
 					slog.Warn("browse retention pass failed")
 				}
+				if reportService != nil {
+					if err := reportService.Prune(maintenance); err != nil {
+						slog.Warn("diagnosis retention pass failed")
+					}
+				}
 				cancel()
 			}
 		}
 	}()
-	app := &httpapi.Server{Engine: engine, Auth: identity, AuthRoutes: identity, Preferences: db, Static: os.DirFS(c.WebRoot)}
+	app := &httpapi.Server{Engine: engine, Auth: identity, AuthRoutes: identity, Preferences: db, Static: loaded.static.FS()}
 	if logService != nil {
 		app.Logs = logService
+	}
+	if reportService != nil {
+		app.Reports = reportService
 	}
 	server := &http.Server{Addr: c.Listen, Handler: app.Handler(), TLSConfig: &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{loaded.tls}}, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 20 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 128 << 10}
 	done := make(chan error, 1)

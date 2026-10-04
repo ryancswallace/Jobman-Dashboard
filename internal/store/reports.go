@@ -7,6 +7,7 @@ import (
 	"errors"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/ryancswallace/jobman-dashboard/internal/api"
 	"github.com/ryancswallace/jobman-dashboard/internal/monitoring"
 	"github.com/ryancswallace/jobman-dashboard/internal/reports"
 )
@@ -75,7 +76,27 @@ func (s *Store) EnqueueReport(ctx context.Context, a monitoring.Actor, subject r
 		if !bytes.Equal(priorKey, requestFingerprint) {
 			return empty, reports.ErrConflict
 		}
-		return scanReport(tx.QueryRow(ctx, `SELECT `+reportColumns+` FROM dashboard_report_tasks t WHERE t.id=$1::uuid AND t.expires_at>clock_timestamp()`, priorID))
+		task, err := scanReport(tx.QueryRow(ctx, `SELECT `+reportColumns+` FROM dashboard_report_tasks t WHERE t.id=$1::uuid AND t.expires_at>clock_timestamp()`, priorID))
+		if errors.Is(err, pgx.ErrNoRows) {
+			return empty, reports.ErrTaskNotFound
+		}
+		if err != nil {
+			return empty, err
+		}
+		// The current caller alias was verified above and source-authorized by
+		// the service. Refresh its background candidate without changing task
+		// ownership, immutable subject, or the idempotent response identity.
+		tag, err := tx.Exec(ctx, `UPDATE dashboard_report_requesters SET issuer=$3,subject=$4 WHERE task_id=$1::uuid AND account_id=$2::uuid`, priorID, a.Account.ID, a.Issuer, a.Subject)
+		if err != nil {
+			return empty, err
+		}
+		if tag.RowsAffected() != 1 {
+			return empty, reports.ErrTaskNotFound
+		}
+		if err = tx.Commit(ctx); err != nil {
+			return empty, err
+		}
+		return task, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return empty, err
@@ -94,14 +115,17 @@ func (s *Store) EnqueueReport(ctx context.Context, a monitoring.Actor, subject r
 		return empty, err
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
-		var global, personal int
+		var global, personal, retained int
+		if err = tx.QueryRow(ctx, `SELECT count(*) FROM dashboard_report_tasks`).Scan(&retained); err != nil {
+			return empty, err
+		}
 		if err = tx.QueryRow(ctx, `SELECT count(*) FROM dashboard_report_tasks WHERE state IN ('queued','collecting','analyzing')`).Scan(&global); err != nil {
 			return empty, err
 		}
 		if err = tx.QueryRow(ctx, `SELECT count(*) FROM dashboard_report_requesters r JOIN dashboard_report_tasks t ON t.id=r.task_id WHERE r.account_id=$1::uuid AND t.state IN ('queued','collecting','analyzing')`, a.Account.ID).Scan(&personal); err != nil {
 			return empty, err
 		}
-		if global >= reports.MaximumPending || personal >= reports.MaximumAccountPending {
+		if global >= reports.MaximumPending || personal >= reports.MaximumAccountPending || retained >= reports.MaximumRetainedTasks {
 			return empty, reports.ErrLimit
 		}
 		id, idErr := newID()
@@ -130,7 +154,7 @@ func (s *Store) EnqueueReport(ctx context.Context, a monitoring.Actor, subject r
 			return empty, reports.ErrLimit
 		}
 	}
-	if _, err = tx.Exec(ctx, `INSERT INTO dashboard_report_requesters(task_id,account_id,issuer,subject) VALUES($1::uuid,$2::uuid,$3,$4) ON CONFLICT(task_id,account_id) DO NOTHING`, task.ID, a.Account.ID, a.Issuer, a.Subject); err != nil {
+	if _, err = tx.Exec(ctx, `INSERT INTO dashboard_report_requesters(task_id,account_id,issuer,subject) VALUES($1::uuid,$2::uuid,$3,$4) ON CONFLICT(task_id,account_id) DO UPDATE SET issuer=EXCLUDED.issuer,subject=EXCLUDED.subject`, task.ID, a.Account.ID, a.Issuer, a.Subject); err != nil {
 		return empty, err
 	}
 	if _, err = tx.Exec(ctx, `INSERT INTO dashboard_report_idempotency(account_id,key_hash,request_key,task_id) VALUES($1::uuid,$2,$3,$4::uuid)`, a.Account.ID, keyHash, requestFingerprint, task.ID); err != nil {
@@ -209,7 +233,7 @@ func (s *Store) AnalyzeReport(ctx context.Context, id, lease string) error {
 // CompleteReport is called only after pair verification, durable object write,
 // and a final current authorization check. A failed lease leaves an orphan for
 // the bounded object janitor, never a ready reference to incomplete bytes.
-func (s *Store) CompleteReport(ctx context.Context, id, lease string, object reports.Object) error {
+func (s *Store) CompleteReport(ctx context.Context, id, lease string, object reports.Object, actor monitoring.Actor) error {
 	if object.Validate() != nil || object.ID != id {
 		return reports.ErrInvalid
 	}
@@ -217,7 +241,7 @@ func (s *Store) CompleteReport(ctx context.Context, id, lease string, object rep
 	if err != nil {
 		return reports.ErrInvalid
 	}
-	tag, err := s.Pool.Exec(ctx, `UPDATE dashboard_report_tasks SET state='ready',object=$3,lease_token=NULL,lease_expires_at=NULL,failure_code='',updated_at=clock_timestamp() WHERE id=$1::uuid AND lease_token=$2::uuid AND state='analyzing' AND lease_expires_at>clock_timestamp() AND expires_at>clock_timestamp()`, id, lease, encoded)
+	tag, err := s.Pool.Exec(ctx, `UPDATE dashboard_report_tasks SET state='ready',object=$3,lease_token=NULL,lease_expires_at=NULL,failure_code='',updated_at=clock_timestamp() WHERE id=$1::uuid AND lease_token=$2::uuid AND state='analyzing' AND lease_expires_at>clock_timestamp() AND expires_at>clock_timestamp() AND EXISTS (SELECT 1 FROM dashboard_report_requesters r JOIN dashboard_accounts a ON a.id=r.account_id JOIN dashboard_identity_aliases i ON i.account_id=a.id WHERE r.task_id=$1::uuid AND a.id=$4::uuid AND a.directory_id=$5::uuid AND a.disabled_at IS NULL AND i.issuer=$6 AND i.subject=$7)`, id, lease, encoded, actor.Account.ID, actor.DirectoryID, actor.Issuer, actor.Subject)
 	if err != nil {
 		return err
 	}
@@ -245,7 +269,68 @@ func (s *Store) FailReport(ctx context.Context, id, lease, code string) error {
 }
 
 func (s *Store) ReportTask(ctx context.Context, account, id string) (reports.Task, error) {
-	return scanReport(s.Pool.QueryRow(ctx, `SELECT `+reportColumns+` FROM dashboard_report_tasks t JOIN dashboard_report_requesters r ON r.task_id=t.id JOIN dashboard_accounts a ON a.id=r.account_id WHERE t.id=$1::uuid AND r.account_id=$2::uuid AND a.disabled_at IS NULL AND t.expires_at>clock_timestamp()`, id, account))
+	task, err := scanReport(s.Pool.QueryRow(ctx, `SELECT `+reportColumns+` FROM dashboard_report_tasks t JOIN dashboard_report_requesters r ON r.task_id=t.id JOIN dashboard_accounts a ON a.id=r.account_id WHERE t.id=$1::uuid AND r.account_id=$2::uuid AND a.disabled_at IS NULL AND t.expires_at>clock_timestamp()`, id, account))
+	if errors.Is(err, pgx.ErrNoRows) {
+		err = reports.ErrTaskNotFound
+	}
+	return task, err
+}
+
+// VerifyReportActor rechecks the persisted verified alias without storing or
+// reusing a bearer token. Source authorization remains a separate live check.
+func (s *Store) VerifyReportActor(ctx context.Context, id string, a monitoring.Actor) error {
+	var active bool
+	err := s.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM dashboard_report_requesters r JOIN dashboard_accounts a ON a.id=r.account_id JOIN dashboard_identity_aliases i ON i.account_id=a.id JOIN dashboard_report_tasks t ON t.id=r.task_id WHERE r.task_id=$1::uuid AND a.id=$2::uuid AND a.directory_id=$3::uuid AND a.disabled_at IS NULL AND i.issuer=$4 AND i.subject=$5 AND t.expires_at>clock_timestamp())`, id, a.Account.ID, a.DirectoryID, a.Issuer, a.Subject).Scan(&active)
+	if err != nil {
+		return err
+	}
+	if !active {
+		return monitoring.ErrForbidden
+	}
+	return nil
+}
+
+func (s *Store) ListReportTasks(ctx context.Context, account string, scope api.Scope, job, before string, limit int) ([]reports.Task, error) {
+	if limit < 1 || limit > 21 {
+		return nil, reports.ErrInvalid
+	}
+	var cursor reports.Task
+	var err error
+	if before != "" {
+		cursor, err = s.ReportTask(ctx, account, before)
+		if err != nil {
+			return nil, err
+		}
+		if cursor.Subject.Scope != scope || cursor.Subject.JobID != job {
+			return nil, reports.ErrTaskNotFound
+		}
+	}
+	rows, err := s.Pool.Query(ctx, `SELECT `+reportColumns+` FROM dashboard_report_tasks t JOIN dashboard_report_requesters r ON r.task_id=t.id JOIN dashboard_accounts a ON a.id=r.account_id WHERE r.account_id=$1::uuid AND a.disabled_at IS NULL AND t.deployment_id=$2::uuid AND t.namespace_id=$3::uuid AND t.job_id=$4::uuid AND t.expires_at>clock_timestamp() AND ($5='' OR (t.created_at,t.id)<($6,$7::uuid)) ORDER BY t.created_at DESC,t.id DESC LIMIT $8`, account, scope.DeploymentID, scope.NamespaceID, job, before, cursor.CreatedAt, nullableReportID(before), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []reports.Task{}
+	for rows.Next() {
+		item, err := scanReport(rows)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+func nullableReportID(id string) any {
+	if id == "" {
+		return nil
+	}
+	return id
+}
+
+func (s *Store) ReportObjectReferenced(ctx context.Context, id string) (bool, error) {
+	var exists bool
+	err := s.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM dashboard_report_tasks WHERE id=$1::uuid)`, id).Scan(&exists)
+	return exists, err
 }
 
 // DeleteExpiredReports returns private object references after removing their
