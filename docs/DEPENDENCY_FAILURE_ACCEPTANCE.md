@@ -108,10 +108,12 @@ checksums, source/run identity and contiguous offsets. A new broker
 process is expected only in the stop/start interval; the pause interval preserves
 its process identity.
 
-This is slow/unavailable broker acceptance, not proof of uninterruptible NFS kernel
-I/O. The real NFS mount remains intact. A future hard-stall test needs its own
-isolated mount/process arrangement and recovery review; stopping the shared NFS
-service or repeatedly restarting brokers is not an acceptable substitute.
+This is slow/unavailable broker acceptance. A separate reviewed hard-NFS test now
+passes using a private mount/network namespace, actual RPC READ interception,
+a 2,001 ms bounded timeout, helper reaping and exact original-byte recovery. The
+independent watchdog and ordinary private unmount both complete. It makes no
+claim that the kernel wait was intrinsically unkillable. See the October4
+hard-NFS evidence in [implementation status](IMPLEMENTATION_STATUS.md).
 
 ## Slow primary Control
 
