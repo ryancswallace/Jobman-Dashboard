@@ -1,13 +1,13 @@
 # Isolated deployed backup and restore acceptance
 
-The restore harness is prepared for independent review. No live restore result is
-claimed. It runs against the existing synthetic Lab and a separately provisioned
+The independently reviewed restore harness has completed the recorded Lab
+acceptance below. It runs against the existing synthetic Lab and a separately provisioned
 clone; it never restores a database, changes a service or configuration, edits a
 source feed, applies recovery, or releases a hold. The reviewed Lab restore driver
 and explicit operator recovery commands perform those actions between test phases.
 
-The candidate is `b8f25afdd90f83b4602f32440a89e74dfa866b6c`, with schema18. First
-complete the current Slurm and multi-Control acceptance and freeze the exact live
+The tested candidate is `b8f25afdd90f83b4602f32440a89e74dfa866b6c`, with schema18.
+For a new exercise, review the current source acceptance and freeze the exact live
 source/configuration set. The harness requires both reviewed Control instances,
 unchanged epochs, and complete source namespaces. Do not reuse the old split
 revision5 snapshot. The exact backup plan and material inventory must be reviewed
@@ -119,3 +119,32 @@ cursor reset, source relabeling, schema repair or hold release.
 Offline guard tests and integration-tagged race compilation can run without live
 opt-ins. They check private receipt ownership/modes/links/size, fixed source proof
 validation and bounded read-only SQL structure. They are not live restore evidence.
+
+## Recorded Lab acceptance — 2026-10-04
+
+The complete sequence passes on Dashboard b8f25af/configuration7/schema18 with
+the f297840 harness and two independent Control sources. Prepare/after-backup/
+held/replayed/resumed/cleanup take8.55/8.52/0.98/0.81/4.61/6.46seconds respectively.
+Original identities, read state, paired reports and citations survive; replayed
+lost-interval E2 remains suppressed, and fresh post-cutoff E3 produces one inbox.
+Three source/namespace scopes lack current-state reconciliation coverage and were
+explicitly acknowledged before apply; no complete-coverage claim follows.
+
+The initial empty-schema restore failure and exact reviewed continuation remain
+part of the evidence. The future Lab driver preserves the provisioned DDL-owned
+empty `public` schema, because an archive's schema TOC entry does not guarantee a
+schema-creation command. Never use that repair to adopt a populated target or
+silently repeat an uncertain restore.
+
+After exact clone-only startup flag changes and separate generation4→5 resume,
+cleanup removed the owned rule copies and cancelled the unused job. An ordinary
+generation5→6 hold preceded stopping the two clone units. The clone database,
+objects and private receipts remain; primary processes and hold=false/generation3
+are unchanged. The backup watchdog did not fire, so its intervention path remains
+a separate fault-test gate. No APNs provider delivery was exercised.
+
+Private consolidated receipt:
+`/private/tmp/jobman-dashboard-restore-complete-acceptance-v1.json`, SHA256
+`1d6344ebba3ae1e91475e11e86ba0614496f3b4ea7a58d681a15888e6c18c50f`.
+The Lab's `docs/DASHBOARD_RESTORE_RELEASE.md` describes the separately reviewed
+prepare/configure/observe/retire helper and its exact-plan/deadline checks.
