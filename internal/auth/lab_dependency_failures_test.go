@@ -728,7 +728,7 @@ func (s *labFaultState) broker() {
 
 func (s *labFaultState) sourceScenario(ctx context.Context, action, selected string, output any) error {
 	root := s.sessions[0].root
-	for name, want := range map[string]string{"dashboard-multisource-notification-scenario.py": "7357d47fb1186749c3c11d17f4bd4ccdc7360a45e5acad191eadf06b9744a253", "dashboard-scale-source-common.py": "deb95b8dc32334cddcbcb2f7c1d24584d43de699212f26661c24499339b8cecb"} {
+	for name, want := range map[string]string{"dashboard-multisource-notification-scenario.py": "2974ca794895b8271fe78d63f75e23d3dbceb907fdcb3ec28de18d7801259b80", "dashboard-scale-source-common.py": "deb95b8dc32334cddcbcb2f7c1d24584d43de699212f26661c24499339b8cecb"} {
 		raw, err := labScaleReadFile(filepath.Join(root, "scripts", name), 128<<10)
 		sum := sha256.Sum256(raw)
 		if err != nil || hex.EncodeToString(sum[:]) != want {
