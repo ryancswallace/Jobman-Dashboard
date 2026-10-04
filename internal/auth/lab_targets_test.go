@@ -45,6 +45,7 @@ func TestLabDeployedTargetCatalogAndPartitions(t *testing.T) {
 			if err != nil || len(data) > 64<<10 || json.Unmarshal(data, &fixture) != nil || !fixture.Synthetic || len(fixture.Namespaces) != 2 {
 				t.Fatal("Expected bounded public synthetic fixture identities")
 			}
+			diagnostic := readLabDiagnosticFixture(t, session.root, false)
 			transport := session.transport.Clone()
 			transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
 				if address != "dashboard.lab.test:8443" {
@@ -95,6 +96,13 @@ func TestLabDeployedTargetCatalogAndPartitions(t *testing.T) {
 			if len(allowed) != wantScopes {
 				t.Fatal("Unexpected fixture namespace names")
 			}
+			wantTargets := wantScopes * 2
+			if diagnostic != nil && user == "alice" {
+				if allowed[diagnostic.NamespaceID] == "" {
+					t.Fatal("Supplemental target belongs to an unknown namespace")
+				}
+				wantTargets++
+			}
 			seen := make(map[string]bool)
 			seenCursors := make(map[string]bool)
 			cursor := ""
@@ -109,7 +117,7 @@ func TestLabDeployedTargetCatalogAndPartitions(t *testing.T) {
 				}
 				var page api.TargetPage
 				read("/api/v1/targets?"+query.Encode(), &page, 200)
-				if page.Completeness != "complete" || page.Total != strconv.Itoa(wantScopes*2) || len(page.Items) != 1 || len(page.Totals) != wantScopes || len(page.Sources) != wantScopes {
+				if page.Completeness != "complete" || page.Total != strconv.Itoa(wantTargets) || len(page.Items) != 1 || len(page.Totals) != wantScopes || len(page.Sources) != wantScopes {
 					t.Fatal("Aggregate target totals, page bounds or completeness differ")
 				}
 				for _, source := range page.Sources {
@@ -118,7 +126,11 @@ func TestLabDeployedTargetCatalogAndPartitions(t *testing.T) {
 					}
 				}
 				for _, total := range page.Totals {
-					if total.DeploymentID != labDeployment || allowed[total.NamespaceID] == "" || total.Total != "2" || total.AsOf.IsZero() {
+					wantTotal := "2"
+					if diagnostic != nil && total.NamespaceID == diagnostic.NamespaceID {
+						wantTotal = "3"
+					}
+					if total.DeploymentID != labDeployment || allowed[total.NamespaceID] == "" || total.Total != wantTotal || total.AsOf.IsZero() {
 						t.Fatal("Per-source exact target totals or provenance differ")
 					}
 				}
@@ -148,6 +160,10 @@ func TestLabDeployedTargetCatalogAndPartitions(t *testing.T) {
 					if target.Generation.ExecutionBackend != "slurm" || partitions.Total != "1" || len(partitions.Items) != 1 || partitions.Items[0].Name != "synthetic" || !partitions.Items[0].IsDefault {
 						t.Fatal("Configured Slurm partition metadata differs")
 					}
+				case "synthetic-diagnostics":
+					if diagnostic == nil || target.NamespaceID != diagnostic.NamespaceID || target.TargetID != diagnostic.TargetID || target.Generation.ID != diagnostic.TargetGenerationID || target.Generation.ExecutionBackend != "subprocess" || target.Generation.LogStore == nil || target.Generation.LogStore.Name != "lab-nfs" || target.Generation.LogStore.Version != "1" || partitions.Total != "0" || len(partitions.Items) != 0 {
+						t.Fatal("Supplemental synthetic target differs from its exact manifest identity")
+					}
 				default:
 					t.Fatal("Unexpected synthetic target")
 				}
@@ -169,7 +185,7 @@ func TestLabDeployedTargetCatalogAndPartitions(t *testing.T) {
 					break
 				}
 			}
-			if len(seen) != wantScopes*2 {
+			if len(seen) != wantTargets {
 				t.Fatal("Target pagination lost rows")
 			}
 			if user == "bob" {
