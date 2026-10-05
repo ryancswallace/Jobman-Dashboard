@@ -6,6 +6,9 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
+- Use the supplied transparent Dashboard logo in the dark web header and native
+  iPhone connection/Overview branding.
+
 - Add the shared Jobman repository baseline: community policies, contributor and
   operator documentation, pinned quality tools, devcontainer and container builds,
   dependency/security/maintenance workflows, local snapshot packaging and checks.

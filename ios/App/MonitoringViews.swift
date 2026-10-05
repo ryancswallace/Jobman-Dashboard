@@ -2,6 +2,7 @@ import DashboardCore
 import SwiftUI
 
 struct OverviewView: View {
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(DashboardStore.self) private var store
     var body: some View {
         List {
@@ -31,7 +32,14 @@ struct OverviewView: View {
                 Section { SourceSummary(completeness: summary.completeness, sources: summary.sources, fetchedAt: summary.fetchedAt) }
             } else if store.error == nil { ProgressView("Loading authorized activity…") }
         }.navigationTitle("Overview").refreshable { store.refresh() }
-            .toolbar { Button { store.refresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") } }
+            .toolbar {
+                if colorScheme == .dark {
+                    ToolbarItem(placement: .topBarLeading) { DashboardBrand(width: 140) }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { store.refresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
+                }
+            }
     }
 
     private func count(_ title: String, _ value: Int?, phase: String, outcome: String = "", window: Overview.Window? = nil) -> some View {

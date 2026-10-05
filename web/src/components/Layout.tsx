@@ -60,7 +60,7 @@ export function Layout() {
           <img className="brand-light" src="/logo.svg" alt="Jobman Dashboard" />
           <img
             className="brand-dark"
-            src="/logo-dark.svg"
+            src="/logo-transparent-dashboard.svg"
             alt="Jobman Dashboard"
           />
         </NavLink>

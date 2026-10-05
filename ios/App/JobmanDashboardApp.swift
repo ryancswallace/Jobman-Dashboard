@@ -55,7 +55,7 @@ private struct ConnectionView: View {
         NavigationStack {
             Form {
                 Section {
-                    Label("Jobman Dashboard", systemImage: "square.grid.2x2.fill").font(.title.bold())
+                    DashboardBrand().font(.title.bold())
                     Text("Monitor jobs and investigate results on your organization's private network.").foregroundStyle(.secondary)
                 }
                 Section("Connect to your organization") {
@@ -193,5 +193,24 @@ struct StatusBadge: View {
         Text("\(title): \(value?.replacingOccurrences(of: "_", with: " ") ?? "Unavailable")")
             .font(.caption.weight(.medium)).padding(.horizontal, 8).padding(.vertical, 5)
             .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+// Uses the supplied transparent artwork without applying the app's tint.
+struct DashboardBrand: View {
+    @Environment(\.colorScheme) private var colorScheme
+    var width: CGFloat = 220
+
+    var body: some View {
+        if colorScheme == .dark {
+            Image("DashboardLogoDark")
+                .renderingMode(.original)
+                .resizable()
+                .scaledToFit()
+                .frame(width: width, height: width * 131.6 / 420.1)
+                .accessibilityLabel("Jobman Dashboard")
+        } else {
+            Label("Jobman Dashboard", systemImage: "square.grid.2x2.fill")
+        }
     }
 }

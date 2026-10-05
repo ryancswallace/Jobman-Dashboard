@@ -22,6 +22,15 @@ IOS_TEST_DESTINATION='platform=iOS Simulator,name=iPhone 18 Pro' ./scripts/test-
 
 Project source references and the scheme are reproducible with `python3 scripts/generate-project.py`. Run it after adding/removing App or UITests Swift files. The generated OpenAPI client is included through `Sources/DashboardCore/DashboardAPI.generated.swift`, a relative symlink to the single checked-in `contracts/swift/DashboardAPI.generated.swift`. `GeneratedTransport.swift` supplies origin-pinned, authenticated, bounded HTTP behavior; the generated bootstrap result is mapped into application state. Artifact, dependency-edge, target, recorded-run, diagnosis, personal-rule, notification-device and inbox models also use generated types directly. Other application models retain unknown enum values and wide integer wire strings; focused contract tests decode the same workload/neighborhood fixtures with both generated and application types.
 
+## Branding
+
+Dark appearance uses `../assets/logo-transparent-dashboard.svg` in the connection
+screen and Overview toolbar. Keep its copies in
+`App/Assets.xcassets/DashboardLogoDark.imageset` and
+`../web/public/logo-transparent-dashboard.svg` identical to the source when
+updating the artwork. The native image preserves the SVG’s original colors and
+aspect ratio; light appearance retains the existing branding.
+
 ## Local iPhone archive and development export
 
 The app icon uses the existing Jobman purple chevron and green Dashboard grid on
