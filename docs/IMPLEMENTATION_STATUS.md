@@ -632,3 +632,55 @@ The actual schema probe has independently reviewed plan `b9ce73e7d804ab82ccc0c9c
 - Web asset repair `c2fa64e4478a5f48c5dff35888a91d6193618126` replaces the whole verified tree with Linux atomic directory exchange instead of retaining obsolete files. Archive/path/link/ownership/size checks precede mutation. Review found and closed two lifecycle errors before delivery: the serving process retains an open web-root handle, requiring stop/replace/start; first installation needs an empty inactive bootstrap before configuration validation. Existing-tree replacement follows validation/migration, and recovery/retry starts the service. Review SHA `04cf8a63e6ef4941cd19db3b3cd03cb8c98d07f895ab54f3e4b05738e958d406`; full static validation passed40 suites/607 groups before the final fixture-only correction, log SHA `5d1043cb11154beba3fdd2a2c644255eb16c207982248a9cf1a7bff482b114db`.
 - The first Linux asset test failed because its bootstrap fixture mkdir modes were masked by umask077; the production helper correctly refused0700. Original failure remains at `/private/tmp/jobman-web-assets-linux-t5qdlg7l/tests.log`, SHA `73d101548a115293e4220242ff562d1b9e884b826c4f0d5b97c10fa2a5b2ae5c`. Two explicit fixture chmod calls were independently reviewed at SHA `7e5f266e0dc68922eebe4f4c510a8bc3cd09ee6d8e4dfb387e38fdd8d36c104f`; all18 actual Linux groups then pass in a new temporary tree. Receipt `/private/tmp/jobman-web-assets-linux-v2-a64pqg1e/result.json`, SHA `a3b6baae63fe99a2d5e7b51bad9d12aa8bb69b28ba141bc08c73df919c3e1de4`, log SHA `65a7554f318ad424ce212994127da70be2d51b8f29eb3757eec1f9c8350b9b1b`. No deployed service/configuration/store was touched; original failed guest evidence remains.
 - Runtime integration `b4beace64d56d53d37c5c0fd134a4500242b3025` includes merged infrastructure without changing its parent runtime tree. The sole CI-script conflict retained the existing wildcard loop, which runs both new suites. [PR2 CI37231810115](https://github.com/ryancswallace/Jobman-Lab/actions/runs/37231810115) passes after retargeting to main; superseded run37231809787 was canceled and is not claimed green. [Lab PR2](https://github.com/ryancswallace/Jobman-Lab/pull/2) is merged as `000da46a7c87630d1aee3391029f5e57ade2ec29`, with its review finding resolved. No branch protections or required approvals were bypassed.
+
+
+## Full Lab web preview recovery (2026-10-05)
+
+- The old loopback process served newer static files with an older fixture API,
+  causing unavailable-operation errors. It was rebuilt and restarted on
+  `127.0.0.1:8091`. Its banner and development guide now describe its limited
+  monitoring-only sample services. The configured application is
+  `https://dashboard.lab.test:8443`, with two Control sources and durable services.
+- All nine full-Lab VMs are running. The documented resume/inventory workflow
+  refreshed guest addresses. Target configuration now reuses exact matching
+  targets after idempotency receipts expire, preserving IDs/generations and
+  rejecting drift; Lab `714b016` is in
+  [PR3](https://github.com/ryancswallace/Jobman-Lab/pull/3), with
+  [passing Linux CI](https://github.com/ryancswallace/Jobman-Lab/actions/runs/37378567698).
+  Six focused helper tests pass. The local full static run stopped in an unchanged
+  two-source notification fixture test; the hosted Linux gate passed.
+- Linux mounts, all-pairs SSH, Slurm validation and Control readiness passed.
+  Windows Time was stopped after resume; starting its existing service and
+  resynchronizing fixed the remaining Windows/SSH/Slurm checks. Fresh real Jobman
+  smoke jobs and log reads passed on Slurm, Linux subprocess and Windows subprocess.
+  Existing Lab state and acceptance evidence were retained.
+- The current web build is `203aa1d3e0870533176a189ff9aad0978d138c24`, including
+  the transparent dark logo. Its archive SHA256 is
+  `19a60c250b216e075498a8568657b929d995c6152c30bfebf1a8debe7618c2bc`.
+  It is served from a separate `web-previews` directory after validating the
+  staged API configuration and restarting only the API. The original release
+  tree is intact. Backend and worker remain RC7
+  `d10fb5f813efa3599a0bc5f79b3ca88826210510`; configuration revision 8 and schema 18
+  are unchanged. Only API `webRoot` changed, with an exact private backup retained.
+  Deployment receipt: `/private/tmp/jobman-dashboard-web-publication.json`.
+- The operator added the two local hostname mappings and explicitly trusted the
+  Lab development CA in the login keychain. The earlier leaf-only trust approach
+  did not satisfy Chrome and its trust entries were removed. Chrome now opens
+  both HTTPS sites and completes synthetic Alice sign-in without certificate
+  bypasses. This establishes Lab browser connectivity, not corporate AD FS.
+- Configured HTTP checks pass: confidential browser session/CSRF/preferences;
+  32-request two-source preview workflows (overview, jobs, targets/partitions,
+  collections, arrays, graph neighborhood, inbox/device catalogs, and create,
+  update/delete of test-owned disabled rules for all three scopes); actual run
+  catalogs/NFS logs/reports/citations; and metadata report generation. Session and
+  preview tests passed again after publishing the static assets (1.199 seconds).
+  The web suite passes 173 tests with two existing opt-in skips.
+- Chrome verification covers live aggregate counts, target catalogs, settings and
+  source/role unions, alert rules, inbox history, job filtering/detail, diagnosis
+  request completion and sealed evidence citation rendering, plus collections,
+  arrays and graph neighborhoods/dependency predicates. The browser returned to
+  sign-in during the longer check; the documented session policy bounds cookies
+  by issuer token expiry and renews through another SSO flow (no browser refresh
+  tokens). There are no
+  registered iPhones in this account. Real APNs, AD FS, signing/distribution and
+  company-managed physical-device acceptance remain external release gates.
