@@ -6,6 +6,9 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
+- Clarify the limited sample preview and add an opt-in smoke for the configured
+  Lab's current monitoring, investigation and personal alert workflows.
+
 - Use the supplied transparent Dashboard logo in the dark web header and native
   iPhone connection/Overview branding.
 

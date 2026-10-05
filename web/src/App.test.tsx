@@ -98,9 +98,7 @@ afterEach(() => {
 describe("web monitoring workflows", () => {
   it("labels fixture mode and preserves two equal job IDs in separate source links", async () => {
     render(<App />);
-    expect(
-      await screen.findByText(/Development fixture environment/),
-    ).toBeVisible();
+    expect(await screen.findByText(/Limited sample preview/)).toBeVisible();
     const links = await screen.findAllByRole("link", {
       name: "Synthetic test",
     });
