@@ -1,0 +1,35 @@
+name: Repository maintenance
+on:
+  schedule:
+    - cron: '23 6 1 * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: dashboard-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    name: Validate repository invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.version
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: node.version
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Select pinned npm
+        run: npm install --global "npm@$(cat npm.version)" --ignore-scripts --no-audit --fund=false
+      - run: npm ci --prefix web
+      - run: make check vulncheck coverage-check
+      - run: make update
+      - name: Require deterministic generators
+        run: git diff --exit-code
+      - run: make snapshot sbom

@@ -71,7 +71,6 @@ func databaseSecret(path string) (string, error) {
 	}
 	return value, nil
 }
-func loadRuntime(c config.Config) (runtimeSecrets, error) { return loadRuntimeMode(c, "serve") }
 func loadRuntimeMode(c config.Config, role string) (result runtimeSecrets, err error) {
 	defer func() {
 		if err != nil {
@@ -166,10 +165,6 @@ func loadRuntimeMode(c config.Config, role string) (result runtimeSecrets, err e
 		return result, err
 	}
 	return result, nil
-}
-
-func runConfigured(path, mode, migrationURLFile string) error {
-	return runConfiguredMode(path, mode, migrationURLFile, "serve")
 }
 
 func runConfiguredMode(path, mode, migrationURLFile, checkMode string) error {

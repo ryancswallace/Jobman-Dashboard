@@ -63,9 +63,16 @@ jobs:
       - name: Select the pinned npm version
         run: npm install --global "npm@$(cat npm.version)" --ignore-scripts --no-audit --fund=false
       - run: npm ci --prefix web
-      - run: make check
+      - run: make quick-check coverage-check
         env:
           JOBMAN_DASHBOARD_TEST_DATABASE_URL: postgres://postgres:synthetic-ci-only@127.0.0.1:5432/dashboard_test?sslmode=disable
+      - name: Retain Go coverage profile
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dashboard-go-coverage-${{ github.sha }}
+          path: coverage.txt
+          if-no-files-found: error
+          retention-days: 14
       - run: npm run build --prefix web
       - name: Cross-build Linux deployment binaries
         run: |

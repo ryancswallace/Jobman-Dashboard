@@ -4,7 +4,7 @@ Private web and native iPhone monitoring for Jobman Control. **Engineering prere
 
 See [requirements](docs/REQUIREMENTS.md), [design](docs/DESIGN.md), and the live [implementation status](docs/IMPLEMENTATION_STATUS.md) for coverage and remaining acceptance gates.
 
-The [engineering candidate](https://github.com/ryancswallace/Jobman-Dashboard/releases/tag/v0.1.0-rc.1)
+The [engineering candidate](https://github.com/ryancswallace/Jobman-Dashboard/releases/tag/v0.1.0-rc.7)
 contains reproducible Linux amd64/arm64 services and web assets. Follow
 [private installation](docs/LINUX_INSTALLATION.md) and the
 [operations runbook](docs/OPERATIONS.md); native signing/distribution is a separate
@@ -34,3 +34,12 @@ make ios-simulator
 Backend tests exercise cross-source paging, account/query/grant/epoch isolation, explicit partial results, schema migration integrity and optimistic preference updates. Database integration tests need `JOBMAN_DASHBOARD_TEST_DATABASE_URL`; each creates and removes its own random schema. With the authorized local Jobman-Lab PostgreSQL VM running, `python3 scripts/test-lab-postgres.py` loads only the synthetic database credential and runs those tests without printing its value.
 
 No command above deploys production, contacts an AI provider, submits jobs, or publishes a release. Internal iPhone signing/distribution and real AD FS/APNs/managed-device acceptance remain release gates.
+
+## Repository and contributor resources
+
+See the [documentation index](docs/README.md), [development guide](docs/DEVELOPMENT.md),
+[contributing policy](CONTRIBUTING.md), [security policy](SECURITY.md),
+[support](SUPPORT.md), [changelog](CHANGELOG.md), [license](LICENSE),
+[release engineering](RELEASE.md) and [repository scaffolding parity](docs/REPOSITORY_SCAFFOLDING.md).
+Run `make help` for focused tooling; the devcontainer supports Go/web development
+and the existing macOS CI job builds the native iPhone application.

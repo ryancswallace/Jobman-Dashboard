@@ -60,7 +60,7 @@ export function Layout() {
           <img className="brand-light" src="/logo.svg" alt="Jobman Dashboard" />
           <img
             className="brand-dark"
-            src="/logo-dark.svg"
+            src="/logo-transparent-dashboard.svg"
             alt="Jobman Dashboard"
           />
         </NavLink>
@@ -175,7 +175,7 @@ export function Layout() {
         {bootstrap.mode && bootstrap.mode !== "production" && (
           <div className="development-banner" role="status">
             {bootstrap.mode === "fixture"
-              ? "Development fixture environment · synthetic data · not a live Control deployment"
+              ? "Limited sample preview · synthetic monitoring data · settings, logs, reports and alerts require a configured server"
               : `Environment: ${bootstrap.mode}`}
           </div>
         )}

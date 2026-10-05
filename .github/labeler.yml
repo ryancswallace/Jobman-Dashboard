@@ -1,0 +1,42 @@
+go:
+  - changed-files:
+      - any-glob-to-any-file: ["**/*.go", "go.mod", "go.sum", "go.version"]
+web:
+  - changed-files:
+      - any-glob-to-any-file: ["web/**", "contracts/typescript/**", "node.version", "npm.version"]
+ios:
+  - changed-files:
+      - any-glob-to-any-file: ["ios/**", "contracts/swift/**"]
+api:
+  - changed-files:
+      - any-glob-to-any-file: ["api/**", "contracts/**", "internal/httpapi/**"]
+database:
+  - changed-files:
+      - any-glob-to-any-file: ["internal/store/**", "deploy/postgres/**"]
+identity:
+  - changed-files:
+      - any-glob-to-any-file: ["internal/auth/**", "internal/runtimeconfig/**"]
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: ["**/*.md", "CITATION.cff", "assets/**"]
+tests:
+  - changed-files:
+      - any-glob-to-any-file: ["**/*_test.go", "**/test_*.py", "**/*.test.ts*", "ios/Tests/**", "ios/UITests/**", "tests/**"]
+ci:
+  - changed-files:
+      - any-glob-to-any-file: [".github/**"]
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file: ["go.mod", "go.sum", "*.version", "web/package*.json", ".github/dependabot.yml"]
+containers:
+  - changed-files:
+      - any-glob-to-any-file: ["Dockerfile*", ".dockerignore", ".devcontainer/**", "compose.yaml"]
+packaging:
+  - changed-files:
+      - any-glob-to-any-file: [".goreleaser.yml", "scripts/*release*", "ios/scripts/*package*", "deploy/**", "RELEASE.md"]
+security:
+  - changed-files:
+      - any-glob-to-any-file: ["SECURITY.md", "docs/SECURITY_MODEL.md", ".github/workflows/codeql.yml", ".github/workflows/scorecard.yml"]
+automation:
+  - changed-files:
+      - any-glob-to-any-file: ["Makefile", "devel/**", ".golangci.yml", "cspell.json"]

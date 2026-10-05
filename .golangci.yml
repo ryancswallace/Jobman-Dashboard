@@ -1,0 +1,27 @@
+version: "2"
+run:
+  timeout: 5m
+  go: "1.26"
+  tests: true
+  modules-download-mode: readonly
+linters:
+  default: none
+  enable:
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - bidichk
+    - durationcheck
+    - nosprintfhostport
+    - sqlclosecheck
+    - rowserrcheck
+  settings:
+    staticcheck:
+      # Correctness checks; style/quick-fix checks would rewrite existing runtime code.
+      checks: ["SA*"]
+  exclusions:
+    generated: strict
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
