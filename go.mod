@@ -10,7 +10,7 @@ require (
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/ryancswallace/jobman v1.8.1-0.20261003211041-62ac89b14547
 	github.com/ryancswallace/jobman-diagnose v0.6.1-0.20261003234632-f47b6058c06e
-	golang.org/x/oauth2 v0.36.0
+	golang.org/x/oauth2 v0.37.0
 	golang.org/x/sys v0.48.0
 )
 
