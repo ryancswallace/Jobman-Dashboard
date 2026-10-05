@@ -337,9 +337,6 @@ func prepareBackground(c config.WorkerConfig, material workerSecrets, db *store.
 
 // Each maintenance operation gets an independent bounded budget: a slow source
 // cannot consume another component's entire pass. The loop itself is serial.
-func runRetention(ctx context.Context, db *store.Store, objects *reports.ObjectStore, sourceIDs []string) {
-	runRetentionObserved(ctx, db, objects, sourceIDs, nil)
-}
 func runRetentionObserved(ctx context.Context, db *store.Store, objects *reports.ObjectStore, sourceIDs []string, observer *observability.Registry) {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()

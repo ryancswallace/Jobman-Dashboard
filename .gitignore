@@ -15,3 +15,16 @@ ios/.build/
 ios/**/.build/
 ios/DerivedData/
 ios/**/xcuserdata/
+
+/dist/
+/.release-generated/
+/coverage.txt
+/results.sarif
+/go.work
+/go.work.sum
+.devcontainer/.env.local
+*.pem
+*.key
+*.p12
+*.pfx
+*.mobileprovision

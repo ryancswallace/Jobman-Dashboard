@@ -1,0 +1,47 @@
+# Reviewed template only; do not apply automatically.
+# Repository settings-as-code for the GitHub Settings app. Changes to this file
+# require the same review as production code and migrations.
+repository:
+  description: "Private web and native iPhone monitoring for Jobman Control."
+  homepage: "https://github.com/ryancswallace/Jobman-Dashboard"
+  topics: "dashboard, go, ios, jobman, monitoring, postgresql, react, swift"
+  has_issues: true
+  has_projects: false
+  has_wiki: false
+  has_discussions: false
+  default_branch: "main"
+  allow_squash_merge: true
+  allow_merge_commit: false
+  allow_rebase_merge: false
+  allow_auto_merge: true
+  allow_update_branch: true
+  squash_merge_commit_title: PR_TITLE
+  squash_merge_commit_message: PR_BODY
+  delete_branch_on_merge: true
+  enable_automated_security_fixes: true
+  enable_vulnerability_alerts: true
+
+branches:
+  - name: main
+    protection:
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+        dismiss_stale_reviews: true
+        require_code_owner_reviews: true
+        require_last_push_approval: true
+      required_status_checks:
+        strict: true
+        contexts:
+          - backend-web
+          - iphone
+          - Repository checks
+          - Analyze Go
+          - Analyze JavaScript
+          - Dependency review
+          - Fuzz browse state
+      enforce_admins: false
+      required_linear_history: true
+      allow_force_pushes: false
+      allow_deletions: false
+      required_conversation_resolution: true
+      restrictions: null

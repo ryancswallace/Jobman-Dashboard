@@ -1,0 +1,104 @@
+version: 2
+project_name: jobman-dashboard
+before:
+  hooks:
+    - go mod verify
+    - make contracts-check docs-check
+builds:
+  - id: dashboard
+    main: ./cmd/jobman-dashboard
+    binary: bin/jobman-dashboard
+    env: [CGO_ENABLED=0, GOWORK=off]
+    flags: [-trimpath, -mod=readonly, -buildvcs=false]
+    ldflags:
+      - -X github.com/ryancswallace/jobman-dashboard/internal/buildinfo.Version={{ .Version }}
+      - -X github.com/ryancswallace/jobman-dashboard/internal/buildinfo.Revision={{ .FullCommit }}
+      - -X github.com/ryancswallace/jobman-dashboard/internal/buildinfo.BuiltAt={{ .Date }}
+    goos: [linux]
+    goarch: [amd64, arm64]
+  - id: log-broker
+    main: ./cmd/jobman-log-broker
+    binary: bin/jobman-log-broker
+    env: [CGO_ENABLED=0, GOWORK=off]
+    flags: [-trimpath, -mod=readonly, -buildvcs=false]
+    ldflags:
+      - -X github.com/ryancswallace/jobman-dashboard/internal/buildinfo.Version={{ .Version }}
+      - -X github.com/ryancswallace/jobman-dashboard/internal/buildinfo.Revision={{ .FullCommit }}
+      - -X github.com/ryancswallace/jobman-dashboard/internal/buildinfo.BuiltAt={{ .Date }}
+    goos: [linux]
+    goarch: [amd64, arm64]
+archives:
+  - id: services
+    ids: [dashboard, log-broker]
+    formats: [tar.gz]
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    files:
+      - LICENSE
+      - '*.md'
+      - CITATION.cff
+      - docs/*.md
+      - api/openapi.json
+      - deploy/*.example.json
+      - deploy/systemd/*.service
+      - deploy/postgres/README.md
+      - deploy/postgres/grants.json
+      - deploy/postgres/grants.py
+      - src: web/dist
+        dst: web
+nfpms:
+  - id: services
+    ids: [dashboard, log-broker]
+    package_name: jobman-dashboard
+    vendor: Jobman Dashboard contributors
+    homepage: https://github.com/ryancswallace/Jobman-Dashboard
+    maintainer: Ryan Wallace <ryancswallace@gmail.com>
+    description: Engineering snapshot of private Jobman monitoring services and web assets.
+    license: MIT
+    formats: [deb, rpm, apk]
+    bindir: /opt/jobman-dashboard/snapshot
+    contents:
+      - src: web/dist/
+        dst: /opt/jobman-dashboard/snapshot/web/
+        type: tree
+      - src: LICENSE
+        dst: /usr/share/licenses/jobman-dashboard/LICENSE
+      - src: THIRD_PARTY_NOTICES.md
+        dst: /usr/share/licenses/jobman-dashboard/THIRD_PARTY_NOTICES.md
+      - src: docs/*.md
+        dst: /usr/share/doc/jobman-dashboard/docs/
+      - src: deploy/config.example.json
+        dst: /usr/share/doc/jobman-dashboard/deploy/config.example.json
+      - src: deploy/log-broker.example.json
+        dst: /usr/share/doc/jobman-dashboard/deploy/log-broker.example.json
+      - src: deploy/operator.example.json
+        dst: /usr/share/doc/jobman-dashboard/deploy/operator.example.json
+      - src: deploy/worker.example.json
+        dst: /usr/share/doc/jobman-dashboard/deploy/worker.example.json
+      - src: deploy/systemd/jobman-dashboard-api.service
+        dst: /usr/share/doc/jobman-dashboard/deploy/systemd/jobman-dashboard-api.service
+      - src: deploy/systemd/jobman-dashboard-worker.service
+        dst: /usr/share/doc/jobman-dashboard/deploy/systemd/jobman-dashboard-worker.service
+      - src: deploy/systemd/jobman-log-broker.service
+        dst: /usr/share/doc/jobman-dashboard/deploy/systemd/jobman-log-broker.service
+      - src: deploy/postgres/README.md
+        dst: /usr/share/doc/jobman-dashboard/deploy/postgres/README.md
+      - src: deploy/postgres/grants.json
+        dst: /usr/share/doc/jobman-dashboard/deploy/postgres/grants.json
+      - src: deploy/postgres/grants.py
+        dst: /usr/share/doc/jobman-dashboard/deploy/postgres/grants.py
+      - src: RELEASE.md
+        dst: /usr/share/doc/jobman-dashboard/RELEASE.md
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+sboms:
+  - id: archives
+    artifacts: archive
+  - id: packages
+    artifacts: package
+snapshot:
+  version_template: '{{ incpatch .Version }}-snapshot.{{ .ShortCommit }}'
+changelog:
+  disable: true
+release:
+  disable: true

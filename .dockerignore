@@ -1,0 +1,25 @@
+# Allow only reviewed build inputs; never send local credentials or evidence.
+**
+!go.mod
+!go.sum
+!go.version
+!node.version
+!npm.version
+!cmd/
+!cmd/**
+!internal/
+!internal/**
+!web/
+!web/**
+!LICENSE
+!THIRD_PARTY_NOTICES.md
+web/node_modules
+web/dist
+**/.env*
+**/*.key
+**/*.pem
+**/*.log
+**/.DS_Store
+!contracts/
+!contracts/typescript/
+!contracts/typescript/*.ts

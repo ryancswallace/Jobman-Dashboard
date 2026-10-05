@@ -13,7 +13,7 @@ spec.loader.exec_module(release)
 
 class ReleaseTests(unittest.TestCase):
     def test_curated_docs_include_current_behavior_and_release_gates(self):
-        self.assertTrue({"RUN_SELECTION.md", "RELEASE_GAP_AUDIT.md", "FINAL_CANDIDATE.md"}.issubset(release.RUNBOOKS))
+        self.assertTrue({"RUN_SELECTION.md", "RELEASE_GAP_AUDIT.md", "FINAL_CANDIDATE.md", "README.md", "INSTALLATION.md", "SECURITY_MODEL.md", "REPOSITORY_SCAFFOLDING.md"}.issubset(release.RUNBOOKS))
         self.assertEqual(len(release.RUNBOOKS), len(set(release.RUNBOOKS)))
         for name in release.RUNBOOKS:
             self.assertEqual(Path(name).name, name)

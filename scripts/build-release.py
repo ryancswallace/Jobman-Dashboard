@@ -26,17 +26,62 @@ FIRST_PARTY = ("github.com/ryancswallace/jobman", "github.com/ryancswallace/jobm
 STABLE_VERSION = re.compile(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\Z")
 MODULE = "github.com/ryancswallace/jobman-dashboard/internal/buildinfo"
 RUNBOOKS = (
-    "AUTHENTICATION.md", "PROCESS_MODES.md", "PURPOSE_KEYS.md", "OPERATOR_STATUS.md", "PROCESS_OBSERVABILITY.md",
-    "LINUX_INSTALLATION.md", "OPERATIONS.md", "LOG_BROKER.md", "DIAGNOSIS_STORAGE.md",
-    "APNS_PROVIDER.md", "DEVICE_REVOCATION.md", "EVENT_INGESTION.md",
-    "EVENT_RECOVERY.md", "NOTIFICATION_RETENTION.md", "IMPLEMENTATION_STATUS.md",
-    "REQUIREMENTS.md", "DESIGN.md", "IMPLEMENTATION_PROMPT.md",
-    "LAB_EXECUTION.md", "LAB_SPLIT.md", "LAB_NOTIFICATIONS.md", "LAB_SCALE.md",
-    "LAB_RESTORE.md", "LAB_MIXED_LOAD.md",
-    "ARTIFACT_METADATA.md", "TARGETS.md", "EVENT_SOURCE.md", "INBOX.md",
-    "NOTIFICATION_PIPELINE.md", "NOTIFICATION_RULES.md", "ACCESSIBILITY.md",
-    "RUN_SELECTION.md", "RELEASE_GAP_AUDIT.md", "FINAL_CANDIDATE.md",
-    "RELEASE_HANDOFF.md", "LAB_RUN_CATALOG.md", "GRAPH_CLIENT_ACCEPTANCE.md",
+    "ACCESSIBILITY.md",
+    "API.md",
+    "APNS_PROVIDER.md",
+    "ARCHITECTURE.md",
+    "ARTIFACT_METADATA.md",
+    "AUTHENTICATION.md",
+    "COMPATIBILITY.md",
+    "CONFIGURATION.md",
+    "CONTAINERS.md",
+    "DEPENDENCY_FAILURE_ACCEPTANCE.md",
+    "DESIGN.md",
+    "DEVELOPMENT.md",
+    "DEVICE_REVOCATION.md",
+    "DIAGNOSIS_STORAGE.md",
+    "EVENT_INGESTION.md",
+    "EVENT_RECOVERY.md",
+    "EVENT_SOURCE.md",
+    "FINAL_CANDIDATE.md",
+    "GRAPH_CLIENT_ACCEPTANCE.md",
+    "IMPLEMENTATION_PROMPT.md",
+    "IMPLEMENTATION_STATUS.md",
+    "INBOX.md",
+    "INSTALLATION.md",
+    "LAB_AUTH_ROTATION.md",
+    "LAB_EXECUTION.md",
+    "LAB_MIXED_LOAD.md",
+    "LAB_MULTISOURCE_NOTIFICATIONS.md",
+    "LAB_NOTIFICATIONS.md",
+    "LAB_REPORT_REFRESH.md",
+    "LAB_RESTORE.md",
+    "LAB_RUN_CATALOG.md",
+    "LAB_SCALE.md",
+    "LAB_SPLIT.md",
+    "LAB_WEB_SESSION.md",
+    "LINUX_INSTALLATION.md",
+    "LOG_BROKER.md",
+    "NOTIFICATION_PIPELINE.md",
+    "NOTIFICATION_RETENTION.md",
+    "NOTIFICATION_RULES.md",
+    "OPERATIONS.md",
+    "OPERATOR_STATUS.md",
+    "PROCESS_MODES.md",
+    "PROCESS_OBSERVABILITY.md",
+    "PURPOSE_KEYS.md",
+    "README.md",
+    "RELEASE_GAP_AUDIT.md",
+    "RELEASE_HANDOFF.md",
+    "REPOSITORY_SCAFFOLDING.md",
+    "REQUIREMENTS.md",
+    "RUN_SELECTION.md",
+    "SECURITY_MODEL.md",
+    "TARGETS.md",
+    "TESTING.md",
+    "TROUBLESHOOTING.md",
+    "UPGRADING.md",
+    "WATCHDOG_DENIAL_CONTRACT.md",
 )
 
 
@@ -237,7 +282,8 @@ def build(version, architectures, output):
             (bundle / "docs").mkdir()
             for name in RUNBOOKS:
                 shutil.copyfile(source / "docs" / name, bundle / "docs" / name)
-            shutil.copyfile(source / "README.md", bundle / "README.md")
+            for name in ("README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "RELEASE.md", "SECURITY.md", "SUPPORT.md", "CHANGELOG.md", "CITATION.cff", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md"):
+                shutil.copyfile(source / name, bundle / name)
             metadata = {"formatVersion": 1, "releaseState": "candidate", "version": version, "revision": revision, "sourceDateEpoch": epoch, "os": "linux", "architecture": architecture, "isa": "v1" if architecture == "amd64" else "v8.0", "toolchains": versions, "goModules": dependencies, "upstreamReleasePins": upstream_release_pins(dependencies), "webLockSHA256": digest(source / "web/package-lock.json")}
             (bundle / "build.json").write_text(json.dumps(metadata, sort_keys=True, indent=2) + "\n")
             write_checksums(bundle)
