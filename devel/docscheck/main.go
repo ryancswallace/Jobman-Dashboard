@@ -135,6 +135,11 @@ func checkContent(root, sourceDirectory, relative string, content []byte) ([]str
 			if !local {
 				continue
 			}
+			targetRelative, relErr := filepath.Rel(root, resolved)
+			if relErr != nil || targetRelative == ".." || strings.HasPrefix(targetRelative, ".."+string(filepath.Separator)) {
+				problems = append(problems, fmt.Sprintf("%s:%d: relative link %q leaves the repository; use a published URL", relative, lineNumber, destination))
+				continue
+			}
 			if _, statErr := os.Stat(resolved); statErr != nil {
 				if errors.Is(statErr, os.ErrNotExist) {
 					problems = append(problems, fmt.Sprintf(

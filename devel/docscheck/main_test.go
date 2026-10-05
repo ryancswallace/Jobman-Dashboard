@@ -57,3 +57,17 @@ func mustWrite(t *testing.T, name, content string) {
 		t.Fatalf("write: %v", err)
 	}
 }
+
+// A sibling checkout on one developer's machine must not make a broken
+// fresh-clone link pass locally.
+func TestRejectAdjacentCheckoutLinks(t *testing.T) {
+	t.Parallel()
+	parent := t.TempDir()
+	root := filepath.Join(parent, "dashboard")
+	mustWrite(t, filepath.Join(parent, "control", "README.md"), "upstream")
+	mustWrite(t, filepath.Join(root, "README.md"), "[upstream](../control/README.md)\n")
+	problems, err := check(root)
+	if err != nil || len(problems) != 1 || !strings.Contains(problems[0], "leaves the repository") {
+		t.Fatalf("check(adjacent checkout) = %v, %v", problems, err)
+	}
+}
