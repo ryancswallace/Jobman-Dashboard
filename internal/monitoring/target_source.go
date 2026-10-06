@@ -21,6 +21,9 @@ type TargetSourcePage struct {
 	Total      string
 	NextCursor string
 	AsOf       time.Time
+	// CreatedBefore is the effective source watermark. Zero means the source
+	// used the requested cutoff (the original internal source contract).
+	CreatedBefore time.Time
 }
 type TargetPartitionQuery struct {
 	Scope        api.Scope `json:"scope"`

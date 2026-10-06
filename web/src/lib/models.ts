@@ -78,8 +78,13 @@ export interface Job extends JobRef {
   startedAt?: string;
   completedAt?: string;
   confidenceUpdatedAt?: string;
+  partition?: string;
+  workloadDigest?: string;
+  execution?: import("../../../contracts/typescript/dashboard.generated").JobExecution;
+  executionUnavailableReason?: string;
   owner?: { id?: string; displayName?: string; verified?: boolean };
   target?: {
+    id?: string;
     name: string;
     generation?: string;
     generationId?: string;

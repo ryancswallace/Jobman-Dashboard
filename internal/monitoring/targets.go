@@ -88,6 +88,14 @@ func (e *Engine) readTargets(ctx context.Context, a Actor, b *targetBuffer, limi
 	if err != nil {
 		return p, err
 	}
+	if p.CreatedBefore.IsZero() {
+		p.CreatedBefore = b.Cutoff
+	}
+	// The initial probe may narrow the creation window. Once its total has
+	// been recorded, even another first-page fetch must keep that same window.
+	if p.CreatedBefore.IsZero() || p.CreatedBefore.After(b.Cutoff) || b.Total != "" && !p.CreatedBefore.Equal(b.Cutoff) {
+		return TargetSourcePage{}, ErrSource
+	}
 	if p.Items == nil || len(p.Items) > limit || p.AsOf.IsZero() || !validDecimal(p.Total) || len(p.NextCursor) > 1024 || p.NextCursor != "" && (p.NextCursor == b.Cursor || len(p.Items) == 0) {
 		return TargetSourcePage{}, ErrSource
 	}
@@ -98,7 +106,7 @@ func (e *Engine) readTargets(ctx context.Context, a Actor, b *targetBuffer, limi
 	lastID, lastCreated := b.LastID, b.LastCreated
 	size := 0
 	for _, t := range p.Items {
-		if t.Scope != b.Scope || t.TargetID == "" || t.CreatedAt.IsZero() || t.CreatedAt.After(b.Cutoff) || t.AsOf.IsZero() || t.Generation.ID == "" || lastID != "" && (t.CreatedAt.After(lastCreated) || t.CreatedAt.Equal(lastCreated) && t.TargetID >= lastID) {
+		if t.Scope != b.Scope || t.TargetID == "" || t.CreatedAt.IsZero() || t.CreatedAt.After(p.CreatedBefore) || t.AsOf.IsZero() || t.Generation.ID == "" || lastID != "" && (t.CreatedAt.After(lastCreated) || t.CreatedAt.Equal(lastCreated) && t.TargetID >= lastID) {
 			return TargetSourcePage{}, ErrSource
 		}
 		raw, _ := json.Marshal(t)
@@ -187,6 +195,7 @@ func (e *Engine) Targets(ctx context.Context, a Actor, q TargetQuery, cursor str
 					excludeTarget(b, e.Now(), err)
 					return
 				}
+				b.Cutoff = p.CreatedBefore
 				b.Total = p.Total
 				b.Done = p.Total == "0"
 				b.Status = api.SourceStatus{Scope: b.Scope, Status: "available", AsOf: &p.AsOf, FetchedAt: e.Now()}

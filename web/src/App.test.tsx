@@ -186,9 +186,9 @@ describe("web monitoring workflows", () => {
     expect(
       screen.getByText("Start provenance").nextElementSibling,
     ).toHaveTextContent("Agent event");
-    expect(screen.getByText("Run").nextElementSibling).toHaveTextContent(
-      "9007199254740993",
-    );
+    expect(
+      screen.getByText("Current run").nextElementSibling,
+    ).toHaveTextContent("9007199254740993");
     expect(
       screen.getByText("Execution ID").nextElementSibling,
     ).toHaveTextContent("execution-id");

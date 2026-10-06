@@ -23,6 +23,8 @@ import {
 } from "../components/States";
 import { LogViewer } from "../components/LogViewer";
 import { Reports } from "../components/Reports";
+import { JobExecution } from "../components/JobExecution";
+import { SelectedRunFacts } from "../components/SelectedRunFacts";
 export function JobDetailPage() {
   const { deploymentId = "", namespaceId = "", jobId = "" } = useParams(),
     { bootstrap, identity } = useSession(),
@@ -189,9 +191,16 @@ export function JobDetailPage() {
             </nav>
             {tab === "details" && (
               <div className="detail-grid">
+                <JobExecution key={`${identity}:${path}`} job={job} />
+                {selectedRun && (
+                  <SelectedRunFacts
+                    run={selectedRun}
+                    timezone={bootstrap.preferences.timezone}
+                  />
+                )}
                 <section className="panel">
                   <div className="panel-heading">
-                    <h2>Job facts</h2>
+                    <h2>Current job facts</h2>
                   </div>
                   <dl className="facts">
                     <div>
@@ -205,6 +214,20 @@ export function JobDetailPage() {
                     <div>
                       <dt>Target</dt>
                       <dd>{job.target?.name ?? "Unavailable"}</dd>
+                    </div>
+                    <div>
+                      <dt>Target ID</dt>
+                      <dd>{job.target?.id ?? "Unavailable"}</dd>
+                    </div>
+                    <div>
+                      <dt>Partition</dt>
+                      <dd>{job.partition ?? "Unavailable"}</dd>
+                    </div>
+                    <div>
+                      <dt>Workload digest</dt>
+                      <dd className="mono">
+                        {job.workloadDigest ?? "Unavailable"}
+                      </dd>
                     </div>
                     <div>
                       <dt>Target generation</dt>
@@ -227,7 +250,7 @@ export function JobDetailPage() {
                       <dd>{job.revision}</dd>
                     </div>
                     <div>
-                      <dt>Run</dt>
+                      <dt>Current run</dt>
                       <dd>
                         {job.currentRun?.id ?? "Unavailable"}
                         {job.currentRun && ` (run ${job.currentRun.number})`}
@@ -283,7 +306,7 @@ export function JobDetailPage() {
                 </section>
                 <section className="panel">
                   <div className="panel-heading">
-                    <h2>Reported timeline</h2>
+                    <h2>Current job reported timeline</h2>
                   </div>
                   <dl className="facts">
                     {[
@@ -323,12 +346,13 @@ export function JobDetailPage() {
                 </section>
                 <section className="panel wide">
                   <div className="panel-heading">
-                    <h2>Scheduler observations</h2>
+                    <h2>Current job scheduler observations</h2>
                   </div>
                   {job.scheduler ? (
                     <dl className="facts compact">
                       {[
                         ["Native job ID", job.scheduler.nativeId],
+                        ["Backend", job.scheduler.backend],
                         ["State", job.scheduler.state],
                         ["Reason", job.scheduler.reason],
                         ["Cluster", job.scheduler.cluster],

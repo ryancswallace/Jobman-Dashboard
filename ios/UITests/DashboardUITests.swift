@@ -5,6 +5,52 @@ final class DashboardUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
 
+    func testSubmittedCommandPreservesLiteralArgumentsAndMetadata() {
+        let app = fixtureApp(extra: ["--dashboard-inspection-fixtures", "--dashboard-manual-refresh-fixtures"])
+        app.tabBars.buttons["Jobs"].tap()
+        let job = app.staticTexts["Synthetic alignment run"]; reveal(job, app: app); job.tap()
+        let target = app.staticTexts["Target name, Synthetic named cluster"]; reveal(target, app: app)
+        XCTAssertTrue(app.staticTexts["Partition, batch-fixture"].exists)
+        XCTAssertTrue(app.staticTexts["sha256:inspection-fixture"].exists)
+        capture("Current job inspection metadata", app: app)
+        let command = app.buttons["viewSubmittedCommand"]; reveal(command, app: app); command.tap()
+        XCTAssertTrue(app.navigationBars["Submitted command"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["/bin/sh"].exists)
+        XCTAssertTrue(app.staticTexts["workspace:/synthetic working directory"].exists)
+        app.buttons["copyArgumentVector"].tap()
+        XCTAssertTrue(app.staticTexts["argumentCopyStatus"].waitForExistence(timeout: 5))
+        capture("Submitted executable and explicit copy", app: app)
+        let script = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "COMMAND-END-MARKER")).firstMatch
+        reveal(script, app: app)
+        XCTAssertTrue(script.label.contains("literal shell-wrapper script"))
+        XCTAssertTrue(script.label.contains("synthetic line 12"))
+        let empty = app.staticTexts["Empty argument (0 bytes)"]; reveal(empty, app: app)
+        XCTAssertTrue(app.staticTexts["two words"].exists)
+        let controls = app.staticTexts["\\u{1B}[31m\\u{202E}control-text"]; reveal(controls, app: app)
+        XCTAssertTrue(controls.exists)
+        capture("Full script tail and separate empty literal arguments", app: app)
+    }
+
+    func testSelectedRunFactsAndUnavailableSubmittedSpecification() {
+        let app = fixtureApp(extra: ["--dashboard-inspection-fixtures", "--dashboard-manual-refresh-fixtures"])
+        app.tabBars.buttons["Jobs"].tap()
+        let job = app.staticTexts["Synthetic alignment run"]; reveal(job, app: app); job.tap()
+        let choose = app.buttons["Choose a recorded run"]; reveal(choose, app: app); choose.tap()
+        let next = app.buttons["Next run page"]; reveal(next, app: app); next.tap()
+        XCTAssertTrue(app.buttons["selectRun-1"].waitForExistence(timeout: 10)); app.buttons["selectRun-1"].tap()
+        let selected = app.staticTexts["Selected run number, 1"]; reveal(selected, app: app)
+        XCTAssertTrue(app.staticTexts["93000000-0000-4000-8000-000000000001"].exists)
+        XCTAssertTrue(app.staticTexts["Run phase, terminal"].exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Current job facts above remain separate")).firstMatch.exists)
+        capture("Selected historical run facts remain separate", app: app)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let other = app.staticTexts["Synthetic index build"]; reveal(other, app: app); other.tap()
+        let unavailable = app.staticTexts["executionUnavailableReason"]; reveal(unavailable, app: app)
+        XCTAssertEqual(unavailable.label, "unsupported_contract")
+        XCTAssertFalse(app.buttons["viewSubmittedCommand"].exists)
+        capture("Unavailable submitted specification disclosed", app: app)
+    }
+
     func testCurrentPageRefreshIncludesAdditionsAndRemovesMissingRows() {
         let app = fixtureApp(extra: ["--dashboard-refresh-fixtures", "--dashboard-manual-refresh-fixtures"])
         app.tabBars.buttons["Workloads"].tap()

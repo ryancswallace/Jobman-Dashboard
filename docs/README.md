@@ -38,6 +38,7 @@ old destructive scenarios. Use the [Lab catalog](LAB_RUN_CATALOG.md).
 - [Initial release implementation status](IMPLEMENTATION_STATUS.md)
 - [Authorized notification history](INBOX.md)
 - [Installation](INSTALLATION.md)
+- [Job details and submitted commands](JOB_DETAILS.md)
 - [API authentication-master rotation acceptance](LAB_AUTH_ROTATION.md)
 - [Actual subprocess acceptance](LAB_EXECUTION.md)
 - [Deployed mixed monitoring load](LAB_MIXED_LOAD.md)

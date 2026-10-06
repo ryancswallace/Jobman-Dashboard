@@ -2,9 +2,13 @@ package control
 
 import (
 	"context"
+	"encoding/json"
 	"net/url"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/ryancswallace/jobman-dashboard/internal/api"
 	"github.com/ryancswallace/jobman-dashboard/internal/monitoring"
@@ -28,7 +32,12 @@ type jobResponse struct {
 		UpdatedAt time.Time         `json:"updatedAt"`
 	} `json:"metadata"`
 	Spec struct {
-		Placement struct {
+		WorkloadDigest             string          `json:"workloadDigest"`
+		Execution                  json.RawMessage `json:"execution"`
+		ExecutionUnavailableReason string          `json:"executionUnavailableReason"`
+		Placement                  struct {
+			Target             string `json:"target"`
+			Partition          string `json:"partition"`
 			TargetID           string `json:"targetId"`
 			TargetGenerationID string `json:"targetGenerationId"`
 			ExecutionBackend   string `json:"executionBackend"`
@@ -46,12 +55,14 @@ type jobResponse struct {
 			api.GroupReference
 			GraphDisposition string `json:"graphDisposition"`
 		} `json:"group"`
-		Phase                 string `json:"phase"`
-		DesiredState          string `json:"desiredState"`
-		Outcome               string `json:"outcome"`
-		ObservationConfidence string `json:"observationConfidence"`
-		NativeID              string `json:"nativeId"`
+		Phase                 string     `json:"phase"`
+		DesiredState          string     `json:"desiredState"`
+		Outcome               string     `json:"outcome"`
+		ObservationConfidence string     `json:"observationConfidence"`
+		ConfidenceUpdatedAt   *time.Time `json:"confidenceUpdatedAt"`
+		NativeID              string     `json:"nativeId"`
 		Scheduler             *struct {
+			Backend    string     `json:"backend"`
 			State      string     `json:"state"`
 			Reason     string     `json:"reason"`
 			Cluster    string     `json:"cluster"`
@@ -72,6 +83,8 @@ func (j jobResponse) normalize(deployment string, ns api.Namespace, principalID 
 		return api.Job{}, monitoring.ErrSource
 	}
 	result := api.Job{Scope: api.Scope{DeploymentID: deployment, NamespaceID: ns.ID}, ID: m.ID, Name: m.Name, TargetID: p.TargetID, TargetGenerationID: p.TargetGenerationID, Backend: p.ExecutionBackend, Revision: strconv.FormatInt(m.Revision, 10), CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt, StartedAt: s.Lifecycle.StartedAt, CompletedAt: s.Lifecycle.CompletedAt, DesiredState: s.DesiredState, Phase: s.Phase, Outcome: s.Outcome, Confidence: s.ObservationConfidence, Labels: m.Labels, Disposition: s.Group.GraphDisposition, Imported: s.Imported, Lifecycle: &s.Lifecycle.Lifecycle, CurrentRun: s.CurrentRun, Group: &s.Group.GroupReference}
+	result.TargetName, result.Partition = p.Target, p.Partition
+	result.WorkloadDigest, result.ConfidenceUpdatedAt = j.Spec.WorkloadDigest, s.ConfidenceUpdatedAt
 	if result.Labels == nil {
 		result.Labels = map[string]string{}
 	}
@@ -82,7 +95,7 @@ func (j jobResponse) normalize(deployment string, ns api.Namespace, principalID 
 		result.Owner = &api.Owner{ID: m.Owner.ID, DisplayName: m.Owner.DisplayName, IsCurrentUser: principalID != "" && m.Owner.ID == principalID}
 	}
 	if s.Scheduler != nil {
-		result.Scheduler = &api.Scheduler{State: s.Scheduler.State, Reason: s.Scheduler.Reason, Cluster: s.Scheduler.Cluster, ObservedAt: s.Scheduler.ObservedAt, JobID: s.NativeID}
+		result.Scheduler = &api.Scheduler{Backend: s.Scheduler.Backend, State: s.Scheduler.State, Reason: s.Scheduler.Reason, Cluster: s.Scheduler.Cluster, ObservedAt: s.Scheduler.ObservedAt, JobID: s.NativeID}
 	} else if s.NativeID != "" {
 		result.Scheduler = &api.Scheduler{JobID: s.NativeID}
 	}
@@ -151,28 +164,103 @@ func (c *Client) Jobs(ctx context.Context, actor monitoring.Actor, query monitor
 }
 
 func (c *Client) Job(ctx context.Context, actor monitoring.Actor, scope api.Scope, id string) (api.Job, error) {
+	detail, err := c.readJob(ctx, actor, scope, id, false)
+	return detail.Job, err
+}
+
+func (c *Client) JobDetail(ctx context.Context, actor monitoring.Actor, scope api.Scope, id string) (api.JobDetail, error) {
+	return c.readJob(ctx, actor, scope, id, true)
+}
+
+func (c *Client) readJob(ctx context.Context, actor monitoring.Actor, scope api.Scope, id string, includeExecution bool) (api.JobDetail, error) {
 	if !uuid(id) {
-		return api.Job{}, monitoring.ErrNotFound
+		return api.JobDetail{}, monitoring.ErrNotFound
 	}
 	d, ns, err := c.authorize(ctx, actor, scope, "jobs.read")
 	if err != nil {
-		return api.Job{}, err
+		return api.JobDetail{}, err
 	}
 	var response jobResponse
 	if err := c.get(ctx, actor, "jobs.read", ns.ID, "/v1/namespaces/"+ns.Name+"/jobs/"+id, nil, &response); err != nil {
-		return api.Job{}, err
+		return api.JobDetail{}, err
 	}
 	job, err := response.normalize(c.ID(), ns, d.principalID)
 	if err != nil {
-		return api.Job{}, err
+		return api.JobDetail{}, err
 	}
 	if job.ID != id {
-		return api.Job{}, monitoring.ErrSource
+		return api.JobDetail{}, monitoring.ErrSource
+	}
+	result := api.JobDetail{Job: job}
+	if includeExecution {
+		if slices.Contains(d.features, "job-execution-detail") {
+			result.Execution, result.ExecutionUnavailableReason, err = normalizeExecution(response.Spec.Execution, response.Spec.ExecutionUnavailableReason)
+			if err != nil {
+				return api.JobDetail{}, err
+			}
+		} else {
+			result.ExecutionUnavailableReason = "unsupported"
+		}
 	}
 	if err := c.recheck(ctx, actor, d, ns, "jobs.read"); err != nil {
-		return api.Job{}, err
+		return api.JobDetail{}, err
 	}
-	return job, nil
+	return result, nil
+}
+
+func normalizeExecution(raw json.RawMessage, reason string) (*api.JobExecution, string, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		if reason == "" {
+			reason = "missing"
+		}
+		if len(reason) > 128 {
+			return nil, "", monitoring.ErrSource
+		}
+		return nil, reason, nil
+	}
+	if reason != "" {
+		return nil, "", monitoring.ErrSource
+	}
+	if len(raw) > 2<<20 {
+		return nil, "too_large", nil
+	}
+	var value struct {
+		Command *struct {
+			Executable string    `json:"executable"`
+			Args       []*string `json:"args"`
+		} `json:"command"`
+		WorkingDirectory *string `json:"workingDirectory"`
+	}
+	if !utf8.Valid(raw) || json.Unmarshal(raw, &value) != nil || value.Command == nil || value.WorkingDirectory == nil || value.Command.Executable == "" || value.Command.Args == nil {
+		return nil, "", monitoring.ErrSource
+	}
+	if len(value.Command.Executable) > 65536 || len(*value.WorkingDirectory) > 65536 || len(value.Command.Args) > 4096 {
+		return nil, "too_large", nil
+	}
+	args := make([]string, len(value.Command.Args))
+	for i, arg := range value.Command.Args {
+		if arg == nil {
+			return nil, "", monitoring.ErrSource
+		}
+		args[i] = *arg
+	}
+	for _, arg := range append([]string{value.Command.Executable, *value.WorkingDirectory}, args...) {
+		if len(arg) > 65536 {
+			return nil, "too_large", nil
+		}
+		if strings.ContainsRune(arg, 0) {
+			return nil, "", monitoring.ErrSource
+		}
+	}
+	result := &api.JobExecution{Command: api.JobCommand{Executable: value.Command.Executable, Args: args}, WorkingDirectory: *value.WorkingDirectory}
+	encoded, err := json.Marshal(result)
+	if err != nil {
+		return nil, "", monitoring.ErrSource
+	}
+	if len(encoded) > 2<<20 {
+		return nil, "too_large", nil
+	}
+	return result, "", nil
 }
 
 func (c *Client) Summary(ctx context.Context, actor monitoring.Actor, scope api.Scope, window api.Window) (monitoring.Counts, error) {

@@ -73,6 +73,12 @@ type Source interface {
 	Summary(context.Context, Actor, api.Scope, api.Window) (Counts, error)
 }
 
+// JobDetailSource adds detail-only sensitive execution metadata without putting
+// command contents in the ordinary Job model or paginated cursor snapshots.
+type JobDetailSource interface {
+	JobDetail(context.Context, Actor, api.Scope, string) (api.JobDetail, error)
+}
+
 func failure(code, message string) error { return &api.Error{Code: code, Message: message} }
 
 var (

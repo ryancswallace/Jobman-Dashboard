@@ -80,7 +80,7 @@ public struct Overview: Decodable, Sendable {
 public struct Job: Codable, Sendable, Identifiable {
     public struct Owner: Codable, Sendable { public let id: String; public let displayName: String?; public let isCurrentUser: Bool }
     public struct Scheduler: Codable, Sendable {
-        public let state: String?; public let jobId: String?; public let reason: String?; public let cluster: String?; public let observedAt: String?
+        public let state: String?; public let jobId: String?; public let reason: String?; public let cluster: String?; public let observedAt: String?; public let backend: String?
     }
     public struct Lifecycle: Codable, Sendable {
         public let startedRecordedAt: String?; public let startedProvenance: String?
@@ -96,6 +96,9 @@ public struct Job: Codable, Sendable, Identifiable {
     public let id: String
     public let name: String?
     public let targetId: String
+    public let targetName: String?
+    public let partition: String?
+    public let workloadDigest: String?
     public let targetGenerationId: String?
     public let backend: String?
     public let revision: String
@@ -108,6 +111,7 @@ public struct Job: Codable, Sendable, Identifiable {
     public let phase: String
     public let outcome: String?
     public let confidence: String?
+    public let confidenceUpdatedAt: String?
     public let labels: [String: String]
     public let scheduler: Scheduler?
     public let disposition: String?
@@ -118,7 +122,12 @@ public struct Job: Codable, Sendable, Identifiable {
     public var ref: JobRef { .init(deploymentId: deploymentId, namespaceId: namespaceId, jobId: id) }
     public var title: String { name ?? id }
 }
-public struct JobDetail: Decodable, Sendable { public let job: Job; public let fetchedAt: String }
+public struct JobDetail: Decodable, Sendable {
+    public let job: Job
+    public let fetchedAt: String
+    public let execution: DashboardAPI.JobExecution?
+    public let executionUnavailableReason: String?
+}
 
 public extension DashboardScope {
     func queryItems(authorized: [NamespaceRef]) throws -> [URLQueryItem] {
