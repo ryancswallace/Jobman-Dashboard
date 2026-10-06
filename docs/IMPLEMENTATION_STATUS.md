@@ -50,7 +50,10 @@ Later checkpoints supersede earlier merge, version and connectivity statements.
   Authentication passed in run `37522208724`; its package listing failed because
   the original `jobman/dashboard` destination was unavailable. The operator has
   selected the existing shared `jobman/stable` repository, matching sibling
-  publishers. RC upload and verification are pending; no upload is claimed yet.
+  publishers. Run `37532251312` uploaded and synchronized the amd64 DEB, but
+  post-upload lookup failed because the query used Python regex escapes. The
+  publisher now uses the sibling query syntax with exact filename comparison;
+  verification of all six packages remains pending.
   Remaining Dashboard inputs are actual corporate
   identity, APNs and managed-device access, manual accessibility and pilot/
   operations acceptance. Production and company-device distribution approvals

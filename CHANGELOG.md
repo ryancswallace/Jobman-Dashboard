@@ -6,6 +6,9 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
+- Use Cloudsmith filename search syntax matching sibling publishers so uploaded
+  Dashboard packages are found during verification and safe reruns.
+
 - Publish Dashboard RC Linux packages to the shared `jobman/stable` Cloudsmith
   repository, retaining RC package names, versions, tags and GitHub prerelease status.
 

@@ -181,7 +181,10 @@ class PublicationTests(unittest.TestCase):
 
         def capture(args):
             self.assertEqual(args[:4], ['cloudsmith', 'list', 'packages', 'jobman/stable'])
-            return json.dumps({'data': list(stored.values())})
+            query = args[args.index('--query') + 1]
+            names = [name for name in packages if query == 'filename:^' + name + '$']
+            self.assertEqual(len(names), 1, 'Cloudsmith requires its native filename query without Python regex escapes')
+            return json.dumps({'data': [stored[name] for name in names if name in stored]})
 
         def api(path):
             if '/releases/tags/' in path:

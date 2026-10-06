@@ -74,8 +74,10 @@ and old PR-approval backlog are resolved; their RC7 statements below are histori
 The Dashboard `main` environment now has its personal Cloudsmith API key.
 Authentication passed in run `37522208724`, but the original `jobman/dashboard`
 destination was unavailable. The operator selected the existing `jobman/stable`
-repository used by sibling publishers. RC package upload and verification remain
-pending. This destination does not change Dashboard prerelease status or imply
+repository used by sibling publishers. Run `37532251312` uploaded the amd64 DEB;
+its verification lookup exposed incompatible filename escaping. The query is
+corrected to match the sibling publishers. Verification of all six packages
+remains pending. This destination does not change Dashboard prerelease status or imply
 production or company-device distribution approval.
 
 ## Historical RC7 handoff — retained unchanged
