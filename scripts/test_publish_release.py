@@ -162,6 +162,93 @@ class PublicationTests(unittest.TestCase):
                         with self.assertRaisesRegex(ValueError, 'outside its signature'):
                             cloudsmith.verify_stored_package(record, source, 'jobman/dashboard', VERSION)
 
+    def image_index(self):
+        return {'manifests': [
+            {'platform': {'os': 'linux', 'architecture': arch},
+             'digest': 'sha256:' + digit * 64,
+             'mediaType': 'application/vnd.oci.image.manifest.v1+json'}
+            for arch, digit in (('amd64', '1'), ('arm64', '2'))
+        ] + [{'platform': {'os': 'unknown', 'architecture': 'unknown'},
+              'digest': 'sha256:' + '3' * 64,
+              'mediaType': 'application/vnd.oci.image.manifest.v1+json'}]}
+
+    def test_platform_manifest_selection_rejects_ambiguous_or_invalid_children(self):
+        index = self.image_index()
+        self.assertEqual(release.platform_manifests(index), {'amd64': 'sha256:' + '1' * 64, 'arm64': 'sha256:' + '2' * 64})
+        invalid = [
+            {}, {'manifests': []},
+            {'manifests': index['manifests'] + [index['manifests'][0]]},
+            {'manifests': index['manifests'][1:]},
+        ]
+        for change in ({'digest': 'sha256:bad'}, {'digest': None},
+                       {'digest': 'sha256:' + '2' * 64},
+                       {'platform': {'os': 'linux', 'architecture': '386'}},
+                       {'platform': {'os': 'unknown', 'architecture': 'amd64'}},
+                       {'mediaType': 'application/vnd.oci.image.index.v1+json'}):
+            invalid.append({'manifests': [index['manifests'][0] | change, *index['manifests'][1:]]})
+        for candidate in invalid:
+            with self.subTest(index=candidate), self.assertRaises(ValueError):
+                release.platform_manifests(candidate)
+
+    def test_container_verification_uses_child_digests_with_classic_store(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            context, output = root / 'context', root / 'output'
+            output.mkdir()
+            for arch in release.ARCHES:
+                for folder in ('bin', 'web'):
+                    directory = context / arch / folder
+                    directory.mkdir(parents=True)
+                    (directory / 'payload').write_bytes((arch + '/' + folder).encode())
+            image, index_digest = 'ghcr.io/owner/dashboard', 'sha256:' + 'f' * 64
+            children = {arch: image + '@' + digest for arch, digest in release.platform_manifests(self.image_index()).items()}
+            commands, pulled = [], {}
+            def inspect(args):
+                commands.append(args)
+                if args[:4] == ['docker', 'buildx', 'imagetools', 'inspect']:
+                    self.assertEqual(args[4], image + '@' + index_digest)
+                    return json.dumps(self.image_index())
+                if args[:2] == ['docker', 'create']:
+                    arch = args[args.index('--platform') + 1].split('/')[1]
+                    self.assertEqual(args[-1], children[arch])
+                    return arch + '-container'
+                if args[:2] == ['docker', 'inspect']:
+                    return json.dumps([{'Config': {'User': '10001:10001', 'Labels': {'org.opencontainers.image.revision': REVISION, 'org.opencontainers.image.version': VERSION}}}])
+                if args[:2] == ['docker', 'run']:
+                    arch = args[args.index('--platform') + 1].split('/')[1]
+                    self.assertEqual(args[-2], children[arch])
+                    return json.dumps({'version': VERSION, 'revision': REVISION, 'architecture': arch, 'os': 'linux'})
+                self.fail('Unexpected capture command: ' + repr(args))
+            def execute(args, **kwargs):
+                commands.append(args)
+                if args[:2] == ['docker', 'pull']:
+                    arch = args[args.index('--platform') + 1].split('/')[1]
+                    # Model the classic store's refusal to overwrite a digest
+                    # already materialized for another architecture.
+                    if args[-1] in pulled and pulled[args[-1]] != arch:
+                        raise RuntimeError('cannot overwrite digest')
+                    pulled[args[-1]] = arch
+                    self.assertEqual(args[-1], children[arch])
+                elif args[:2] == ['docker', 'cp']:
+                    arch = args[2].split('-container:')[0]
+                    folder = 'web' if args[2].endswith('/web') else 'bin'
+                    shutil.copytree(context / arch / folder, args[3])
+                elif args[:2] != ['docker', 'rm']:
+                    self.fail('Unexpected run command: ' + repr(args))
+            def unconfigured(args, **kwargs):
+                commands.append(args)
+                arch = args[args.index('--platform') + 1].split('/')[1]
+                self.assertEqual(args[-1], children[arch])
+                return subprocess.CompletedProcess(args, 1, '', 'configuration required')
+            with patch.object(release, 'capture', side_effect=inspect), patch.object(release, 'run', side_effect=execute), patch.object(release.subprocess, 'run', side_effect=unconfigured):
+                release.verify_container(self.args(input=context, output=output, image=image, image_digest=index_digest, runtime_architecture='all'))
+            self.assertEqual(len(pulled), 2)
+            self.assertEqual(len([args for args in commands if args[:2] == ['docker', 'run']]), 6)
+            receipt = json.loads((output / 'container.json').read_text())
+            self.assertEqual(receipt['digest'], index_digest)
+            self.assertEqual(receipt['platforms'], ['linux/amd64', 'linux/arm64'])
+            self.assertTrue(receipt['canonicalPayloadVerified'])
+
     def test_container_payload_comparison_rejects_changed_extra_or_linked_bytes(self):
         with tempfile.TemporaryDirectory() as temp:
             expected, actual = Path(temp) / 'expected', Path(temp) / 'actual'

@@ -112,13 +112,36 @@ def same_payload(expected, actual):
         need(digest(expected / path) == digest(actual / path) and ((expected / path).stat().st_mode & 0o777) == ((actual / path).stat().st_mode & 0o777), "Container rebuilt or changed canonical bytes/modes")
 
 
+def platform_manifests(index):
+    """Select exactly one immutable runnable child for each supported platform."""
+    need(isinstance(index, dict) and isinstance(index.get("manifests"), list), "Image must be a multi-platform manifest index")
+    result = {}
+    for manifest in index["manifests"]:
+        need(isinstance(manifest, dict) and isinstance(manifest.get("platform"), dict), "Image descriptor lacks platform metadata")
+        platform = manifest["platform"]
+        os_name, arch = platform.get("os"), platform.get("architecture")
+        # BuildKit attaches provenance as non-runnable unknown/unknown entries.
+        if (os_name, arch) == ("unknown", "unknown"):
+            continue
+        need(os_name == "linux" and arch in ARCHES and arch not in result, "Image must contain exactly one amd64 and one arm64 Linux manifest")
+        digest_value = manifest.get("digest")
+        need(isinstance(digest_value, str) and DIGEST.fullmatch(digest_value), "Platform manifest digest must be SHA-256")
+        need(manifest.get("mediaType") in ("application/vnd.oci.image.manifest.v1+json", "application/vnd.docker.distribution.manifest.v2+json"), "Platform descriptor must identify an image manifest")
+        result[arch] = digest_value
+    need(set(result) == set(ARCHES) and len(set(result.values())) == len(ARCHES), "Image must contain distinct amd64 and arm64 Linux manifests")
+    return result
+
+
 def verify_container(args):
     need(DIGEST.fullmatch(args.image_digest), "Invalid immutable image digest")
-    image = args.image + "@" + args.image_digest
-    index = json.loads(capture(["docker", "buildx", "imagetools", "inspect", image, "--raw"]))
-    platforms = {(m["platform"].get("os"), m["platform"].get("architecture")) for m in index.get("manifests", []) if m.get("platform", {}).get("os") != "unknown"}
-    need(platforms == {("linux", arch) for arch in ARCHES}, "Image must contain exactly amd64 and arm64 Linux platforms")
+    index_image = args.image + "@" + args.image_digest
+    index = json.loads(capture(["docker", "buildx", "imagetools", "inspect", index_image, "--raw"]))
+    manifests = platform_manifests(index)
     for arch in ARCHES:
+        # Docker's classic store cannot retain two platform images under one
+        # index digest. Pull and execute each immutable child independently;
+        # the release receipt and attestation still identify the whole index.
+        image = args.image + "@" + manifests[arch]
         run(["docker", "pull", "--platform", "linux/" + arch, image], timeout=600)
         container = capture(["docker", "create", "--platform", "linux/" + arch, image])
         try:

@@ -17,7 +17,7 @@ Diagnose [PR12](https://github.com/ryancswallace/Jobman-Diagnose/pull/12) aligns
 collector with that release and adds a released-version compatibility lane.
 Diagnose stable publication retains its live-provider evaluation gates; the
 reviewed dependency update is merged at `d9021503db6346d363a82d381bd400da1542f04f`
-and its `v0.7.0-rc.1` engineering candidate is being built. Both
+and its [v0.7.0-rc.1 candidate](https://github.com/ryancswallace/Jobman-Diagnose/releases/tag/v0.7.0-rc.1) is published with verified assets and provenance. Both
 isolated Dashboard Lab Control instances now run the attested v0.2.0 executable;
 46 bounded authenticated job reads and eight namespace denials passed, with no
 schema change or job creation. Final candidate deployment remains separate.
@@ -27,6 +27,22 @@ existing maintainer's approval. Cloudsmith upload requires a separately configur
 `CLOUDSMITH_API_KEY` and non-stable repository; neither is assumed present. This
 packaging work does not close corporate identity, APNs, managed-device or pilot
 acceptance gates.
+
+### First controlled publication attempt
+
+[PR19](https://github.com/ryancswallace/Jobman-Dashboard/pull/19) merged at
+`05c97b46375929984395e6ecc166345249ce5c1c`; exact main CI, repository checks,
+CodeQL, fuzz and Scorecard all passed. [RC8 publication](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37508828710)
+passed reproducible Linux archive/package builds, unsigned native build10, and
+amd64/arm64 installation, reinstallation and removal in Ubuntu, Fedora and Alpine.
+Publication stopped when the hosted Docker image store refused a second platform
+under the same manifest-list digest. No GitHub RC8 tag or release was created.
+The partially published RC8 container remains immutable at
+`sha256:c29824b09c16c30064de593f30fcd764abe0a047871cc4d0492a36e61c1ca8d5`.
+It is not an accepted candidate. The repair verifies and loads each architecture
+using its own child-manifest digest while retaining the index as release identity.
+The next selected candidate is RC9 with unsigned native build11; its publication
+and exact-byte Lab deployment remain pending.
 
 ## Current next actions
 

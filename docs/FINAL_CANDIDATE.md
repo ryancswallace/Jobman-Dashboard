@@ -1,10 +1,12 @@
 # Final candidate packaging and release gates
 
-This is an offline packaging procedure. It does not authorize a release tag,
-upload, source deployment, production installation, or Apple distribution.
-A successful candidate build proves the recorded artifacts and checks; it does
-not complete the external acceptance gates in
-[the implementation status](IMPLEMENTATION_STATUS.md).
+This procedure distinguishes local/CI validation from the controlled engineering
+RC publisher. Local builds and `ci.yml` candidate dispatches do not tag or publish.
+The main-only `release.yml` workflow publishes a reviewed RC after exact-source
+checks and protected-environment approval; see [distribution](DISTRIBUTION.md).
+Neither path authorizes production installation, source deployment or Apple
+distribution, or completes the external acceptance gates in
+[implementation status](IMPLEMENTATION_STATUS.md).
 
 The curated Linux documentation includes the
 [recorded-run contract](RUN_SELECTION.md) and
@@ -14,7 +16,11 @@ Neither document turns a pending acceptance into a passing one.
 
 ## Compatible upstream versions
 
-Candidate builds accept checksum-verified, immutable development pseudo-versions.
+Candidate builds accept checksum-verified immutable released versions, prereleases
+and development pseudo-versions. The current source pins Core `v1.9.0` and
+Diagnose `v0.7.0-rc.1`; Control `v0.2.0` is verified deployed on both Dashboard Lab
+sources. Diagnose real-provider acceptance and a compatible stable release remain
+open; see the exact tuple and pending evidence in [release handoff](RELEASE_HANDOFF.md).
 Final release requires reviewed, published compatible stable tags for Jobman Core,
 Jobman Control and Jobman Diagnose, followed by explicit dependency-pin updates
 and the required checks. Do not substitute the latest old tag merely to make a
@@ -41,33 +47,70 @@ The current builder accepts only `vX.Y.Z-rc.N`. Adding final-version publication
 support is a separate reviewed step after the release gates close; there is no
 flag that waives upstream or external acceptance.
 
-## Exact candidate procedure
+## Controlled RC publication
 
-1. Finish scoped reviews and required CI, commit the intended source, and record
-   its full Git SHA. Build from a clean checkout of that SHA; preserve unrelated
-   developer files separately instead of adding them to a release.
-2. Select the next unused candidate version and explicit native numeric marketing
-   version/build. Record their mapping to the same source SHA. Never overwrite an
-   existing artifact or infer native version numbers from a prerelease string.
-3. Dispatch the existing `ci.yml` workflow at that SHA with `candidateVersion`,
-   `nativeVersion` and `nativeBuild`. A candidate dispatch includes the unsigned
-   iPhone archive. The Linux candidate job waits for backend/web/PostgreSQL and
-   native checks, builds both Linux architectures twice, and requires matching
-   archive checksums.
-4. Retain the CI run URLs, artifact SHA-256 values, full source SHA and toolchain
-   records. Verify outer and inner Linux checksums, exact build metadata, and the
-   native tar/inventory digests against its completion receipt. Check the included
-   run-selection and release-gap documents are the committed versions.
-5. Independently review the resulting tuple and plan any separately authorized
-   acceptance against those exact bytes. Keep prior successes, failures and
-   partial receipts; a new candidate does not inherit unperformed acceptance.
+1. Merge the reviewed source and wait for the latest successful push runs of
+   Dashboard CI, repository checks, CodeQL, fuzz and Scorecard at that exact main
+   commit. Record the full Git SHA; source advancement requires a newly tested
+   selection.
+2. Choose the next unused `vX.Y.Z-rc.N` and an explicit native build greater than
+   the previous published build. RC7 used marketing version `0.1.0`, build `9`;
+   the selected RC9 mapping is marketing version `0.1.0`, build `11`. The release
+   workflow derives the three-component marketing version from the selected RC
+   and requires the operator-provided native build. Do not infer the native build
+   from the RC suffix.
+3. Dispatch the publisher from main:
+
+   ```sh
+   gh workflow run release.yml --repo ryancswallace/Jobman-Dashboard --ref main \
+     -f version=v0.1.0-rc.9 -f nativeBuild=11
+   ```
+
+4. The workflow builds canonical Linux archives and DEB/RPM/APK packages twice,
+   compares checksums, builds an unsigned native archive from the same source,
+   and exercises packages on amd64/arm64 in all three target distributions.
+   Review and approve the resulting `main` environment deployment. Publication
+   rechecks exact-source gates before proceeding.
+5. The approved job assembles versioned GHCR images from the canonical Linux
+   bytes, checks container payloads/runtime behavior, generates SPDX inventories
+   and attestations, stages a draft and verifies downloaded assets and their
+   publisher/source attestations before publishing a prerelease. It never tags
+   `latest` or promotes a stable release. Retain the run URLs, exact asset set,
+   source SHA, SHA256SUMS and immutable container digest.
+6. Record independent artifact review and separately authorized acceptance against
+   those exact bytes in [release handoff](RELEASE_HANDOFF.md). Keep prior successes,
+   failures and partial receipts. If publication partially fails, retain its
+   reserved version and evidence, repair the cause and choose a new RC; do not
+   replace published tags/assets/images. Optional Cloudsmith distribution runs
+   separately for a published candidate.
+
+## Validation-only candidates and local builds
+
+For a build without publication, dispatch `ci.yml` with `candidateVersion`,
+explicit `nativeVersion` and `nativeBuild` at the reviewed source. A candidate
+request includes the unsigned native archive and builds both Linux architectures
+twice after backend/web/PostgreSQL and native checks. This path retains CI
+artifacts; it does not create versioned native Linux packages, publish a GitHub
+release or push containers.
+
+```sh
+gh workflow run ci.yml --ref <reviewed-branch-or-commit> \
+  -f candidateVersion=v0.1.0-rc.9 -f nativeVersion=0.1.0 -f nativeBuild=11
+```
+
+Verify outer/inner Linux checksums, exact build metadata and native tar/inventory
+hashes against the completion receipt. Inspect the committed run-selection,
+release-gap and distribution guides. These checks do not transfer acceptance
+from older versions to newly built bytes.
 
 Local equivalents are `python3 scripts/build-release.py --version <new-rc>
 --output-directory <new-absolute-directory>` and, from the same clean source,
 `python3 ios/scripts/package-app.py unsigned --version <numeric-version> --build
-<numeric-build> --output <new-absolute-directory>`. See
-[Linux installation](LINUX_INSTALLATION.md) and the repository's `ios/README.md`
-for prerequisites and explicit signed-development commands.
+<numeric-build> --output <new-absolute-directory>`. To package canonical Linux
+archives locally, use `make release-packages INPUT_DIR=<candidate-directory>
+OUTPUT_DIR=<new-package-directory>`. See [Linux installation](LINUX_INSTALLATION.md)
+and the repository's `ios/README.md` for prerequisites and explicit
+signed-development commands.
 
 ## Unsigned native provenance
 
@@ -80,8 +123,10 @@ The completion receipt also binds the full archive inventory and the produced
 `JobmanDashboard-unsigned.xcarchive.tar.gz`. The inventory covers resources,
 symbols and internal aliases, with bounded entry and content sizes.
 
-The CI job uploads that exact tar, inventory, intent, receipt and build log; it
-does not create a second unrecorded tar. Native archives are not claimed to be
-byte-reproducible. An unsigned archive is not an installable IPA and proves no
+The validation-only CI job retains that exact tar, inventory, intent, receipt and
+build log; it does not create a second unrecorded tar. The release publisher
+retains the original tar and inventory with sanitized `native-provenance.json`,
+excluding raw logs, runner paths and build commands from release assets. Native
+archives are not claimed to be byte-reproducible. An unsigned archive is not an installable IPA and proves no
 signing, APNs, physical-device, company-managed-device or distribution behavior.
 Existing organization inputs and external acceptance remain required.
