@@ -1,8 +1,59 @@
 # Initial release implementation status
 
-Updated: 2026-10-06. Release state: **engineering prerelease v0.1.0-rc.7 remains the published candidate. Later source changes add expanded web/iPhone job inspection; delivery and current Lab evidence are recorded in the October 6 checkpoint below. Actual corporate identity, APNs and signed managed-device acceptance remain open.**
+Updated: 2026-10-06. **Engineering prerelease v0.1.0-rc.10 is published and its
+published binaries pass synthetic Lab activation and authenticated checks. Final
+acceptance remains open.** Corporate identity, real APNs, signed managed-device,
+manual accessibility, pilot/operations and stable Diagnose provider gates remain.
+Historical checkpoints below retain their original versions, failures and counts.
 
-The adopted [implementation prompt](IMPLEMENTATION_PROMPT.md), [requirements](REQUIREMENTS.md), and [design](DESIGN.md) govern this work. A passing local slice is not release acceptance. The tables and chronological checkpoints retain their original evidence; later dated checkpoints supersede older merge, browser-connectivity and test-count statements.
+The adopted [implementation prompt](IMPLEMENTATION_PROMPT.md),
+[requirements](REQUIREMENTS.md) and [design](DESIGN.md) govern this work.
+Later checkpoints supersede earlier merge, version and connectivity statements.
+
+## Current RC10 checkpoint
+
+- [RC10](https://github.com/ryancswallace/Jobman-Dashboard/releases/tag/v0.1.0-rc.10)
+  published through [run37515898448](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37515898448)
+  at `2026-10-06T19:08:37Z`, source `5b20dfb7a51d206aeb7132db94d961a14b6ab03e`,
+  unsigned native version `0.1.0`/build `12`. Merged PR19–PR21, independent review,
+  [main CI](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37514864598)
+  and [repository checks](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37514864586)
+  passed. All 25 assets and 26 asset/container attestations verified; all six real
+  package installations verified 88 canonical files/modes each. Both platforms
+  passed anonymous container pulls, payload and runtime checks. Exact archive
+  hashes/container digest and independent receipt SHA-256 are in
+  [release handoff](RELEASE_HANDOFF.md) and the sanitized
+  [distribution verification summary](evidence/rc10-distribution.json).
+- Exact-RC10 API/worker/broker activation passed. Only API `webRoot` changed in
+  application configuration; no migrations were run, Control process IDs were preserved,
+  and rollback material is retained privately. Authenticated Lab checks passed
+  46 GETs, 30 exact command reads, eight namespace denials, 32-request preview
+  catalog/rule workflows and metadata/log reports with sealed citations in
+  5.753 seconds. Web-session acceptance initially skipped without opt-in; its
+  explicit rerun passed in 0.384 seconds. All seven HTTPS static files match
+  source after fixing the harness's `/index.html` 301 probe to request `/` and
+  require 200. No application change was needed. Rendered-browser checks were
+  not rerun on RC10; earlier Chrome evidence retains its original source tuple.
+  The sanitized [Lab verification summary](evidence/rc10-lab.json) records the
+  scope, counts and retained harness corrections.
+- Core `v1.9.0` and Control `v0.2.0` are released; Dashboard embeds Core and
+  Diagnose `v0.7.0-rc.1`. Both Dashboard Lab Control sources remain verified at
+  `733dea9001116ebd9327351e40168491f780b870`. Diagnose real-provider profiles,
+  compatible stable publication and subsequent Dashboard repinning/checks remain
+  open; they are not satisfied by its candidate version.
+- RC8's partial OCI push and RC9's 25-asset draft remain immutable. The repaired
+  read-only verifier passed every RC9 asset attestation and container/source check;
+  all six packages contain the verified 88-file payload and native build `11`
+  passed. RC9 remains unpublished as draft ID `405033021`; no prior version was
+  overwritten or promoted. Earlier failure records remain below.
+- Cloudsmith distribution remains blocked on publisher setup: the Dashboard
+  `main` environment still lacks `CLOUDSMITH_API_KEY` (checked October 6), so no
+  registry upload is claimed. Remaining Dashboard inputs are actual corporate
+  identity, APNs and managed-device access, manual accessibility and pilot/
+  operations acceptance. Production and company-device distribution approvals
+  remain separate. Earlier Lab Chrome-access and PR-approval blockers are resolved.
+
+## Earlier distribution checkpoints — retained unchanged
 
 ## Distribution work — October 6
 
@@ -57,14 +108,6 @@ now discovers the exact draft through the authenticated release list; a separate
 read-only verification command exercises downloaded assets and provenance before
 publication. The next selected candidate is RC10/native build12, with publication
 and exact-byte Lab deployment still pending.
-
-## Current next actions
-
-Expanded job inspection and compatible target pagination pass live two-Control Lab verification. [Dashboard PR17](https://github.com/ryancswallace/Jobman-Dashboard/pull/17) records final CI and merge state. [Control PR31](https://github.com/ryancswallace/Jobman-Control/pull/31) is merged at `733dea9001116ebd9327351e40168491f780b870`; all required checks passed and original branch protections were restored. Earlier ecosystem PR approval/merge cleanup is complete.
-1. Reconcile compatible tagged upstream releases and Dashboard dependency pins before building the next release candidate. Do not relabel the immutable RC7 artifacts as the newer engineering deployment.
-2. Obtain actual corporate AD FS/direct-AD inputs and authorized test identities; run sign-in, role-union and active-revocation acceptance. Synthetic Keycloak/direct-directory evidence remains distinct.
-3. Identify APNs ownership/connectivity, approved Apple signing/internal distribution and a company-managed test iPhone; complete real background delivery, signed installation/upgrade and managed-device acceptance.
-4. Finish manual web/iPhone accessibility checks and identify pilot/private-hosting and operating owners. The Lab browser now opens with operator-approved hostname mappings and certificate trust. Prepare the production installation/recovery plan before requesting production approval.
 
 ## Baseline and preservation
 

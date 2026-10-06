@@ -1,5 +1,85 @@
 # Jobman Dashboard initial-release handoff
 
+## Current candidate — RC10
+
+Published source: `5b20dfb7a51d206aeb7132db94d961a14b6ab03e`, including merged
+[PR19](https://github.com/ryancswallace/Jobman-Dashboard/pull/19),
+[PR20](https://github.com/ryancswallace/Jobman-Dashboard/pull/20) and
+[PR21](https://github.com/ryancswallace/Jobman-Dashboard/pull/21).
+RC10 includes unsigned iPhone marketing version `0.1.0`, build `12`.
+[Main CI](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37514864598)
+and [repository checks](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37514864586)
+passed, together with PR21 checks and independent review.
+[RC10](https://github.com/ryancswallace/Jobman-Dashboard/releases/tag/v0.1.0-rc.10)
+was published as a prerelease at `2026-10-06T19:08:37Z` by
+[release run37515898448](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37515898448).
+All 25 release assets and 26 asset/container attestations passed independent
+verification. Six real package installations each verified all 88 canonical files
+and modes; anonymous pulls, payload comparison and runtime checks passed on both
+container platforms. The native archive is unsigned and non-installable.
+
+| Artifact | Verified SHA-256 or manifest digest |
+| --- | --- |
+| `jobman-dashboard_v0.1.0-rc.10_linux_amd64.tar.gz` | `bbbac74c570b90e14774af0c44c574fbc0e5cf18b1f69b151a337483c52e6a07` |
+| `jobman-dashboard_v0.1.0-rc.10_linux_arm64.tar.gz` | `67b593fdbf5e1fe840662fab4202aa6819d6b2af9da7197cf9dce6519e82bfe1` |
+| `JobmanDashboard-unsigned.xcarchive.tar.gz` (build `12`) | `7c00b2cdd8b4097d9ece9734b926ce696504ef00f6dba975b0fbe84a7b663170` |
+| `ghcr.io/ryancswallace/jobman-dashboard:v0.1.0-rc.10` | `sha256:7b8687c7b14869ff7afd9d02c471c33e5fb3206fd8842650b02a90afd402ed70` |
+
+Exact-RC10 Lab staging and activation passed for API, worker and broker; all
+running release binaries match the verified Linux archive. The only application
+configuration change was API `webRoot`; no migrations were run, Control process
+IDs were preserved, and rollback material remains private. Authenticated acceptance passed
+46 GETs, 30 exact command reads, eight namespace denials, the 32-request preview
+catalog/rule workflows, and metadata/log reports with sealed citations in
+5.753 seconds. The web-session test initially skipped because its opt-in was
+missing; an explicit rerun passed in 0.384 seconds. All seven served HTTPS static
+web files match the source. The first `/index.html` probe returned an empty 301;
+the harness was corrected to request `/` and require 200, with no app change.
+Rendered-browser testing was not rerun on RC10; earlier Chrome evidence remains
+tied to its recorded engineering deployment.
+
+The sanitized [distribution verification summary](evidence/rc10-distribution.json)
+and [Lab verification summary](evidence/rc10-lab.json) retain the inspectable public
+results. The original independent artifact receipt has SHA-256
+`54c5987db869c060364df03d36eec03d1b7d0aece5b0a4e38a8e085fcf2e6b46`.
+Detailed deployment/test logs, rollback material, initial skips and harness
+failures remain private; raw logs and private configuration are not release
+assets. This post-publication record supplements the immutable bundles, which
+retain their original build-time documentation. Older acceptance below does not
+imply additional RC10 reruns.
+See [distribution](DISTRIBUTION.md) for signed provenance/checksum verification,
+version-owned packages, non-root containers and explicit service activation.
+
+| Upstream | Exact selected source and current evidence |
+| --- | --- |
+| Embedded Core `v1.9.0` | `c0c651f8a555bb56d1bdb1e65f56c47c288dd285`; published stable module |
+| Deployed Control `v0.2.0` | `733dea9001116ebd9327351e40168491f780b870`; both Dashboard Lab sources verified; pre-RC10 checks passed 46 authenticated GETs, 30 exact command reads and eight namespace denials |
+| Embedded Diagnose `v0.7.0-rc.1` | `d9021503db6346d363a82d381bd400da1542f04f`; published candidate; real-provider acceptance and compatible stable publication remain open |
+
+RC8 failed after pushing its immutable container index
+`sha256:c29824b09c16c30064de593f30fcd764abe0a047871cc4d0492a36e61c1ca8d5`;
+no GitHub RC8 tag/release was created. RC9 reached tag/draft creation and retained
+all 25 assets, then failed draft discovery. The new read-only verifier subsequently
+validated every RC9 asset attestation and the container digest/source; all six
+packages contain the verified 88-file payload and native build `11` passed its
+checks. The verified RC9 draft (ID `405033021`) remains unpublished and immutable.
+Original [RC8](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37508828710)
+and [RC9](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37512314090)
+runs and their failures remain evidence; neither is relabeled as a successful release.
+
+Final acceptance remains open for corporate AD FS/direct AD, real APNs, signed
+company-managed-device delivery, manual accessibility and pilot/operating owners,
+plus stable Diagnose acceptance. The earlier synthetic Lab Chrome-access blocker
+and old PR-approval backlog are resolved; their RC7 statements below are historical.
+Cloudsmith distribution is blocked on publisher setup: the Dashboard `main`
+environment still lacks `CLOUDSMITH_API_KEY`, checked on October 6. No Cloudsmith
+upload is claimed. No production or company-device distribution approval is implied.
+
+## Historical RC7 handoff — retained unchanged
+
+The following record preserves the original RC7 tuple, hashes and acceptance
+statements. Current versions and outstanding actions are summarized above.
+
 Status: **release candidate; final acceptance remains open**. This handoff is
 supported by exact candidate checks in the synthetic Lab. See
 [implementation status](IMPLEMENTATION_STATUS.md) for the chronological evidence,

@@ -1,0 +1,47 @@
+{
+  "archiveSHA256": {
+    "JobmanDashboard-unsigned.xcarchive.tar.gz": "7c00b2cdd8b4097d9ece9734b926ce696504ef00f6dba975b0fbe84a7b663170",
+    "jobman-dashboard_v0.1.0-rc.10_linux_amd64.tar.gz": "bbbac74c570b90e14774af0c44c574fbc0e5cf18b1f69b151a337483c52e6a07",
+    "jobman-dashboard_v0.1.0-rc.10_linux_arm64.tar.gz": "67b593fdbf5e1fe840662fab4202aa6819d6b2af9da7197cf9dce6519e82bfe1"
+  },
+  "assetAndOCIAttestations": 26,
+  "assetCount": 25,
+  "checksumManifestSHA256": "0721366c8f013ae5fc928b324793a020c7640d9bb3ac2aa3d718c5afcfaff451",
+  "containerIndexDigest": "sha256:7b8687c7b14869ff7afd9d02c471c33e5fb3206fd8842650b02a90afd402ed70",
+  "containerPlatformDigests": {
+    "amd64": "sha256:355c162cdafece90d59d71773ada2a53f812c635a088431aa58d326d81fafbe4",
+    "arm64": "sha256:ee91a48908720193557e76e91a27f6982917f53d53ddb2bc3ad90350861a67cb"
+  },
+  "failures": [],
+  "nativeActualInfo": {
+    "CFBundleIdentifier": "org.jobman.dashboard",
+    "CFBundleShortVersionString": "0.1.0",
+    "CFBundleVersion": "12",
+    "DTSDKName": "iphoneos26.5",
+    "DTXcode": "2660"
+  },
+  "nativeUnsigned": "not signed at all",
+  "packageFilesVerified": {
+    "jobman-dashboard_v0.1.0-rc.10_linux_amd64.apk": 88,
+    "jobman-dashboard_v0.1.0-rc.10_linux_amd64.deb": 88,
+    "jobman-dashboard_v0.1.0-rc.10_linux_amd64.rpm": 88,
+    "jobman-dashboard_v0.1.0-rc.10_linux_arm64.apk": 88,
+    "jobman-dashboard_v0.1.0-rc.10_linux_arm64.deb": 88,
+    "jobman-dashboard_v0.1.0-rc.10_linux_arm64.rpm": 88
+  },
+  "publishedAt": "2026-10-06T19:08:37Z",
+  "receipts": {
+    "artifacts-receipt.json": "b079067721b036c61af9869a87efa64152b398e5022d8d3ebaa6120a435d4514",
+    "committed-source-receipt.json": "c190bef21131db34410b5aa3b235cd57d5e257772d6473113fadc82e1e337829",
+    "container-receipt.json": "ac6a40a8d097c775a85ed891ff03d1f90218914c7f543f4b0f0dffaff6fc9d36",
+    "download-receipt.json": "e24f6d79ea3e09dd5ddd4e587f2eba7eaf26cfbe14f56041c2d4385b9cdbe529",
+    "packages-receipt.json": "009672450141f91ec3470b5898228daedc224791fb078e0f22c72dece7b1c847"
+  },
+  "releaseId": 405054571,
+  "revision": "5b20dfb7a51d206aeb7132db94d961a14b6ab03e",
+  "state": "published-prerelease",
+  "status": "passed",
+  "verifiedAt": "2026-10-06T19:11:39.168738+00:00",
+  "verifierSHA256": "4fe2d676b051ceae0d2cc3e0b58c409afd3ac242f0a64cd34a64d1261f808ce7",
+  "version": "v0.1.0-rc.10"
+}
