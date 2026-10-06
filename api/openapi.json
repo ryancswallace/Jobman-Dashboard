@@ -2949,6 +2949,9 @@
           },
           "cluster": {
             "type": "string"
+          },
+          "backend": {
+            "type": "string"
           }
         },
         "required": [],
@@ -3040,6 +3043,19 @@
           },
           "group": {
             "$ref": "#/components/schemas/GroupReference"
+          },
+          "targetName": {
+            "type": "string"
+          },
+          "partition": {
+            "type": "string"
+          },
+          "workloadDigest": {
+            "type": "string"
+          },
+          "confidenceUpdatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "required": [
@@ -3066,6 +3082,13 @@
           "fetchedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "execution": {
+            "$ref": "#/components/schemas/JobExecution"
+          },
+          "executionUnavailableReason": {
+            "type": "string",
+            "description": "Why submitted command detail is unavailable: missing, unsupported, or too_large. Future values remain inspectable. Omitted when execution is present."
           }
         },
         "required": [
@@ -6177,6 +6200,48 @@
             "format": "date-time"
           }
         }
+      },
+      "JobCommand": {
+        "type": "object",
+        "description": "Immutable submitted executable and ordered arguments. Values are untrusted text, not a shell command to execute. Environment values are never included.",
+        "properties": {
+          "executable": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 65536
+          },
+          "args": {
+            "type": "array",
+            "maxItems": 4096,
+            "items": {
+              "type": "string",
+              "maxLength": 65536
+            }
+          }
+        },
+        "required": [
+          "executable",
+          "args"
+        ],
+        "additionalProperties": false
+      },
+      "JobExecution": {
+        "type": "object",
+        "description": "Detail-only submitted execution specification; not proof of runtime expansion or successful execution. Maximum encoded projection size is 2 MiB.",
+        "properties": {
+          "command": {
+            "$ref": "#/components/schemas/JobCommand"
+          },
+          "workingDirectory": {
+            "type": "string",
+            "maxLength": 65536
+          }
+        },
+        "required": [
+          "command",
+          "workingDirectory"
+        ],
+        "additionalProperties": false
       }
     }
   }

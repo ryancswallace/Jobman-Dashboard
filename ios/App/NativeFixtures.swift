@@ -16,6 +16,7 @@ enum NativeFixtures {
     static func response(path: String, query: [URLQueryItem] = []) -> [String: Any] {
         if NativeRuleFixtures.enabled || NativeInboxFixtures.enabled, path == "/api/v1/bootstrap" { return NativeRuleFixtures.bootstrap() }
         func value(_ name: String) -> String? { query.first { $0.name == name }?.value }
+        let inspection = ProcessInfo.processInfo.arguments.contains("--dashboard-inspection-fixtures")
         let stream = value("stream") ?? "stdout"
         let now = Date()
         let date: (Date) -> String = { ISO8601DateFormatter().string(from: $0) }
@@ -56,7 +57,23 @@ enum NativeFixtures {
         }
         if path.hasSuffix("/artifacts") { return page([["id":"artifact-fixture","name":"synthetic-summary.txt","sizeBytes":"120","checksum":"synthetic-checksum","availability":"metadata_only","publishedAt":date(now),"runNumber":selectedRunNumber ?? "9007199254740993","runId":selectedRunNumber == nil ? "run-fixture" : runId,"executionId":selectedRunNumber == nil ? "execution-fixture" : executionId,"targetGenerationId":"generation-fixture"]]) }
         if path.contains("/reports") { return NativeReportFixtures.response(path: path, query: query, timestamp: date(now)) }
-        if path.contains("/jobs/") { return ["job":job(path.contains("/west/") ? "west":"east", path.split(separator: "/").last.map(String.init) ?? "job-042"),"fetchedAt":date(now)] }
+        if path.contains("/jobs/") {
+            var item = job(path.contains("/west/") ? "west":"east", path.split(separator: "/").last.map(String.init) ?? "job-042")
+            var result: [String: Any] = ["job": item, "fetchedAt": date(now)]
+            if inspection {
+                item["targetName"] = "Synthetic named cluster"; item["partition"] = "batch-fixture"
+                item["scheduler"] = ["backend": "slurm", "state": "FAILED", "jobId": "1001"]
+                item["workloadDigest"] = "sha256:inspection-fixture"; item["confidenceUpdatedAt"] = date(now.addingTimeInterval(-30))
+                item["currentRun"] = ["id": runId, "number": "9007199254740993", "executionId": executionId]
+                result["job"] = item
+                if path.contains("/west/") { result["executionUnavailableReason"] = "unsupported_contract" }
+                else {
+                    let script = "printf '%s\\n' \"$1\"\n# literal shell-wrapper script\n" + (1...12).map { "# synthetic line \($0): spaces and quotes remain in this argument" }.joined(separator: "\n") + "\nprintf 'COMMAND-END-MARKER\\n'"
+                    result["execution"] = ["command": ["executable": "/bin/sh", "args": ["-c", script, "", "two words", "quote'\"value", "\u{1b}[31m\u{202e}control-text"]], "workingDirectory": "workspace:/synthetic working directory"]
+                }
+            }
+            return result
+        }
         if path == "/api/v1/targets" || path.contains("/targets/") {
             let generation: [String: Any] = ["id":"generation-fixture", "number":"9007199254740993", "executionBackend":"slurm", "transport":"agent-api", "runtimes":["native"], "operatingSystems":["linux"], "architectures":["x86_64"], "capabilities":["arrays", "collections"], "partitions":[["name":"batch", "isDefault":true]], "partitionCount":"201", "partitionsTruncated":true, "logStore":["name":"lab-logs", "version":"1"], "artifactStores":[], "provider":["kind":"on-prem"]]
             let target: [String: Any] = ["deploymentId":"east", "namespaceId":"research", "targetId":"slurm-batch", "name":"Synthetic Slurm", "kind":"slurm", "state":"active", "revision":"4", "createdAt":date(now), "updatedAt":date(now), "asOf":date(now), "generation":generation]

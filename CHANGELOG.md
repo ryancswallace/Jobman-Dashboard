@@ -6,6 +6,10 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
+- Show complete submitted commands and working directories in authorized web and
+  iPhone job details, retain additional shared status metadata, and separate
+  historical-run facts from current job state.
+
 - Upgrade the web build to Vite 8 together with its required React plugin 6 peer,
   TypeScript 7, jest-dom 7 and jsdom 30, retaining the explicit ES2022 output target
   and static deployment model.

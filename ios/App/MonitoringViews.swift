@@ -131,8 +131,10 @@ struct JobDetailView: View {
             if let error { ErrorMessage(error: error) }
             if let detail {
                 let job = detail.job
-                Section("Lifecycle") {
+                Section("Current job lifecycle") {
                     JobRow(job: job)
+                    Text("These facts describe the current job snapshot. Choosing a recorded run below does not change them.").font(.footnote).foregroundStyle(.secondary)
+                    TimestampRow(label: "Confidence updated", value: job.confidenceUpdatedAt)
                     LabeledContent("Desired state", value: job.desiredState)
                     LabeledContent("Graph disposition", value: job.disposition ?? "Unavailable")
                     Text("A cancellation request is intent. Only the reported terminal outcome confirms cancellation.").font(.footnote).foregroundStyle(.secondary)
@@ -146,12 +148,17 @@ struct JobDetailView: View {
                     TimestampRow(label: "Metadata updated", value: job.updatedAt)
                     TimestampRow(label: "Last fetched", value: detail.fetchedAt)
                 }
-                Section("Placement and ownership") {
+                Section("Current job placement and ownership") {
                     LabeledContent("Submitted by", value: job.owner?.displayName ?? job.owner?.id ?? "Unavailable")
-                    LabeledContent("Target", value: job.targetId)
+                    InspectionText(label: "Owner ID", value: job.owner?.id ?? "Unavailable")
+                    LabeledContent("Target name", value: job.targetName ?? "Unavailable")
+                    LabeledContent("Target ID", value: job.targetId)
+                    LabeledContent("Partition", value: job.partition ?? "Unavailable")
+                    InspectionText(label: "Workload digest", value: job.workloadDigest ?? "Unavailable")
                     LabeledContent("Target generation ID", value: job.targetGenerationId ?? "Unavailable")
                     LabeledContent("Backend", value: job.backend ?? "Unavailable")
                     LabeledContent("Revision", value: job.revision)
+                    LabeledContent("Scheduler backend", value: job.scheduler?.backend ?? "Unavailable")
                     LabeledContent("Scheduler state", value: job.scheduler?.state ?? "Unavailable")
                     LabeledContent("Scheduler job ID", value: job.scheduler?.jobId ?? "Unavailable")
                     LabeledContent("Scheduler reason", value: job.scheduler?.reason ?? "Unavailable")
@@ -160,7 +167,7 @@ struct JobDetailView: View {
                     LabeledContent("Imported history", value: job.imported.map { $0 ? "Yes" : "No" } ?? "Unavailable")
                     ForEach(job.labels.keys.sorted(), id: \.self) { key in LabeledContent(key, value: job.labels[key] ?? "") }
                 }
-                Section("Run and workload references") {
+                Section("Current job run and workload references") {
                     LabeledContent("Current run", value: job.currentRun?.number ?? "Unavailable")
                     LabeledContent("Run ID", value: job.currentRun?.id ?? "Unavailable")
                     LabeledContent("Execution ID", value: job.currentRun?.executionId ?? "Unavailable")
@@ -173,6 +180,20 @@ struct JobDetailView: View {
                         if let index = job.group?.graphIndex { LabeledContent("Graph index", value: String(index)) }
                     }
                 }
+                Section("Submitted command") {
+                    if let execution = detail.execution {
+                        Text("Immutable submitted specification. It does not describe shell expansion or prove that the command ran.").font(.footnote).foregroundStyle(.secondary)
+                        InspectionText(label: "Submitted working directory", value: execution.workingDirectory, empty: "Empty (no directory specified)")
+                        NavigationLink { JobCommandView(execution: execution) } label: {
+                            Label("View full command and arguments", systemImage: "text.alignleft")
+                        }.accessibilityIdentifier("viewSubmittedCommand")
+                        Text("\(execution.command.args.count) ordered arguments; environment values are not included.").font(.caption)
+                    } else {
+                        Text("Submitted command unavailable")
+                        Text(verbatim: JobInspectionText.literal(detail.executionUnavailableReason ?? "The source did not provide a submitted execution specification."))
+                            .font(.footnote).textSelection(.enabled).accessibilityIdentifier("executionUnavailableReason")
+                    }
+                }
                 Section("Investigate") {
                     NavigationLink(selectedRun.map { "Selected run \($0.number)" } ?? "Choose a recorded run") { RunPickerView(ref: ref, selection: $selectedRun) }
                     if let run = selectedRun { Text("Run \(run.number) · \(run.id)").font(.caption).accessibilityIdentifier("selectedRun") }
@@ -180,6 +201,9 @@ struct JobDetailView: View {
                     NavigationLink { ArtifactsView(ref: ref, run: selectedRun).id(selectedRun?.id ?? "all") } label: { Label("Artifact metadata", systemImage: "doc") }
                     NavigationLink { ReportsView(ref: ref, selectedRunID: selectedRun?.id).id(selectedRun?.id ?? "current") } label: { Label("Diagnosis", systemImage: "stethoscope") }
                     Button { watching = true } label: { Label("Watch this job…", systemImage: "bell.badge") }
+                }
+                if let run = selectedRun {
+                    SelectedRunFacts(run: run, currentRunID: job.currentRun?.id)
                 }
             } else if error == nil { ProgressView("Loading job…") }
         }.navigationTitle(detail?.job.name ?? "Job").navigationBarTitleDisplayMode(.inline)

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   decodeJob,
+  decodeJobDetail,
   decodeJobs,
   decodeOverview,
   decodeBootstrap,
@@ -21,6 +22,38 @@ const job: JobDTO = {
   labels: {},
 };
 describe("contract semantics", () => {
+  it("exposes execution only in job detail and preserves source inspection facts", () => {
+    const execution = {
+      command: { executable: "echo", args: ["", "a b", "\n"] },
+      workingDirectory: "/work",
+    };
+    const enriched = {
+      ...job,
+      targetName: "Named target",
+      partition: "gpu",
+      workloadDigest: "sha256:abc",
+      confidenceUpdatedAt: "2026-10-06T00:00:00Z",
+      execution,
+    };
+    const listed = decodeJob(enriched);
+    expect(listed.execution).toBeUndefined();
+    expect(listed).toMatchObject({
+      target: { id: "t", name: "Named target" },
+      partition: "gpu",
+      workloadDigest: "sha256:abc",
+      confidenceUpdatedAt: enriched.confidenceUpdatedAt,
+    });
+    const detail = decodeJobDetail({
+      job: enriched,
+      execution,
+      fetchedAt: job.updatedAt,
+    });
+    expect(detail.data.execution).toEqual(execution);
+    expect(
+      decodeJobDetail({ job, executionUnavailableReason: "future_reason" }).data
+        .executionUnavailableReason,
+    ).toBe("future_reason");
+  });
   it("keeps job phase, cancellation intent and stale confidence separate", () => {
     const result = decodeJob(job);
     expect(result.phase).toBe("running");

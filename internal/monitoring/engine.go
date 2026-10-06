@@ -495,7 +495,12 @@ func (e *Engine) Job(ctx context.Context, a Actor, s api.Scope, id string) (api.
 	}
 	err = e.call(ctx, s.DeploymentID, func(c context.Context) error {
 		var err error
-		result.Job, err = e.sources[s.DeploymentID].Job(c, a, s, id)
+		if source, ok := e.sources[s.DeploymentID].(JobDetailSource); ok {
+			result, err = source.JobDetail(c, a, s, id)
+		} else {
+			result.Job, err = e.sources[s.DeploymentID].Job(c, a, s, id)
+			result.ExecutionUnavailableReason = "unsupported"
+		}
 		return err
 	})
 	if err != nil {

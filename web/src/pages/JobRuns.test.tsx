@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { JobDetailPage } from "./JobDetail";
@@ -206,6 +212,58 @@ it("does not fall back to current logs when a historical reference is inaccessib
   );
   expect(
     screen.getByRole("button", { name: "Use current defaults" }),
+  ).toBeVisible();
+});
+it("keeps historical run facts separate from current job metadata", async () => {
+  mount(`?runId=${old.id}`);
+  const heading = await screen.findByRole("heading", {
+    name: "Selected run facts · run 2",
+  });
+  const selected = within(heading.closest("section")!);
+  expect(selected.getByText(old.executionId)).toBeVisible();
+  expect(selected.getByText(old.targetGenerationId)).toBeVisible();
+  expect(selected.getByText("Failure")).toBeVisible();
+  expect(selected.getByText("Run record created")).toBeVisible();
+  expect(
+    screen.getByRole("heading", { name: "Current job facts" }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole("heading", { name: "Current job reported timeline" }),
+  ).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Use current defaults" }));
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("heading", { name: "Selected run facts · run 2" }),
+    ).toBeNull(),
+  );
+  expect(screen.queryByText(old.executionId)).toBeNull();
+});
+it("shows scheduler-reported backend separately from execution placement", async () => {
+  const original = fetcher.getMockImplementation()!;
+  fetcher.mockImplementation(async (input: string, options?: RequestInit) =>
+    String(input).endsWith(`/jobs/${job.id}`)
+      ? Response.json({
+          job: {
+            ...job,
+            backend: "placement-backend",
+            scheduler: { backend: "scheduler-backend" },
+          },
+          fetchedAt: job.updatedAt,
+        })
+      : original(input, options),
+  );
+  mount();
+  const current = await screen.findByRole("heading", {
+    name: "Current job facts",
+  });
+  expect(
+    within(current.closest("section")!).getByText("placement-backend"),
+  ).toBeVisible();
+  const scheduler = screen.getByRole("heading", {
+    name: "Current job scheduler observations",
+  });
+  expect(
+    within(scheduler.closest("section")!).getByText("scheduler-backend"),
   ).toBeVisible();
 });
 it("rejects mismatched selected artifact provenance before displaying it", async () => {

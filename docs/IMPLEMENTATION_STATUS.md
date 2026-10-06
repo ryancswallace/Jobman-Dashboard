@@ -684,3 +684,27 @@ The actual schema probe has independently reviewed plan `b9ce73e7d804ab82ccc0c9c
   tokens). There are no
   registered iPhones in this account. Real APNs, AD FS, signing/distribution and
   company-managed physical-device acceptance remain external release gates.
+
+## Expanded job inspection — October 6
+
+- Added full immutable submitted executable/ordered arguments and portable working
+  directory to authorized web and iPhone job details. Commands remain detail-only;
+  environment values, list/cursor storage and push payloads are excluded. Older
+  sources retain status with explicit unavailable command details.
+- Preserved target name/ID, partition, workload digest, confidence timestamp and
+  distinct scheduler backend. Selected-run facts remain separate from current job
+  state. Both clients preserve empty/Unicode/multiline arguments and make invisible
+  direction controls inspectable; copy requires an explicit user action.
+- Control [PR31](https://github.com/ryancswallace/Jobman-Control/pull/31) adds the
+  namespace/job/digest-bound projection without migrations or agent changes. Its
+  full local gate, actual PostgreSQL authorization tests and hosted CI pass.
+- Dashboard full `make check`, generated-contract/docs checks and focused Go race
+  authorization/bounds tests pass. Final web suite: 184 passed, two existing opt-in
+  skips; production build and browser fixture checks pass. Native: 86 core tests,
+  unsigned simulator build, two new detail workflows and the existing selected-run
+  workflow pass; five screenshots inspected. Initial UI selector failures were
+  fixed without relaxing content assertions.
+- Independent review identified encoded-JSON size inflation and null-argument
+  coercion; both were repaired with regressions before delivery. Corporate identity,
+  signed-device and APNs acceptance remain separate. GitHub delivery and retained
+  synthetic Lab verification are in progress for this checkpoint.

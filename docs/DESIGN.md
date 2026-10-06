@@ -255,6 +255,14 @@ Graph `blocked`/`skipped` dispositions remain visible and separate from schedule
 
 Summary and drill-down queries share one definition of scope, filters, and time interval. Produce each source summary in one bounded transactional read. Counts describe the recorded snapshot time; a later live drill-down can change as jobs advance. Show that distinction rather than promising a transaction spanning several independent Controls. Complete group summaries and their returned child page share a source snapshot/revision where practical.
 
+Single-job inspection includes the shared status metadata and a detail-only submitted
+execution projection from Control. Preserve executable and argument boundaries,
+working directory, target name/partition, workload digest and confidence timestamp.
+The command projection is never part of job-list/cursor models or notification
+payloads. Control and Dashboard use the existing namespace `jobs.read` authority;
+older sources retain status with an explicit unsupported-command state. See
+[job details](JOB_DETAILS.md) for bounds, compatibility and display semantics.
+
 ### 5.3 Aggregation and pagination
 
 Dashboard asks each selected Control for its authorized namespaces, then uses bounded multi-namespace queries within that source. Aggregate totals sum the successfully returned contributions and display their completeness. Namespaces not authorized to the user are never part of a denominator, source breakdown, autocomplete, or notification count. A source timeout produces an explicit partial view with retry, while healthy sources remain usable.

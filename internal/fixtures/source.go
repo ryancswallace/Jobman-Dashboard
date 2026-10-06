@@ -114,6 +114,19 @@ func (s *Source) Job(_ context.Context, a monitoring.Actor, scope api.Scope, id 
 	}
 	return api.Job{}, monitoring.ErrNotFound
 }
+
+func (s *Source) JobDetail(ctx context.Context, a monitoring.Actor, scope api.Scope, id string) (api.JobDetail, error) {
+	job, err := s.Job(ctx, a, scope, id)
+	if err != nil {
+		return api.JobDetail{}, err
+	}
+	job.TargetName, job.Partition = "Synthetic Slurm", "cpu"
+	job.ConfidenceUpdatedAt = &job.UpdatedAt
+	return api.JobDetail{Job: job, Execution: &api.JobExecution{
+		Command:          api.JobCommand{Executable: "/usr/bin/python3", Args: []string{"analysis.py", "--dataset", "synthetic sample", "--output", "results/report.json"}},
+		WorkingDirectory: "workspace:/synthetic",
+	}}, nil
+}
 func (s *Source) Summary(_ context.Context, a monitoring.Actor, scope api.Scope, w api.Window) (monitoring.Counts, error) {
 	if err := s.allow(a, scope.NamespaceID); err != nil {
 		return monitoring.Counts{}, err

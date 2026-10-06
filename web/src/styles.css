@@ -900,6 +900,17 @@ input[type="radio"] {
 .wide {
   grid-column: 1/-1;
 }
+.execution-command {
+  margin: 0;
+  padding: 16px;
+  max-height: 32rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 13px;
+}
 .facts {
   margin: 0;
   padding: 8px 24px;

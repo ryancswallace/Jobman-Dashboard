@@ -70,6 +70,7 @@ type Owner struct {
 }
 
 type Scheduler struct {
+	Backend    string     `json:"backend,omitempty"`
 	State      string     `json:"state,omitempty"`
 	JobID      string     `json:"jobId,omitempty"`
 	ObservedAt *time.Time `json:"observedAt,omitempty"`
@@ -97,29 +98,33 @@ type GroupReference struct {
 
 type Job struct {
 	Scope
-	ID                 string            `json:"id"`
-	Name               string            `json:"name,omitempty"`
-	TargetID           string            `json:"targetId"`
-	TargetGeneration   string            `json:"targetGeneration,omitempty"`
-	TargetGenerationID string            `json:"targetGenerationId,omitempty"`
-	Backend            string            `json:"backend,omitempty"`
-	Revision           string            `json:"revision"`
-	Owner              *Owner            `json:"owner,omitempty"`
-	CreatedAt          time.Time         `json:"createdAt"`
-	UpdatedAt          time.Time         `json:"updatedAt"`
-	StartedAt          *time.Time        `json:"startedAt,omitempty"`
-	CompletedAt        *time.Time        `json:"completedAt,omitempty"`
-	DesiredState       string            `json:"desiredState"`
-	Phase              string            `json:"phase"`
-	Outcome            string            `json:"outcome,omitempty"`
-	Confidence         string            `json:"confidence"`
-	Labels             map[string]string `json:"labels"`
-	Scheduler          *Scheduler        `json:"scheduler,omitempty"`
-	Disposition        string            `json:"disposition,omitempty"`
-	Imported           bool              `json:"imported"`
-	Lifecycle          *Lifecycle        `json:"lifecycle,omitempty"`
-	CurrentRun         *RunReference     `json:"currentRun,omitempty"`
-	Group              *GroupReference   `json:"group,omitempty"`
+	ID                  string            `json:"id"`
+	Name                string            `json:"name,omitempty"`
+	TargetID            string            `json:"targetId"`
+	TargetName          string            `json:"targetName,omitempty"`
+	Partition           string            `json:"partition,omitempty"`
+	WorkloadDigest      string            `json:"workloadDigest,omitempty"`
+	TargetGeneration    string            `json:"targetGeneration,omitempty"`
+	TargetGenerationID  string            `json:"targetGenerationId,omitempty"`
+	Backend             string            `json:"backend,omitempty"`
+	Revision            string            `json:"revision"`
+	Owner               *Owner            `json:"owner,omitempty"`
+	CreatedAt           time.Time         `json:"createdAt"`
+	UpdatedAt           time.Time         `json:"updatedAt"`
+	StartedAt           *time.Time        `json:"startedAt,omitempty"`
+	CompletedAt         *time.Time        `json:"completedAt,omitempty"`
+	DesiredState        string            `json:"desiredState"`
+	Phase               string            `json:"phase"`
+	Outcome             string            `json:"outcome,omitempty"`
+	Confidence          string            `json:"confidence"`
+	ConfidenceUpdatedAt *time.Time        `json:"confidenceUpdatedAt,omitempty"`
+	Labels              map[string]string `json:"labels"`
+	Scheduler           *Scheduler        `json:"scheduler,omitempty"`
+	Disposition         string            `json:"disposition,omitempty"`
+	Imported            bool              `json:"imported"`
+	Lifecycle           *Lifecycle        `json:"lifecycle,omitempty"`
+	CurrentRun          *RunReference     `json:"currentRun,omitempty"`
+	Group               *GroupReference   `json:"group,omitempty"`
 }
 
 type SourceStatus struct {
@@ -139,8 +144,22 @@ type Page[T any] struct {
 }
 
 type JobDetail struct {
-	Job       Job       `json:"job"`
-	FetchedAt time.Time `json:"fetchedAt"`
+	Job                        Job           `json:"job"`
+	FetchedAt                  time.Time     `json:"fetchedAt"`
+	Execution                  *JobExecution `json:"execution,omitempty"`
+	ExecutionUnavailableReason string        `json:"executionUnavailableReason,omitempty"`
+}
+
+// JobExecution is the immutable submitted invocation. It is returned only on an
+// authorized detail read, never in lists, cursor storage, or notifications.
+type JobExecution struct {
+	Command          JobCommand `json:"command"`
+	WorkingDirectory string     `json:"workingDirectory"`
+}
+
+type JobCommand struct {
+	Executable string   `json:"executable"`
+	Args       []string `json:"args"`
 }
 
 type Window struct {
