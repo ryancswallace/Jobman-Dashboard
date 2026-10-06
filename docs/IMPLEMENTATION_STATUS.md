@@ -1,17 +1,16 @@
 # Initial release implementation status
 
-Updated: 2026-10-04. Release state: **engineering prerelease v0.1.0-rc.7 published with reproducible Linux packages, verified and deployed with both Control636 sources in the Lab; exact upgrade and recorded-run smoke pass. Prior checkpoint load, faults, fresh installation/rollback, watchdog recovery, schema refusal and large-graph traversal pass. Both Lab review fixes are merged; final external acceptance remains open**.
+Updated: 2026-10-06. Release state: **engineering prerelease v0.1.0-rc.7 remains the published candidate. Later source changes add expanded web/iPhone job inspection; delivery and current Lab evidence are recorded in the October 6 checkpoint below. Actual corporate identity, APNs and signed managed-device acceptance remain open.**
 
-The adopted [implementation prompt](IMPLEMENTATION_PROMPT.md), [requirements](REQUIREMENTS.md), and [design](DESIGN.md) govern this work. The persistent goal remains active through implementation, GitHub delivery, and acceptance. A passing local slice is not release acceptance.
+The adopted [implementation prompt](IMPLEMENTATION_PROMPT.md), [requirements](REQUIREMENTS.md), and [design](DESIGN.md) govern this work. A passing local slice is not release acceptance. The tables and chronological checkpoints retain their original evidence; later dated checkpoints supersede older merge, browser-connectivity and test-count statements.
 
 ## Current next actions
 
-Dashboard source and final handoff delivery are tracked in [PR6](https://github.com/ryancswallace/Jobman-Dashboard/pull/6), including current checks and merge state. RC7 publication, exact Lab deployment, 57-request smoke and both Lab review fixes are complete. The immutable candidate remains `d10fb5f`; later handoff changes do not alter its binaries or tag.
-
-1. Obtain eligible non-author reviews for Core PR54, Control PR29 and Diagnose PR11, then perform protected merges, compatible stable upstream releases, Dashboard dependency repinning and renewed checks. Current development module versions remain explicit release gates.
+Expanded job inspection and compatible target pagination pass live two-Control Lab verification. [Dashboard PR17](https://github.com/ryancswallace/Jobman-Dashboard/pull/17) records final CI and merge state. [Control PR31](https://github.com/ryancswallace/Jobman-Control/pull/31) is merged at `733dea9001116ebd9327351e40168491f780b870`; all required checks passed and original branch protections were restored. Earlier ecosystem PR approval/merge cleanup is complete.
+1. Reconcile compatible tagged upstream releases and Dashboard dependency pins before building the next release candidate. Do not relabel the immutable RC7 artifacts as the newer engineering deployment.
 2. Obtain actual corporate AD FS/direct-AD inputs and authorized test identities; run sign-in, role-union and active-revocation acceptance. Synthetic Keycloak/direct-directory evidence remains distinct.
-3. Identify APNs ownership/connectivity, approved Apple signing/internal distribution and a company-managed test iPhone; complete real background delivery, signed installation/upgrade and managed-device acceptance. Xcode is installed; tooling availability does not close device gates.
-4. Arrange an approved live-browser environment, manual web/iPhone accessibility checks, pilot/private hosting and operating owners. Prepare the concrete production installation/recovery plan before requesting the required production approval. Preserve release-candidate labeling until every required gate passes.
+3. Identify APNs ownership/connectivity, approved Apple signing/internal distribution and a company-managed test iPhone; complete real background delivery, signed installation/upgrade and managed-device acceptance.
+4. Finish manual web/iPhone accessibility checks and identify pilot/private-hosting and operating owners. The Lab browser now opens with operator-approved hostname mappings and certificate trust. Prepare the production installation/recovery plan before requesting production approval.
 
 ## Baseline and preservation
 
@@ -706,5 +705,47 @@ The actual schema probe has independently reviewed plan `b9ce73e7d804ab82ccc0c9c
   fixed without relaxing content assertions.
 - Independent review identified encoded-JSON size inflation and null-argument
   coercion; both were repaired with regressions before delivery. Corporate identity,
-  signed-device and APNs acceptance remain separate. GitHub delivery and retained
-  synthetic Lab verification are in progress for this checkpoint.
+  signed-device and APNs acceptance remain separate.
+- Delivered source is tracked in [Dashboard PR17](https://github.com/ryancswallace/Jobman-Dashboard/pull/17).
+  Its initial `0b0776b` feature checks passed hosted backend/web, native, repository,
+  fuzz and CodeQL gates. Control merged at `733dea9`; its main-branch
+  [Test gate](https://github.com/ryancswallace/Jobman-Control/actions/runs/37460243122)
+  also passed. Final Dashboard delivery adds the following independently reviewed
+  integration repair and retained-fixture test.
+- The live upgrade exposed an older compatibility defect: newer Control clamps
+  target catalog creation bounds to a committed timestamp, while Dashboard required
+  an echoed wall-clock bound. Dashboard now pins each source's returned bound after
+  its initial probe and rejects changes during data fetches, continuations and
+  replay. Race regressions cover legacy sources, empty catalogs, late inserts,
+  per-source bounds and rejected widening/narrowing; focused lint passes.
+- Engineering Lab deployment: Control source `95d647a` (the merged PR31 tree) on
+  both Dashboard-specific services, Dashboard API `cb3fcbc`, and web assets from
+  `0b0776b`. Runtime Go/client code is committed; only this documentation was dirty
+  during the API engineering build. Worker/broker retain RC7, with no schema or
+  protocol change required by job inspection. Static index bytes match the build.
+- The Lab was behind on existing Control migration 22. Both scoped databases were
+  logically backed up and archives fully decoded/rehashed before its transactional
+  application; exact ledgers, original job IDs/revisions/counts and unrelated
+  Control service/database were verified unchanged except for the intended schema.
+  Private recovery receipts are retained on the guests. The old Control binary
+  requires its paired pre-upgrade database, so binary-only rollback is unsupported.
+- Resume also exposed future-dated directory verification fences. Current host/VM
+  clocks and LDAPS verified correctly. Supported identical-mapping revision 2→3
+  reconfiguration forced fresh verification for all 12 primary and all 7 secondary
+  namespaces, retaining identities, groups and permissions. No timestamp forging,
+  freshness bypass or job mutation was used.
+- Final live checks pass against both sources: 46 bounded GETs with 30 exact command
+  reads covering 20 retained jobs, eight namespace denials and list exclusion;
+  32-request preview workflows for monitoring, targets/partitions, collections,
+  arrays, graphs, inbox/device catalogs and three personal alert scopes; actual
+  Keycloak confidential web session, CSRF and logout checks. Combined runtime:
+  1.681 seconds. Only the preview's own disabled rules and restored test preferences
+  are mutated; no jobs or devices are created.
+- Chrome sign-in and job-detail rendering pass against the deployed Lab, including
+  the full shell executable, arguments/script, submitted logical working directory,
+  workload/target identifiers, confidence time and reported lifecycle timestamps
+  for a retained executed synthetic job. Native evidence remains simulator-only.
+- The optional integration-tagged lint probe reported a pre-existing SA4000 finding
+  at `internal/auth/lab_multisource_notifications_test.go:143` (two stateful token
+  calls); the new inspection test compiles and its focused race tests pass. Normal
+  repository gates are unchanged.

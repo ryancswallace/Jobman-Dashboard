@@ -48,3 +48,26 @@ API responses remain `no-store`; command data is not added to persistent client
 storage, URLs, application logs, or push payloads. Text rendering does not execute
 markup or follow command contents as links. Existing source-qualified identity,
 revocation, and account-change clearing rules also apply to these details.
+
+## Synthetic Lab verification
+
+After both Control services and Dashboard are upgraded, the opt-in inspection
+check reads the retained primary/secondary fixtures through actual authenticated
+Dashboard requests:
+
+```sh
+JOBMAN_DASHBOARD_LAB_ROOT=/absolute/path/to/jobman-lab \
+JOBMAN_DASHBOARD_LAB_SECONDARY_FIXTURE=/private/path/to/secondary-fixture.json \
+JOBMAN_DASHBOARD_LAB_RUNTIME=1 \
+JOBMAN_DASHBOARD_LAB_JOB_INSPECTION=1 \
+GOWORK=off GOTOOLCHAIN=go1.26.6 \
+go test -tags=integration ./internal/auth -run '^TestLabJobInspection$' -count=1 -v
+```
+
+Use the retained secondary fixture receipt from the existing two-Control Lab.
+The check signs in the synthetic Alice and Bob identities, compares the exact
+normalized submitted invocation, verifies placement/workload metadata, checks
+that job lists omit commands, and exercises namespace denials. All application
+requests are bounded GETs; it creates no jobs or new fixtures and prints no
+credentials or command payloads. This establishes synthetic integration, not
+corporate identity or physical-device acceptance.
