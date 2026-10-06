@@ -71,17 +71,16 @@ Final acceptance remains open for corporate AD FS/direct AD, real APNs, signed
 company-managed-device delivery, manual accessibility and pilot/operating owners,
 plus stable Diagnose acceptance. The earlier synthetic Lab Chrome-access blocker
 and old PR-approval backlog are resolved; their RC7 statements below are historical.
-The Dashboard `main` environment now has its personal Cloudsmith API key.
-Authentication passed in run `37522208724`, but the original `jobman/dashboard`
-destination was unavailable. The operator selected the existing `jobman/stable`
-repository used by sibling publishers. Run `37532251312` uploaded the amd64 DEB;
-its verification lookup exposed incompatible filename escaping. The query is
-corrected to match the sibling publishers. Run `37534170921` verified DEB/RPM
-and uploaded the amd64 APK, exposing Cloudsmith Alpine filename normalization.
-The publisher now identifies APKs by name, version and architecture with the
-original checksum. All three amd64 packages are present; the arm64 packages and
-all-six workflow verification remain pending. This destination does not change Dashboard prerelease status or imply
-production or company-device distribution approval.
+Cloudsmith distribution completed successfully on October 6 in
+[run 37535796557](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37535796557),
+using the personal API key and shared `jobman/stable` repository. All six Linux
+packages are synchronized and verified; existing amd64 uploads were reused.
+Separate public downloads verified source DEB/APK hashes and complete RPM content
+outside the permitted signature header. [Registry evidence](evidence/rc10-cloudsmith.json)
+records source/registry hashes, package IDs and the exact publisher revision.
+Cloudsmith normalizes APK filenames; exact name/version/architecture checks
+preserve identity across both architectures. Dashboard remains a prerelease;
+this publication does not imply production or company-device acceptance.
 
 ## Historical RC7 handoff — retained unchanged
 
