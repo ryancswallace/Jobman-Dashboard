@@ -294,7 +294,7 @@ struct WorkloadDetailView: View {
             Section("Jobs in group") {
                 if !pageHistory.isEmpty { Button("Previous jobs page") { Task { await previous() } }.disabled(loading) }
                 if let cursor { Button("Next jobs page") { Task { await next(cursor) } }.disabled(loading) }
-                if let total = page?.total ?? detail?.total { Text("\(children.count) jobs on this page; \(total) in the group").font(.caption).accessibilityIdentifier("childPageTotal") }
+                if let total = page?.total ?? detail?.total { Text("Jobs on this page: \(children.count); total in group: \(total)").font(.caption).accessibilityIdentifier("childPageTotal") }
                 ForEach(children) { child in
                     DisclosureGroup {
                         WorkloadChildFacts(child: child)

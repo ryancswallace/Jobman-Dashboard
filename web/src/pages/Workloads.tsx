@@ -169,7 +169,7 @@ export function WorkloadsPage() {
       ) : (
         !result.error && (
           <Empty
-            title={`No ${kind === "array" ? "Slurm arrays" : kind === "graph" ? "dependency graphs" : "collections"} in the selected namespaces`}
+            title={`No ${kind === "array" ? "Slurm arrays" : kind === "graph" ? "dependency graphs" : "collections"} returned for this selection`}
           >
             Job groups appear when reported by the selected Control deployments.
           </Empty>

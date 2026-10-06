@@ -180,7 +180,7 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Inbox"].firstMatch.waitForExistence(timeout: 5))
         app.tabBars.buttons["More"].tap()
         app.buttons["Settings"].tap()
-        let help = app.staticTexts["Manual only stops routine data refreshes. Access checks continue, and active log following or a report being prepared may still refresh."]
+        let help = app.staticTexts.matching(NSPredicate(format: "label == %@", "Manual only stops routine data refreshes. Access checks continue, and active log following or a report being prepared may still refresh.")).firstMatch
         reveal(help, app: app); XCTAssertTrue(help.exists)
         XCTAssertTrue(app.buttons["Save settings"].exists)
         capture("Synthetic settings refresh explanation", app: app)

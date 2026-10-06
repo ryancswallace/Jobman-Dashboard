@@ -18,14 +18,14 @@ final class GraphCeilingUITests: XCTestCase {
     func testLargeGraphChildPagesReplaceAndKeepExactTotal() {
         let app = app(), total = app.staticTexts["childPageTotal"]
         reveal(total, app: app)
-        XCTAssertEqual(total.label, "50 jobs on this page; 10000 in the group")
+        XCTAssertEqual(total.label, "Jobs on this page: 50; total in group: 10000")
         reveal(app.buttons["node-00000"], app: app)
         capture("Native ceiling first child page", app)
         let next = app.buttons["Next jobs page"]
         reveal(next, app: app, up: false); next.tap()
         XCTAssertTrue(app.buttons["node-00050"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["node-00000"].exists)
-        XCTAssertEqual(total.label, "50 jobs on this page; 10000 in the group")
+        XCTAssertEqual(total.label, "Jobs on this page: 50; total in group: 10000")
         app.buttons["Previous jobs page"].tap()
         XCTAssertTrue(app.buttons["node-00000"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["node-00050"].exists)

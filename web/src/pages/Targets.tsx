@@ -61,7 +61,7 @@ export function TargetsPage() {
         />
         <span>
           {result.data
-            ? `${count(result.data.data.total)} targets ${result.data.meta.completeness === "partial" ? "in available sources (subtotal)" : ""}`
+            ? `Targets: ${count(result.data.data.total)} ${result.data.meta.completeness === "partial" ? "in available sources (subtotal)" : ""}`
             : "Target totals unavailable"}
         </span>
       </div>
@@ -78,7 +78,7 @@ export function TargetsPage() {
                   <th>Target</th>
                   <th>Deployment / namespace</th>
                   <th>Configured state</th>
-                  <th>Backend / provider</th>
+                  <th>Execution system / provider</th>
                   <th>Configuration version</th>
                   <th>Partitions</th>
                 </tr>
@@ -349,7 +349,7 @@ function PartitionBrowser({
           {result.data && (
             <>
               <p>
-                {result.data.data.items.length} partitions on this page ·{" "}
+                Partitions on this page: {result.data.data.items.length} ·{" "}
                 {count(result.data.data.total)} total
               </p>
               <ul className="partition-list">

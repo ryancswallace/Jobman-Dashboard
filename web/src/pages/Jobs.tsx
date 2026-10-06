@@ -246,7 +246,7 @@ export function JobsPage() {
         {result.data && (
           <div className="pagination">
             <span>
-              {result.data.data.length} jobs on this page · results reflect the
+              Jobs on this page: {result.data.data.length} · results reflect the
               latest information from Control
             </span>
             <div>

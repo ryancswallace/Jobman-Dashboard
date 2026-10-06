@@ -370,7 +370,7 @@ export function JobDetailPage() {
                     <dl className="facts compact">
                       {[
                         ["Scheduler job ID", job.scheduler.nativeId],
-                        ["Backend", job.scheduler.backend],
+                        ["Execution system", job.scheduler.backend],
                         ["State", job.scheduler.state],
                         ["Reason", job.scheduler.reason],
                         ["Cluster", job.scheduler.cluster],

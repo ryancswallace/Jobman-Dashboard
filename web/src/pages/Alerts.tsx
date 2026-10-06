@@ -215,7 +215,7 @@ function AlertWorkspace() {
       <div className="page-meta">
         <span>
           {page
-            ? `${page.items.length} rules on this page`
+            ? `Rules on this page: ${page.items.length}`
             : "Personal alert rules"}
         </span>
         <button className="text-button" onClick={refresh}>

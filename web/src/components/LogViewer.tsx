@@ -285,7 +285,7 @@ export function LogViewer({ job, run }: { job: JobRef; run?: Wire.JobRun }) {
           {buffer.text ||
             (state === "complete"
               ? "This log is complete and contains no output."
-              : "No log output is available yet.")}
+              : "No log text is currently loaded.")}
         </pre>
       )}
       <div className="log-footer">
