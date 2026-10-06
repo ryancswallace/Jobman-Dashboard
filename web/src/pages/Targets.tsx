@@ -150,7 +150,7 @@ export function TargetsPage() {
       ) : (
         !result.error && (
           <Empty title="No targets available">
-            No targets are configured in the selected namespaces.
+            No targets were returned for the selected namespaces.
           </Empty>
         )
       )}
