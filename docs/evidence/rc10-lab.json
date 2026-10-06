@@ -1,0 +1,69 @@
+{
+  "version": "v0.1.0-rc.10",
+  "revision": "5b20dfb7a51d206aeb7132db94d961a14b6ab03e",
+  "environment": "isolated synthetic Jobman-Lab",
+  "status": "passed",
+  "deployedRoles": [
+    "api",
+    "worker",
+    "broker"
+  ],
+  "archiveSHA256": "67b593fdbf5e1fe840662fab4202aa6819d6b2af9da7197cf9dce6519e82bfe1",
+  "migrationsExecuted": false,
+  "controlProcessesPreserved": true,
+  "configurationChange": "API webRoot points to immutable published bundle; prior private configurations and rollback receipts retained on guests.",
+  "tests": {
+    "jobInspection": {
+      "boundedGETs": 46,
+      "exactCommandReads": 30,
+      "namespaceDenials": 8,
+      "controlDeployments": 2
+    },
+    "previewWorkflows": {
+      "boundedRequests": 32,
+      "coverage": [
+        "monitoring",
+        "targets",
+        "collections",
+        "arrays",
+        "graph",
+        "inbox",
+        "device catalog",
+        "three personal alert scopes"
+      ]
+    },
+    "reports": [
+      "metadata collection",
+      "redacted log collection",
+      "sealed citation bytes and offsets",
+      "idempotency",
+      "cross-account denial"
+    ],
+    "webSession": [
+      "synthetic Keycloak PKCE callback",
+      "secure cookie contract",
+      "CSRF and origin rejection",
+      "preference restoration",
+      "logout revocation"
+    ],
+    "canonicalWebFilesOverVerifiedTLS": 7
+  },
+  "verificationCorrections": [
+    "Web-session opt-in was initially omitted and the test skipped; the explicit opt-in rerun passed.",
+    "Initial static probe requested /index.html, which redirects to /; corrected probe requires HTTP200 at / and exact canonical bytes."
+  ],
+  "unverified": [
+    "real AD FS/direct AD",
+    "APNs",
+    "signed or managed physical device",
+    "fresh RC10 browser rendering",
+    "production or pilot acceptance"
+  ],
+  "privateReceiptSHA256": {
+    "stage": "3ec93a6cc32d30448c4837ac88f6537a4365106470ad5e6bf4e3af830fffbaa2",
+    "activate": "f4f48707ca14ef5ada1eeae06f91c23cec1b66326e19796f32a4f82a335a7071",
+    "functional": "c328cb1c61b7415d1d73738621439475b01bc5aca5b79c9849ceec6d9961b480",
+    "webSession": "dd84226b663e911a96f9fa42060becb3c0857193434f5021c341604971d7c5e1",
+    "webFiles": "2b63e9bc7f268c3e429ac8e973fb80dcfd1ebc67c5dffc3e41103cddf8372ac8"
+  }
+}

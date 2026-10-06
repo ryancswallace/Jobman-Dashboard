@@ -6,6 +6,19 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
+No additional changes recorded after RC10.
+
+## v0.1.0-rc.10
+
+Published [engineering prerelease](https://github.com/ryancswallace/Jobman-Dashboard/releases/tag/v0.1.0-rc.10)
+from `5b20dfb7a51d206aeb7132db94d961a14b6ab03e`, with unsigned native version
+`0.1.0`, build `12`. All 25 assets and 26 attestations verify; native Linux package
+installations, both public container platforms and exact-package Lab activation/
+authenticated checks pass. See [release handoff](docs/RELEASE_HANDOFF.md) for hashes
+and evidence. RC10 browser rendering was not rerun; external Dashboard acceptance,
+stable Diagnose provider gates and optional Cloudsmith setup remain open. RC8's
+partial container push and RC9's verified unpublished draft remain immutable.
+
 - Discover release drafts through the authenticated release list and allow
   read-only verification of complete draft assets before publication.
 
