@@ -52,8 +52,12 @@ Later checkpoints supersede earlier merge, version and connectivity statements.
   selected the existing shared `jobman/stable` repository, matching sibling
   publishers. Run `37532251312` uploaded and synchronized the amd64 DEB, but
   post-upload lookup failed because the query used Python regex escapes. The
-  publisher now uses the sibling query syntax with exact filename comparison;
-  verification of all six packages remains pending.
+  publisher now uses the sibling query syntax with exact filename comparison.
+  Run `37534170921` verified DEB/RPM and uploaded the amd64 APK; Cloudsmith renamed
+  that APK during synchronization. Alpine lookup now checks name, version and
+  architecture with the original checksum. Read-only live checks find the three
+  amd64 packages and correctly report the three arm64 packages as missing.
+  Publication and verification of all six packages remain pending.
   Remaining Dashboard inputs are actual corporate
   identity, APNs and managed-device access, manual accessibility and pilot/
   operations acceptance. Production and company-device distribution approvals

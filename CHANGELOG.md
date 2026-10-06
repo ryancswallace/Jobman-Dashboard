@@ -6,6 +6,9 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
+- Verify Cloudsmith-normalized Alpine filenames by package name, version and
+  architecture while still requiring the original APK checksum.
+
 - Use Cloudsmith filename search syntax matching sibling publishers so uploaded
   Dashboard packages are found during verification and safe reruns.
 

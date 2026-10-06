@@ -16,10 +16,47 @@ release = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release)
 
 
+def alpine_identity(filename):
+    if not filename.endswith(".apk"):
+        return None
+    match = re.fullmatch(r"jobman-dashboard_(v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+)_linux_(amd64|arm64)\.apk", filename)
+    release.need(match, "Invalid canonical Alpine filename")
+    version, arch = match.groups()
+    name = "jobman-dashboard-" + version[1:].replace(".", "-")
+    package_version = version[1:].replace("-rc.", "_rc.") + "-r1"
+    return name, package_version, {"amd64": "x86_64", "arm64": "aarch64"}[arch]
+
+
+def registry_query(filename):
+    identity = alpine_identity(filename)
+    if identity:
+        name, version, _ = identity
+        return f"format:alpine AND name:^{name}$ AND version:^{version}$"
+    # Cloudsmith search anchors are not Python regular expressions.
+    return "filename:^" + filename + "$"
+
+
+def matches_package(record, filename):
+    identity = alpine_identity(filename)
+    if not identity:
+        return record.get("filename") == filename
+    name, version, arch = identity
+    # Cloudsmith normalizes APK filenames; both architectures share the same
+    # filename. Require the complete package identity before comparing bytes.
+    if record.get("filename") not in (filename, f"{name}-{version}.apk"):
+        return False
+    release.need(record.get("format") == "alpine" and record.get("name") == name and record.get("version") == version,
+                 "Registry Alpine package identity conflicts with the upload")
+    architectures = record.get("architectures")
+    release.need(isinstance(architectures, list) and len(architectures) == 1 and isinstance(architectures[0], dict),
+                 "Registry Alpine architecture is unavailable or ambiguous")
+    return architectures[0].get("name") == arch
+
+
 def package_state(response, filename, expected):
     records = response.get("data", [])
-    matching = [item for item in records if item.get("filename") == filename]
-    release.need(len(matching) <= 1, "Duplicate registry filename requires manual investigation")
+    matching = [item for item in records if matches_package(item, filename)]
+    release.need(len(matching) <= 1, "Duplicate registry package identity requires manual investigation")
     if not matching:
         return "missing", None
     record = matching[0]
@@ -103,9 +140,7 @@ def main():
                 release.need(name in checksums, "Published RC package set is incomplete")
                 package = directory / name
                 release.attest(package, args)
-                # Match the sibling publishers: Cloudsmith query parsing does not
-                # accept Python regex escapes. package_state enforces exact identity.
-                command = ["cloudsmith", "list", "packages", args.destination, "--output-format", "json", "--query", "filename:^" + name + "$"]
+                command = ["cloudsmith", "list", "packages", args.destination, "--output-format", "json", "--query", registry_query(name)]
                 state, record = package_state(json.loads(release.capture(command)), name, checksums[name])
                 if state == "missing":
                     release.run(["cloudsmith", "push", kind, args.destination + "/" + distro + "/any-version", str(package), "--tags", "rc,source-sha256-" + checksums[name]], timeout=600)

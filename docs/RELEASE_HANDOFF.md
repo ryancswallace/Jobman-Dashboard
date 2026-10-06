@@ -76,8 +76,11 @@ Authentication passed in run `37522208724`, but the original `jobman/dashboard`
 destination was unavailable. The operator selected the existing `jobman/stable`
 repository used by sibling publishers. Run `37532251312` uploaded the amd64 DEB;
 its verification lookup exposed incompatible filename escaping. The query is
-corrected to match the sibling publishers. Verification of all six packages
-remains pending. This destination does not change Dashboard prerelease status or imply
+corrected to match the sibling publishers. Run `37534170921` verified DEB/RPM
+and uploaded the amd64 APK, exposing Cloudsmith Alpine filename normalization.
+The publisher now identifies APKs by name, version and architecture with the
+original checksum. All three amd64 packages are present; the arm64 packages and
+all-six workflow verification remain pending. This destination does not change Dashboard prerelease status or imply
 production or company-device distribution approval.
 
 ## Historical RC7 handoff — retained unchanged
