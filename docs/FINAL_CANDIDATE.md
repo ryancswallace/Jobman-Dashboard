@@ -55,7 +55,7 @@ flag that waives upstream or external acceptance.
    selection.
 2. Choose the next unused `vX.Y.Z-rc.N` and an explicit native build greater than
    the previous published build. RC7 used marketing version `0.1.0`, build `9`;
-   the selected RC9 mapping is marketing version `0.1.0`, build `11`. The release
+   the selected RC10 mapping is marketing version `0.1.0`, build `12`. The release
    workflow derives the three-component marketing version from the selected RC
    and requires the operator-provided native build. Do not infer the native build
    from the RC suffix.
@@ -63,7 +63,7 @@ flag that waives upstream or external acceptance.
 
    ```sh
    gh workflow run release.yml --repo ryancswallace/Jobman-Dashboard --ref main \
-     -f version=v0.1.0-rc.9 -f nativeBuild=11
+     -f version=v0.1.0-rc.10 -f nativeBuild=12
    ```
 
 4. The workflow builds canonical Linux archives and DEB/RPM/APK packages twice,
@@ -95,7 +95,7 @@ release or push containers.
 
 ```sh
 gh workflow run ci.yml --ref <reviewed-branch-or-commit> \
-  -f candidateVersion=v0.1.0-rc.9 -f nativeVersion=0.1.0 -f nativeBuild=11
+  -f candidateVersion=v0.1.0-rc.10 -f nativeVersion=0.1.0 -f nativeBuild=12
 ```
 
 Verify outer/inner Linux checksums, exact build metadata and native tar/inventory

@@ -44,6 +44,20 @@ using its own child-manifest digest while retaining the index as release identit
 The next selected candidate is RC9 with unsigned native build11; its publication
 and exact-byte Lab deployment remain pending.
 
+### Verified RC9 draft retained
+
+[PR20](https://github.com/ryancswallace/Jobman-Dashboard/pull/20) repaired platform
+verification and merged at `d47ea417a4ae77a0bb0e6872bbbbcb6cd3ae5627` after passing
+CI and independent review. [RC9 publication](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37512314090)
+passed all builds, lifecycle tests, both container architectures, SPDX generation
+and GitHub attestations. It created the immutable tag and a draft with 25 assets,
+then stopped because GitHub's release-by-tag endpoint does not return drafts.
+The draft and container are retained without replacing any bytes. Publication
+now discovers the exact draft through the authenticated release list; a separate
+read-only verification command exercises downloaded assets and provenance before
+publication. The next selected candidate is RC10/native build12, with publication
+and exact-byte Lab deployment still pending.
+
 ## Current next actions
 
 Expanded job inspection and compatible target pagination pass live two-Control Lab verification. [Dashboard PR17](https://github.com/ryancswallace/Jobman-Dashboard/pull/17) records final CI and merge state. [Control PR31](https://github.com/ryancswallace/Jobman-Control/pull/31) is merged at `733dea9001116ebd9327351e40168491f780b870`; all required checks passed and original branch protections were restored. Earlier ecosystem PR approval/merge cleanup is complete.

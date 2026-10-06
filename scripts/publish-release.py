@@ -59,6 +59,32 @@ def latest_gate(runs, revision):
     need(latest.get("status") == "completed" and latest.get("conclusion") == "success", "Latest exact-commit workflow did not succeed")
 
 
+def release_for_tag(repository, version):
+    """Find drafts through the authenticated list API, then address their ID.
+
+    GitHub's releases/tags endpoint only returns published releases. Scan a
+    bounded complete list so duplicate matching drafts cannot select arbitrarily.
+    """
+    matches = []
+    for page in range(1, 11):
+        releases = api(f"repos/{repository}/releases?per_page=100&page={page}")
+        need(isinstance(releases, list) and len(releases) <= 100, "Unexpected release listing response")
+        for release in releases:
+            need(isinstance(release, dict), "Unexpected release listing entry")
+            if release.get("tag_name") == version:
+                matches.append(release)
+        need(len(matches) <= 1, "Multiple releases match the candidate tag")
+        if len(releases) < 100:
+            if not matches:
+                return None
+            release_id = matches[0].get("id")
+            need(type(release_id) is int and release_id > 0, "Invalid release ID")
+            selected = api(f"repos/{repository}/releases/{release_id}")
+            need(selected.get("id") == release_id and selected.get("tag_name") == version, "Release identity changed after discovery")
+            return selected
+    raise ValueError("Release listing exceeds the bounded discovery limit")
+
+
 def preflight(args):
     selection(args.version, args.revision, args.repository)
     need(os.environ.get("GITHUB_REF") == "refs/heads/main", "Publication must run from main")
@@ -70,8 +96,7 @@ def preflight(args):
     # A list endpoint distinguishes an absent tag from authentication/network errors.
     refs = api(f"repos/{args.repository}/git/matching-refs/tags/{args.version}")
     need(not any(r["ref"] == "refs/tags/" + args.version for r in refs), "Tag already exists; recovery requires a new RC, never overwrite")
-    releases = api(f"repos/{args.repository}/releases?per_page=100")
-    need(not any(r["tag_name"] == args.version for r in releases), "Release already exists; use a new RC")
+    need(release_for_tag(args.repository, args.version) is None, "Release already exists; use a new RC")
 
 
 def package_module():
@@ -244,11 +269,13 @@ def stage(args):
     run(["gh", "release", "upload", args.version, "--repo", args.repository, *[str(p) for p in sorted(args.input.iterdir())]], timeout=900)
 
 
-def publish(args):
+def verify_draft(args):
+    """Read-only verification of every staged asset, source proof and image pin."""
     selection(args.version, args.revision, args.repository)
     local = read_checksums(args.input)
     need(set(local) == expected_assets(args.version), "Release payload/SBOM set is incomplete or unexpected")
-    release = api(f"repos/{args.repository}/releases/tags/{args.version}")
+    release = release_for_tag(args.repository, args.version)
+    need(release is not None, "Candidate release does not exist")
     need(release["draft"] is True and release["prerelease"] is True, "Only a staged draft prerelease can be published")
     need(api(f"repos/{args.repository}/git/ref/tags/{args.version}")["object"]["sha"] == args.revision, "Reserved release tag moved")
     need({a["name"] for a in release["assets"]} == set(local) | {"SHA256SUMS"} and len(release["assets"]) == len(local) + 1, "Remote asset inventory differs")
@@ -264,13 +291,20 @@ def publish(args):
         attest("oci://" + container["image"] + "@" + container["digest"], args)
         resolved = capture(["docker", "buildx", "imagetools", "inspect", container["image"] + ":" + args.version, "--format", "{{.Manifest.Digest}}"])
         need(resolved == container["digest"], "Versioned container tag moved")
-    # Never mark any candidate as latest, stable, or final-release eligible.
-    run(["gh", "release", "edit", args.version, "--repo", args.repository, "--draft=false", "--prerelease", "--latest=false"])
+    return release["id"]
+
+
+def publish(args):
+    release_id = verify_draft(args)
+    # Address precisely the verified draft; never re-resolve it by tag or mark
+    # a candidate as latest, stable, or final-release eligible.
+    published = api(f"repos/{args.repository}/releases/{release_id}", "--method", "PATCH", "-F", "draft=false", "-F", "prerelease=true", "-f", "make_latest=false")
+    need(published.get("id") == release_id and published.get("tag_name") == args.version and published.get("draft") is False and published.get("prerelease") is True, "Published release identity or state differs")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("preflight", "context", "verify-container", "assemble", "checksums", "stage", "publish"))
+    parser.add_argument("command", choices=("preflight", "context", "verify-container", "assemble", "checksums", "stage", "verify-draft", "publish"))
     parser.add_argument("--version", default=os.environ.get("RELEASE_VERSION", ""))
     parser.add_argument("--revision", default=os.environ.get("GITHUB_SHA", ""))
     parser.add_argument("--repository", default=os.environ.get("GITHUB_REPOSITORY", ""))
@@ -281,7 +315,9 @@ def main():
     parser.add_argument("--runtime-architecture", choices=("amd64", "arm64", "all"))
     args = parser.parse_args()
     try:
-        globals()[args.command.replace("-", "_")](args)
+        result = globals()[args.command.replace("-", "_")](args)
+        if args.command == "verify-draft":
+            print(json.dumps({"verifiedDraftReleaseId": result, "version": args.version, "revision": args.revision, "published": False}, sort_keys=True))
     except (ValueError, KeyError, OSError, subprocess.SubprocessError) as error:
         parser.exit(1, f"Release stopped: {error}\nExisting tags, drafts and images are retained. Use a new RC after partial publication.\n")
 

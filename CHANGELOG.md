@@ -6,6 +6,9 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
+- Discover release drafts through the authenticated release list and allow
+  read-only verification of complete draft assets before publication.
+
 - Verify each container architecture by its own immutable manifest digest so
   release checks also work with Docker image stores that load one platform per digest.
 

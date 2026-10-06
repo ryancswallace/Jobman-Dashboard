@@ -92,17 +92,67 @@ class PublicationTests(unittest.TestCase):
             for name in release.expected_assets(VERSION):
                 (root / name).write_bytes(b'fixture')
             release.checksums(self.args(input=root))
-            record = {'draft': True, 'prerelease': True, 'assets': [{'name': p.name} for p in root.iterdir()]}
+            record = {'id': 405033021, 'tag_name': VERSION, 'draft': True, 'prerelease': True, 'assets': [{'name': p.name} for p in root.iterdir()]}
             commands = []
             def command(args, **kwargs):
                 commands.append(args)
                 if args[:3] == ['gh', 'release', 'download']:
                     target = Path(args[args.index('--dir') + 1])
                     for path in root.iterdir(): shutil.copyfile(path, target / path.name)
-            with patch.object(release, 'api', side_effect=[record, {'object': {'sha': REVISION}}]), patch.object(release, 'run', side_effect=command), patch.object(release, 'attest', side_effect=ValueError('wrong source')):
+            with patch.object(release, 'api', side_effect=[[record], record, {'object': {'sha': REVISION}}]), patch.object(release, 'run', side_effect=command), patch.object(release, 'attest', side_effect=ValueError('wrong source')):
                 with self.assertRaisesRegex(ValueError, 'wrong source'):
                     release.publish(self.args(input=root))
             self.assertFalse(any(command[:3] == ['gh', 'release', 'edit'] for command in commands))
+
+    def test_draft_discovery_paginates_list_then_fetches_exact_id(self):
+        unrelated = [{'id': n + 1, 'tag_name': f'v0.0.0-rc.{n + 1}', 'draft': False} for n in range(100)]
+        draft = {'id': 405033021, 'tag_name': VERSION, 'draft': True, 'prerelease': True, 'assets': []}
+        with patch.object(release, 'api', side_effect=[unrelated, [draft], draft]) as api:
+            self.assertEqual(release.release_for_tag(REPO, VERSION), draft)
+        self.assertEqual([call.args[0] for call in api.call_args_list], [f'repos/{REPO}/releases?per_page=100&page=1', f'repos/{REPO}/releases?per_page=100&page=2', f'repos/{REPO}/releases/405033021'])
+
+    def test_draft_discovery_rejects_duplicates_identity_changes_and_unbounded_lists(self):
+        draft = {'id': 405033021, 'tag_name': VERSION, 'draft': True}
+        for responses in ([[draft, draft]], [[draft], draft | {'tag_name': 'v0.1.0-rc.99'}], [[draft | {'id': '405033021'}]]):
+            with self.subTest(responses=responses), patch.object(release, 'api', side_effect=responses), self.assertRaises(ValueError):
+                release.release_for_tag(REPO, VERSION)
+        with patch.object(release, 'api', return_value=[{'id': n + 1, 'tag_name': 'unrelated'} for n in range(100)]) as api:
+            with self.assertRaisesRegex(ValueError, 'bounded discovery'):
+                release.release_for_tag(REPO, VERSION)
+            self.assertEqual(api.call_count, 10)
+
+    def test_verify_draft_uses_real_list_and_id_shapes_and_never_mutates(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for name in release.expected_assets(VERSION):
+                (root / name).write_bytes(b'fixture')
+            container = {'image': 'ghcr.io/owner/dashboard', 'digest': 'sha256:' + 'e' * 64, 'version': VERSION, 'revision': REVISION, 'canonicalPayloadVerified': True}
+            (root / 'container.json').write_text(json.dumps(container))
+            release.checksums(self.args(input=root))
+            draft = {'id': 405033021, 'tag_name': VERSION, 'draft': True, 'prerelease': True, 'assets': [{'id': n, 'name': path.name} for n, path in enumerate(root.iterdir())]}
+            def download(args, **kwargs):
+                self.assertEqual(args[:3], ['gh', 'release', 'download'])
+                target = Path(args[args.index('--dir') + 1])
+                for path in root.iterdir(): shutil.copyfile(path, target / path.name)
+            def api_response(path, *args):
+                self.assertFalse(args, 'Verification must use only read APIs')
+                if path == f'repos/{REPO}/releases?per_page=100&page=1': return [draft]
+                if path == f'repos/{REPO}/releases/405033021': return draft
+                if path == f'repos/{REPO}/git/ref/tags/{VERSION}': return {'object': {'sha': REVISION}}
+                self.fail('Unexpected endpoint (draft lookup by tag would return404): ' + path)
+            with patch.object(release, 'api', side_effect=api_response), patch.object(release, 'run', side_effect=download), patch.object(release, 'attest') as attest, patch.object(release, 'capture', return_value=container['digest']), patch.object(release, 'preflight') as preflight:
+                self.assertEqual(release.verify_draft(self.args(input=root)), 405033021)
+                preflight.assert_not_called()
+                self.assertEqual(attest.call_count, len(release.expected_assets(VERSION)) + 2)
+                self.assertEqual(attest.call_args.args[0], 'oci://' + container['image'] + '@' + container['digest'])
+
+    def test_publish_updates_only_verified_id_as_nonlatest_prerelease(self):
+        published = {'id': 405033021, 'tag_name': VERSION, 'draft': False, 'prerelease': True}
+        with patch.object(release, 'verify_draft', return_value=405033021) as verify, patch.object(release, 'api', return_value=published) as api:
+            args = self.args()
+            release.publish(args)
+            verify.assert_called_once_with(args)
+            api.assert_called_once_with(f'repos/{REPO}/releases/405033021', '--method', 'PATCH', '-F', 'draft=false', '-F', 'prerelease=true', '-f', 'make_latest=false')
 
     def test_image_absence_requires_explicit_registry_result(self):
         for stderr in ('ERROR: ghcr.io/owner/app:v0.1.0-rc.8: not found', 'manifest unknown'):
