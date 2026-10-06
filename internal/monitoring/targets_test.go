@@ -304,3 +304,118 @@ func TestTargetCursorKeepsMaximumScopeMetadataWithinExistingEncodingCeiling(t *t
 		t.Fatalf("bounded replay encoding %d %v", len(data), err)
 	}
 }
+
+// This source models Control's committed-visible watermark, including an insert
+// committed after the metadata probe but before the first data-page request.
+type watermarkTargetFixture struct {
+	*targetFixture
+	queries []TargetSourceQuery
+	change  time.Duration
+}
+
+func (s *watermarkTargetFixture) Targets(_ context.Context, _ Actor, q TargetSourceQuery) (TargetSourcePage, error) {
+	s.queries = append(s.queries, q)
+	if len(s.queries) == 2 {
+		late := s.targetRows[0]
+		late.TargetID = "late-insert"
+		late.CreatedAt = late.CreatedAt.Add(time.Second)
+		s.targetRows = append([]api.Target{late}, s.targetRows...)
+	}
+	cutoff := minTime(q.CreatedBefore, s.targetRows[0].CreatedAt)
+	if len(s.queries) > 1 {
+		cutoff = cutoff.Add(s.change)
+	}
+	rows := []api.Target{}
+	for _, row := range s.targetRows {
+		if !row.CreatedAt.After(cutoff) {
+			rows = append(rows, row)
+		}
+	}
+	start, _ := strconv.Atoi(q.Cursor)
+	if start > len(rows) {
+		return TargetSourcePage{}, ErrSource
+	}
+	end := min(start+q.Limit, len(rows))
+	p := TargetSourcePage{Items: rows[start:end], Total: strconv.Itoa(len(rows)), AsOf: clock, CreatedBefore: cutoff}
+	if end < len(rows) {
+		p.NextCursor = strconv.Itoa(end)
+	}
+	return p, nil
+}
+
+func minTime(a, b time.Time) time.Time {
+	if a.Before(b) {
+		return a
+	}
+	return b
+}
+
+func TestTargetsPinEachSourceWatermarkBeforeDataAndReplay(t *testing.T) {
+	a := &watermarkTargetFixture{targetFixture: newTargetFixture("a", 3)}
+	b := &watermarkTargetFixture{targetFixture: newTargetFixture("b", 3)}
+	for _, item := range []struct {
+		source *watermarkTargetFixture
+		age    time.Duration
+	}{{a, time.Hour}, {b, 2 * time.Hour}} {
+		for i := range item.source.targetRows {
+			item.source.targetRows[i].CreatedAt = item.source.targetRows[i].CreatedAt.Add(-item.age)
+		}
+	}
+	e := groupEngine(t, a, b)
+	q := TargetQuery{Limit: 2}
+	page, err := e.Targets(t.Context(), actor("alice"), q, "")
+	seen := map[string]bool{}
+	for pages := 0; ; pages++ {
+		if err != nil || pages > 5 || page.Total != "6" || page.Completeness != "complete" {
+			t.Fatal("stable source watermarks were not preserved", err)
+		}
+		for _, item := range page.Items {
+			key := item.DeploymentID + item.TargetID
+			if item.TargetID == "late-insert" || seen[key] {
+				t.Fatal("late or duplicate target entered the pinned browse")
+			}
+			seen[key] = true
+		}
+		if page.NextCursor == "" {
+			break
+		}
+		cursor := page.NextCursor
+		page, err = e.Targets(t.Context(), actor("alice"), q, cursor)
+		before := len(a.queries) + len(b.queries)
+		replay, replayErr := e.Targets(t.Context(), actor("alice"), q, cursor)
+		if replayErr != nil || !reflect.DeepEqual(page, replay) || len(a.queries)+len(b.queries) != before {
+			t.Fatal("replay changed the page or refetched source rows", replayErr)
+		}
+	}
+	if len(seen) != 6 {
+		t.Fatal("pinned pagination lost an original target")
+	}
+	for _, item := range []struct {
+		source *watermarkTargetFixture
+		cutoff time.Time
+	}{{a, clock.Add(-time.Hour)}, {b, clock.Add(-2 * time.Hour)}} {
+		if len(item.source.queries) < 3 || item.source.queries[1].Cursor != "" {
+			t.Fatal("test did not exercise probe, first data fetch and continuation")
+		}
+		for _, query := range item.source.queries[1:] {
+			if !query.CreatedBefore.Equal(item.cutoff) {
+				t.Fatal("source-specific effective cutoff was not persisted")
+			}
+		}
+	}
+}
+
+func TestTargetsRejectWatermarkChangeAfterProbe(t *testing.T) {
+	for _, change := range []time.Duration{-time.Second, time.Second} {
+		t.Run(change.String(), func(t *testing.T) {
+			source := &watermarkTargetFixture{targetFixture: newTargetFixture("a", 3), change: change}
+			for i := range source.targetRows {
+				source.targetRows[i].CreatedAt = source.targetRows[i].CreatedAt.Add(-time.Hour)
+			}
+			e := groupEngine(t, source)
+			if _, err := e.Targets(t.Context(), actor("alice"), TargetQuery{Limit: 2}, ""); err == nil {
+				t.Fatal("changed watermark accepted between probe and data fetch")
+			}
+		})
+	}
+}

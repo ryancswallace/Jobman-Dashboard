@@ -120,3 +120,95 @@ func TestTargetAdapterPreservesBoundedFactsAndAuthority(t *testing.T) {
 		})
 	}
 }
+
+func TestTargetAdapterEffectiveCreationWatermark(t *testing.T) {
+	for _, mode := range []string{"clamped", "echoed", "empty", "zero", "widened", "row-after-watermark", "continuation-shrinks", "continuation-widens"} {
+		t.Run(mode, func(t *testing.T) {
+			now := time.Now().UTC()
+			cutoff := now.Add(-time.Hour)
+			if mode == "echoed" {
+				cutoff = now
+			} else if mode == "empty" {
+				cutoff = time.Unix(0, 0).UTC()
+			}
+			c := testClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/v1/capabilities":
+					v := capabilities(now)
+					m := v["capabilities"].(map[string]any)
+					m["features"] = append(m["features"].([]string), "target-catalogs")
+					respond(w, v)
+				case "/v1/me":
+					v := grants(now, "9")
+					v["namespaces"].([]any)[0].(map[string]any)["capabilities"] = []string{"namespace.read", "targets.read"}
+					respond(w, v)
+				default:
+					second := r.URL.Query().Get("pageToken") != ""
+					want := now
+					if second {
+						want = cutoff
+					}
+					if r.URL.Query().Get("createdBefore") != want.Format(time.RFC3339Nano) || second && r.URL.Query().Get("pageToken") != "opaque-next" {
+						t.Error("source request did not retain the effective watermark and opaque token")
+					}
+					returned := cutoff
+					switch mode {
+					case "zero":
+						returned = time.Time{}
+					case "widened":
+						returned = now.Add(time.Second)
+					case "continuation-shrinks":
+						if second {
+							returned = cutoff.Add(-time.Minute)
+						}
+					case "continuation-widens":
+						if second {
+							returned = cutoff.Add(time.Minute)
+						}
+					}
+					item := targetDocument(now)
+					item["createdAt"] = cutoff
+					next := "opaque-next"
+					if second {
+						item["createdAt"] = cutoff.Add(-2 * time.Minute)
+						next = ""
+					}
+					if mode == "row-after-watermark" {
+						item["createdAt"] = cutoff.Add(time.Minute)
+					}
+					v := map[string]any{"apiVersion": contract, "kind": "TargetCatalog", "namespace": "lab", "namespaceId": namespaceID, "asOf": now, "recoveryEpoch": "1", "authorizationVersion": "9", "authorizationCheckedAt": now, "authorizationExpiresAt": now.Add(time.Minute), "createdBefore": returned, "total": "2", "items": []any{item}, "nextPageToken": next}
+					if mode == "empty" {
+						v["total"], v["items"], v["nextPageToken"] = "0", []any{}, ""
+					}
+					respond(w, v)
+				}
+			}))
+			q := monitoring.TargetSourceQuery{NamespaceID: namespaceID, Limit: 1, CreatedBefore: now}
+			first, err := c.Targets(t.Context(), testActor, q)
+			if mode == "empty" {
+				if err != nil || !first.CreatedBefore.Equal(cutoff) || len(first.Items) != 0 || first.Total != "0" || first.NextCursor != "" {
+					t.Fatal("empty committed catalog watermark rejected", err)
+				}
+				return
+			}
+			if mode == "zero" || mode == "widened" || mode == "row-after-watermark" {
+				if err == nil {
+					t.Fatal("accepted invalid initial watermark or out-of-window row")
+				}
+				return
+			}
+			if err != nil || !first.CreatedBefore.Equal(cutoff) || first.NextCursor != "opaque-next" {
+				t.Fatal("effective initial watermark unavailable", err)
+			}
+			q.CreatedBefore, q.Cursor = first.CreatedBefore, first.NextCursor
+			second, err := c.Targets(t.Context(), testActor, q)
+			if strings.HasPrefix(mode, "continuation-") {
+				if err == nil {
+					t.Fatal("accepted changed continuation watermark")
+				}
+			} else if err != nil || !second.CreatedBefore.Equal(cutoff) || second.NextCursor != "" {
+				t.Fatal("valid continuation failed", err)
+			}
+		})
+	}
+}

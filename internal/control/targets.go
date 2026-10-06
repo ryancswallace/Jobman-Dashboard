@@ -115,14 +115,16 @@ func (c *Client) Targets(ctx context.Context, a monitoring.Actor, q monitoring.T
 	if err = c.get(ctx, a, "targets.read", n.ID, "/v1/namespaces/"+n.Name+"/target-catalog", params, &v); err != nil {
 		return out, err
 	}
-	if !c.validTargetAuthority(v.targetAuthority, d, n, "TargetCatalog") || !v.CreatedBefore.Equal(q.CreatedBefore) || !decimal(v.Total) || v.Items == nil || len(v.Items) > q.Limit || len(v.Next) > 1024 || v.Next != "" && (v.Next == q.Cursor || len(v.Items) == 0) {
+	// Newer Control sources clamp the initial wall-clock cutoff to their
+	// committed creation watermark. Continuations must retain that exact value.
+	if !c.validTargetAuthority(v.targetAuthority, d, n, "TargetCatalog") || v.CreatedBefore.IsZero() || v.CreatedBefore.After(q.CreatedBefore) || q.Cursor != "" && !v.CreatedBefore.Equal(q.CreatedBefore) || !decimal(v.Total) || v.Items == nil || len(v.Items) > q.Limit || len(v.Next) > 1024 || v.Next != "" && (v.Next == q.Cursor || len(v.Items) == 0) {
 		return out, monitoring.ErrSource
 	}
-	out = monitoring.TargetSourcePage{Items: []api.Target{}, Total: v.Total, NextCursor: v.Next, AsOf: v.AsOf}
+	out = monitoring.TargetSourcePage{Items: []api.Target{}, Total: v.Total, NextCursor: v.Next, AsOf: v.AsOf, CreatedBefore: v.CreatedBefore}
 	bytes := 0
 	for _, raw := range v.Items {
 		item, err := mapTarget(raw, scope, v.AsOf)
-		if err != nil || item.CreatedAt.After(q.CreatedBefore) {
+		if err != nil || item.CreatedAt.After(v.CreatedBefore) {
 			return monitoring.TargetSourcePage{}, monitoring.ErrSource
 		}
 		b, _ := json.Marshal(raw)
