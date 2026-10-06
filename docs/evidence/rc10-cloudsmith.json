@@ -1,0 +1,65 @@
+{
+  "version": "v0.1.0-rc.10",
+  "repository": "jobman/stable",
+  "packages": [
+    {
+      "filename": "jobman-dashboard_v0.1.0-rc.10_linux_amd64.apk",
+      "registry_filename": "jobman-dashboard-0-1-0-rc-10-0.1.0_rc.10-r1.apk",
+      "source_sha256": "902447ee348bee50e62836ef594219c185a0951c6eed0477535221c92f62cbed",
+      "registry_sha256": "902447ee348bee50e62836ef594219c185a0951c6eed0477535221c92f62cbed",
+      "package_id": "3vbh1Mghuo30",
+      "public_download_verified": true,
+      "source_content_verified": true
+    },
+    {
+      "filename": "jobman-dashboard_v0.1.0-rc.10_linux_amd64.deb",
+      "registry_filename": "jobman-dashboard_v0.1.0-rc.10_linux_amd64.deb",
+      "source_sha256": "0a69ac6e85ebff22f981b4ee8ac715d3fb9b6c13a81071c7a0068ccaa44aeb93",
+      "registry_sha256": "0a69ac6e85ebff22f981b4ee8ac715d3fb9b6c13a81071c7a0068ccaa44aeb93",
+      "package_id": "uWRYZFYiWlfA",
+      "public_download_verified": true,
+      "source_content_verified": true
+    },
+    {
+      "filename": "jobman-dashboard_v0.1.0-rc.10_linux_amd64.rpm",
+      "registry_filename": "jobman-dashboard_v0.1.0-rc.10_linux_amd64.rpm",
+      "source_sha256": "586f666c6cde8b3dfafc7b16ae0c998c8ebed9eb09434b3c052fbc0837179182",
+      "registry_sha256": "1e39ebb7d2b760fe66d64453b071dc3bc5f7922ff715de5bbe2eb84ba2773b8e",
+      "package_id": "g7PFx8ddVkJU",
+      "public_download_verified": true,
+      "source_content_verified": true
+    },
+    {
+      "filename": "jobman-dashboard_v0.1.0-rc.10_linux_arm64.apk",
+      "registry_filename": "jobman-dashboard-0-1-0-rc-10-0.1.0_rc.10-r1.apk",
+      "source_sha256": "f2e5a0f70e94e12f37475ef0a55014efe779d32ebca245ff3dce8ec1ef89be2e",
+      "registry_sha256": "f2e5a0f70e94e12f37475ef0a55014efe779d32ebca245ff3dce8ec1ef89be2e",
+      "package_id": "xFqnV6QJWrdf",
+      "public_download_verified": true,
+      "source_content_verified": true
+    },
+    {
+      "filename": "jobman-dashboard_v0.1.0-rc.10_linux_arm64.deb",
+      "registry_filename": "jobman-dashboard_v0.1.0-rc.10_linux_arm64.deb",
+      "source_sha256": "eb7df7996dc7b41e9df5679b6fc6169fddf1325b77c3cb0d1b24554bbd8c1d92",
+      "registry_sha256": "eb7df7996dc7b41e9df5679b6fc6169fddf1325b77c3cb0d1b24554bbd8c1d92",
+      "package_id": "cdFCxSZWE4Mt",
+      "public_download_verified": true,
+      "source_content_verified": true
+    },
+    {
+      "filename": "jobman-dashboard_v0.1.0-rc.10_linux_arm64.rpm",
+      "registry_filename": "jobman-dashboard_v0.1.0-rc.10_linux_arm64.rpm",
+      "source_sha256": "fa46bce48042e32e54011c2738bbd2a6dce1fe4c81c48b730adcaceae33bee9b",
+      "registry_sha256": "2f7b254e47286d23be06e314b4b08692e0196952a475f2748197e547573b48ec",
+      "package_id": "bxXodCqC7ELi",
+      "public_download_verified": true,
+      "source_content_verified": true
+    }
+  ],
+  "verified_on": "2026-10-06",
+  "workflow_run": "https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37535796557",
+  "publisher_revision": "a4d84a56fa134630c00c2112f532187b24f3d2d7",
+  "release_revision": "5b20dfb7a51d206aeb7132db94d961a14b6ab03e",
+  "workflow_conclusion": "success"
+}

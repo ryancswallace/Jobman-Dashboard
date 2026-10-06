@@ -133,6 +133,11 @@ installation and activation are deliberately separate operator actions.
 
 ## Cloudsmith setup
 
+RC10 publication to `jobman/stable` completed in
+[run 37535796557](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37535796557).
+All six packages were also downloaded publicly and compared with the verified
+release artifacts; see [the registry verification record](evidence/rc10-cloudsmith.json).
+
 The optional `publish-cloudsmith-packages.yml` workflow uses a **personal
 Cloudsmith API key**, matching the other Jobman repositories. A service account,
 OIDC integration or paid plan is not required by this workflow. The key acts with

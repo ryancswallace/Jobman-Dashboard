@@ -46,18 +46,15 @@ Later checkpoints supersede earlier merge, version and connectivity statements.
   all six packages contain the verified 88-file payload and native build `11`
   passed. RC9 remains unpublished as draft ID `405033021`; no prior version was
   overwritten or promoted. Earlier failure records remain below.
-- The Dashboard `main` environment now has a personal `CLOUDSMITH_API_KEY`.
-  Authentication passed in run `37522208724`; its package listing failed because
-  the original `jobman/dashboard` destination was unavailable. The operator has
-  selected the existing shared `jobman/stable` repository, matching sibling
-  publishers. Run `37532251312` uploaded and synchronized the amd64 DEB, but
-  post-upload lookup failed because the query used Python regex escapes. The
-  publisher now uses the sibling query syntax with exact filename comparison.
-  Run `37534170921` verified DEB/RPM and uploaded the amd64 APK; Cloudsmith renamed
-  that APK during synchronization. Alpine lookup now checks name, version and
-  architecture with the original checksum. Read-only live checks find the three
-  amd64 packages and correctly report the three arm64 packages as missing.
-  Publication and verification of all six packages remain pending.
+- Cloudsmith distribution is complete for RC10. The personal API key and shared
+  `jobman/stable` repository match the other Jobman publishers. [Run 37535796557](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37535796557)
+  succeeded from publisher revision `a4d84a56fa134630c00c2112f532187b24f3d2d7`,
+  verifying all six amd64/arm64 DEB/RPM/APK packages and reusing the three existing
+  amd64 uploads. Independent public downloads matched the source DEB/APK hashes
+  and RPM content outside Cloudsmith's signature header; [registry evidence](evidence/rc10-cloudsmith.json)
+  records exact source/registry hashes and package IDs. The earlier missing
+  destination, filename-query escaping and Alpine filename-normalization failures
+  remain recorded in runs `37522208724`, `37532251312` and `37534170921`.
   Remaining Dashboard inputs are actual corporate
   identity, APNs and managed-device access, manual accessibility and pilot/
   operations acceptance. Production and company-device distribution approvals
