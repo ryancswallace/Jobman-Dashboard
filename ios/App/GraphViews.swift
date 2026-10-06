@@ -10,7 +10,7 @@ struct GraphExplorer: View {
     }
     var body: some View {
         GraphSnapshotView(workload: workload, center: center) { center = $0 }
-            .id(center).navigationTitle("Graph neighborhood")
+            .id(center).navigationTitle("Connected jobs")
     }
 }
 
@@ -26,7 +26,7 @@ private struct GraphSnapshotView: View {
     private var loading: Bool { requests.busy }
     var body: some View {
         List {
-            Section("Selected node") {
+            Section("Selected job") {
                 #if DEBUG
                 if NativeGraphFixtures.enabled { NativeGraphDisplayFacts() }
                 #endif
@@ -38,24 +38,24 @@ private struct GraphSnapshotView: View {
                     NavigationLink("Open selected job") { JobDetailView(ref: node.job.ref) }
                 }
             }
-            if let error { Section { ErrorMessage(error: error); Button("Retry neighborhood") { Task { await load() } } } }
-            if loading && neighborhood == nil { ProgressView("Loading bounded neighborhood…") }
+            if let error { Section { ErrorMessage(error: error); Button("Retry connected jobs") { Task { await load() } } } }
+            if loading && neighborhood == nil { ProgressView("Loading connected jobs…") }
             if let neighborhood {
-                Section("Bounded graph diagram") {
-                    Text("Neighborhood totals: \(neighborhood.totalNodes) nodes, \(neighborhood.totalEdges) edges").font(.caption).accessibilityIdentifier("graphNeighborhoodTotal")
-                    Text("Not shown in this neighborhood: \(neighborhood.omittedNodes) nodes, \(neighborhood.omittedEdges) edges").font(.caption).accessibilityIdentifier("graphOmissions")
+                Section("Connected jobs diagram") {
+                    Text("Connected area: \(neighborhood.totalNodes) jobs, \(neighborhood.totalEdges) dependencies").font(.caption).accessibilityIdentifier("graphNeighborhoodTotal")
+                    Text("Not shown here: \(neighborhood.omittedNodes) jobs, \(neighborhood.omittedEdges) dependencies").font(.caption).accessibilityIdentifier("graphOmissions")
                     Toggle("Show diagram", isOn: $showDiagram)
                     if showDiagram { DependencyDiagram(neighborhood: neighborhood, select: select) }
-                    Text("Select a node to recenter. The list below offers the same selection and job access with VoiceOver. Diagram edges do not determine readiness.").font(.footnote)
+                    Text("Each node represents a job; arrows show dependencies. Select a node to center the diagram on it, or use the list below with VoiceOver. Check the reported readiness to know whether a job can proceed.").font(.footnote)
                 }
-                Section("Accessible node list") {
+                Section("Connected jobs list") {
                     ForEach(neighborhood.nodes) { child in
                         VStack(alignment: .leading, spacing: 8) {
                             Button("Center on \(child.name ?? child.id)") { select(child.id) }
                                 .buttonStyle(.borderless).disabled(child.id == center)
                                 .accessibilityAddTraits(child.id == center ? .isSelected : [])
                                 .accessibilityIdentifier("center-\(child.id)")
-                            Text("Node \(child.id)").font(.caption)
+                            Text("Job \(child.id)").font(.caption)
                             WorkloadChildFacts(child: child)
                             NavigationLink("Open job \(child.job.id)") { JobDetailView(ref: child.job.ref) }.buttonStyle(.borderless)
                         }
@@ -84,11 +84,12 @@ struct GraphDependenciesView: View {
     var body: some View {
         List {
             Section {
-                Text("Node \(node)").font(.headline)
+                Text("Job \(node)").font(.headline)
                 Text("\(workload.deploymentId) / \(workload.namespaceId)").font(.caption)
                 Picker("Direction", selection: $direction) {
                     Text("Incoming").tag("incoming"); Text("Outgoing").tag("outgoing"); Text("Both").tag("")
                 }.pickerStyle(.segmented)
+                Text("Incoming dependencies are jobs this job depends on. Outgoing dependencies lead to jobs that depend on this one.").font(.footnote).foregroundStyle(.secondary)
             }
             GraphEdgeRows(workload: workload, node: node, direction: direction).id(direction)
         }.navigationTitle("Dependencies")
@@ -109,7 +110,7 @@ private struct GraphEdgeRows: View {
     var body: some View {
         Section("\(direction.isEmpty ? "All connected" : direction.capitalized) dependencies") {
             if let page {
-                Text("\(page.items.count) edges on this page; \(page.total ?? "unavailable") matching edges at source").font(.caption).accessibilityIdentifier("edgePageTotal")
+                Text("\(page.items.count) dependencies on this page; \(page.total ?? "not available") matching dependencies in total").font(.caption).accessibilityIdentifier("edgePageTotal")
                 if history.canGoBack { Button("Previous dependency page") { Task { await previous() } }.disabled(loading) }
                 if let cursor = page.nextCursor { Button("Next dependency page") { Task { await next(cursor) } }.disabled(loading) }
                 if history.discardedPages > 0 {
@@ -118,15 +119,15 @@ private struct GraphEdgeRows: View {
                 }
                 ForEach(page.items) { edge in
                     DisclosureGroup("\(edge.from) → \(edge.to)") {
-                        LabeledContent("Predicate", value: edge.predicate)
-                        LabeledContent("Accepted outcomes", value: edge.outcomes.isEmpty ? "None specified" : edge.outcomes.joined(separator: ", "))
+                        LabeledContent("Dependency condition", value: edge.predicate)
+                        LabeledContent("Required results", value: edge.outcomes.isEmpty ? "None specified" : edge.outcomes.joined(separator: ", "))
                         LabeledContent("Dependency state", value: edge.state)
-                        LabeledContent("Upstream phase", value: edge.upstreamPhase)
-                        LabeledContent("Upstream outcome", value: edge.upstreamOutcome ?? "Unavailable")
-                        NavigationLink("Open upstream job") { JobDetailView(ref: reference(edge.fromJobId)) }
-                        NavigationLink("Open downstream job") { JobDetailView(ref: reference(edge.toJobId)) }
-                        NavigationLink("Explore upstream node") { GraphExplorer(workload: workload, initialCenter: edge.fromJobId) }
-                        NavigationLink("Explore downstream node") { GraphExplorer(workload: workload, initialCenter: edge.toJobId) }
+                        LabeledContent("Earlier job status", value: InterfaceText.jobStatus(edge.upstreamPhase))
+                        LabeledContent("Earlier job final result", value: edge.upstreamOutcome.map(InterfaceText.finalResult) ?? "Not available")
+                        NavigationLink("Open earlier job") { JobDetailView(ref: reference(edge.fromJobId)) }
+                        NavigationLink("Open dependent job") { JobDetailView(ref: reference(edge.toJobId)) }
+                        NavigationLink("Explore earlier job") { GraphExplorer(workload: workload, initialCenter: edge.fromJobId) }
+                        NavigationLink("Explore dependent job") { GraphExplorer(workload: workload, initialCenter: edge.toJobId) }
                     }
                 }
                 if page.items.isEmpty { Text("No matching dependencies") }

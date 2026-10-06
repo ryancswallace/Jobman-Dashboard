@@ -83,8 +83,8 @@ func failure(code, message string) error { return &api.Error{Code: code, Message
 
 var (
 	ErrCursor    = failure("cursor_expired", "This browse session expired or its access changed. Refresh the list.")
-	ErrForbidden = failure("forbidden", "This scope is not currently authorized.")
-	ErrAuthority = failure("authorization_unavailable", "Current source authorization could not be verified.")
-	ErrSource    = failure("source_unavailable", "The source is unavailable. Retry when private connectivity is restored.")
-	ErrNotFound  = failure("not_found_or_inaccessible", "The resource is absent or inaccessible.")
+	ErrForbidden = failure("forbidden", "You do not currently have permission to view this information.")
+	ErrAuthority = failure("authorization_unavailable", "Your access could not be checked with Jobman Control. Try again shortly.")
+	ErrSource    = failure("source_unavailable", "Monitoring data is unavailable. Check your private network or VPN connection. If the problem continues, contact your administrator.")
+	ErrNotFound  = failure("not_found_or_inaccessible", "This item could not be found, or you do not have access to it.")
 )

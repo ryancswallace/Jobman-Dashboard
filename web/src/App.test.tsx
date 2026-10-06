@@ -98,7 +98,7 @@ afterEach(() => {
 describe("web monitoring workflows", () => {
   it("labels fixture mode and preserves two equal job IDs in separate source links", async () => {
     render(<App />);
-    expect(await screen.findByText(/Limited sample preview/)).toBeVisible();
+    expect(await screen.findByText(/Sample preview/)).toBeVisible();
     const links = await screen.findAllByRole("link", {
       name: "Synthetic test",
     });
@@ -121,7 +121,7 @@ describe("web monitoring workflows", () => {
     );
     render(<App />);
     expect(await screen.findByText(/Cancellation is requested/)).toBeVisible();
-    expect(screen.getByText("Stale")).toBeVisible();
+    expect(screen.getByText("Outdated")).toBeVisible();
     expect(screen.queryByText("Cancelled")).not.toBeInTheDocument();
     expect(screen.getByText("Started").nextElementSibling).toHaveTextContent(
       "Unavailable",
@@ -132,7 +132,7 @@ describe("web monitoring workflows", () => {
     render(<App />);
     await screen.findAllByRole("link", { name: "Synthetic test" });
     await userEvent.selectOptions(
-      screen.getByRole("combobox", { name: "Phase" }),
+      screen.getByRole("combobox", { name: "Job status" }),
       "running",
     );
     await waitFor(() => expect(location.search).toContain("phase=running"));
@@ -176,7 +176,9 @@ describe("web monitoring workflows", () => {
         : previous(input, options),
     );
     render(<App />);
-    expect(await screen.findByText(/Imported history/)).toBeVisible();
+    expect(
+      await screen.findByText(/imported from earlier records/),
+    ).toBeVisible();
     expect(screen.getByText("Started").nextElementSibling).toHaveTextContent(
       "Unavailable",
     );
@@ -184,7 +186,7 @@ describe("web monitoring workflows", () => {
       screen.getByText("Start recorded").nextElementSibling,
     ).not.toHaveTextContent("Unavailable");
     expect(
-      screen.getByText("Start provenance").nextElementSibling,
+      screen.getByText("Start time source").nextElementSibling,
     ).toHaveTextContent("Agent event");
     expect(
       screen.getByText("Current run").nextElementSibling,
@@ -203,7 +205,7 @@ describe("web monitoring workflows", () => {
       screen.getByRole("link", { name: "graph-id" }).parentElement,
     ).toHaveTextContent("node 0");
     expect(
-      screen.getByText("Graph disposition").nextElementSibling,
+      screen.getByText("Dependency decision").nextElementSibling,
     ).toHaveTextContent("Skipped");
     expect(screen.getByText("Reason").nextElementSibling).toHaveTextContent(
       "Resources",
@@ -283,7 +285,7 @@ describe("web monitoring workflows", () => {
       screen.getByRole("radio", { name: /All jobs in selected namespaces/ }),
     );
     const fieldset = screen.getByRole("group", {
-      name: "Authorized namespaces",
+      name: "Namespaces you can access",
     });
     await userEvent.click(
       within(fieldset).getByRole("checkbox", { name: "Lab East / Research" }),
@@ -291,7 +293,9 @@ describe("web monitoring workflows", () => {
     await userEvent.click(
       within(fieldset).getByRole("checkbox", { name: "Lab West / Research" }),
     );
-    await userEvent.click(screen.getByRole("button", { name: "All terminal" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "All final results" }),
+    );
     await userEvent.click(screen.getByRole("button", { name: "Save rule" }));
     await waitFor(() =>
       expect(
@@ -468,10 +472,12 @@ describe("group monitoring workflows", () => {
       screen.getByRole("button", { name: "Inspect dependencies" }),
     );
     expect(
-      await screen.findByRole("region", { name: "Neighborhood node list" }),
+      await screen.findByRole("region", { name: "Connected job list" }),
     ).toBeVisible();
     expect(
-      screen.getByText(/Not shown in this neighborhood: 4 nodes, 4 edges/),
+      screen.getByText(
+        /Not shown in this diagram: 4 nodes, 4 dependency links/,
+      ),
     ).toBeVisible();
     const inspector = screen.getByRole("region", {
       name: "Dependency inspection",
@@ -538,7 +544,9 @@ describe("group monitoring workflows", () => {
       ]),
     );
     expect(
-      screen.getByText("2 workloads in available sources (subtotal)"),
+      screen.getByText(
+        "Job groups: 2 in available deployments (partial count)",
+      ),
     ).toBeVisible();
   });
 });
@@ -578,13 +586,13 @@ it("pages artifact metadata with exact run/size and restarts paging when selecti
   expect(await screen.findByText("first-result")).toBeVisible();
   expect(screen.getByText("9,007,199,254,740,993 bytes")).toBeVisible();
   expect(
-    screen.getByText("Published metadata; bytes unverified"),
+    screen.getByText("File details only; availability not checked"),
   ).toBeVisible();
   expect(
     screen.queryByRole("link", { name: /download/i }),
   ).not.toBeInTheDocument();
   await userEvent.click(
-    screen.getByRole("button", { name: "Next artifact page →" }),
+    screen.getByRole("button", { name: "Next file page →" }),
   );
   expect(await screen.findByText("second-result")).toBeVisible();
   expect(location.search).toContain("artifactCursor=artifact-next");

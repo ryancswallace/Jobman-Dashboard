@@ -107,7 +107,7 @@ func (p PinnedLogs) ReadLogTail(ctx context.Context, r diagnostic.SharedLogReque
 }
 
 func evidenceUnavailable() error {
-	return &api.Error{Code: "evidence_unavailable", Message: "The selected log evidence could not be read within its byte, page and time limits."}
+	return &api.Error{Code: "evidence_unavailable", Message: "The selected logs could not be read within the report size or time limits. Try a report without logs, or contact your administrator."}
 }
 
 func (p PinnedLogs) matches(m logs.Manifest, r diagnostic.SharedLogRequest, run string) bool {
@@ -120,5 +120,5 @@ func (p PinnedLogs) matches(m logs.Manifest, r diagnostic.SharedLogRequest, run 
 }
 
 func snapshotChanged() error {
-	return &api.Error{Code: "snapshot_changed", Message: "The source snapshot changed. Generate a report from its current revision."}
+	return &api.Error{Code: "snapshot_changed", Message: "The job information changed while the report was being prepared. Request a new report."}
 }

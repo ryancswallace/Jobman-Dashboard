@@ -63,16 +63,20 @@ export function ArtifactList({
     <section className="panel">
       <div className="panel-heading">
         <div>
-          <h2>Published artifacts</h2>
-          <p>Metadata only. File availability has not been checked.</p>
+          <h2>Output file details</h2>
+          <p>
+            Files published by the job. Only file details are shown; files
+            cannot be opened or downloaded here, and their availability has not
+            been checked.
+          </p>
         </div>
         <button className="button secondary" onClick={firstPage}>
-          Refresh artifacts
+          Refresh file details
         </button>
       </div>
       <div className="panel-body">
         <label>
-          Actual run number{" "}
+          Run number{" "}
           <input
             aria-label="Artifact run number"
             type="text"
@@ -99,7 +103,7 @@ export function ArtifactList({
       <Completeness meta={result.data?.meta} />
       {result.error && <ErrorNotice error={result.error} retry={firstPage} />}
       {!result.data && result.loading ? (
-        <Spinner label="Loading artifact metadata" />
+        <Spinner label="Loading output file details" />
       ) : (
         result.data && (
           <>
@@ -136,7 +140,7 @@ export function ArtifactList({
                         </td>
                         <td>
                           {a.availability === "metadata_only"
-                            ? "Published metadata; bytes unverified"
+                            ? "File details only; availability not checked"
                             : a.availability}
                         </td>
                       </tr>
@@ -145,20 +149,20 @@ export function ArtifactList({
                 </table>
               </div>
             ) : (
-              <Empty title="No artifact metadata">
-                No artifacts have been published for this job
+              <Empty title="No output file details">
+                No output files have been reported for this job
                 {run ? ` in run ${run}` : ""}.
               </Empty>
             )}
             <div className="pagination">
               <span>
                 {result.data.data.items.length} shown of{" "}
-                {count(result.data.data.total)} published artifacts
+                {count(result.data.data.total)} reported output files
               </span>
               <div>
                 {cursor && (
                   <button className="button secondary" onClick={firstPage}>
-                    First artifact page
+                    First file page
                   </button>
                 )}
                 {result.data.meta.nextCursor && (
@@ -170,7 +174,7 @@ export function ArtifactList({
                       setSearch(q);
                     }}
                   >
-                    Next artifact page →
+                    Next file page →
                   </button>
                 )}
               </div>

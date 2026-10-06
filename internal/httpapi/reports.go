@@ -44,15 +44,15 @@ func reportSelection(r *http.Request) (api.Scope, string, error) {
 func writeReportError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, reports.ErrInvalid):
-		err = &api.Error{Code: "invalid_request", Message: "Supply valid report identifiers, profile and request fields."}
+		err = &api.Error{Code: "invalid_request", Message: "The report request is invalid. Reopen the job, choose a report type, and try again."}
 	case errors.Is(err, reports.ErrConflict):
-		err = &api.Error{Code: "revision_conflict", Message: "This request key is already bound to another request. Start a new request."}
+		err = &api.Error{Code: "revision_conflict", Message: "This report request conflicts with an earlier request. Start a new report request."}
 	case errors.Is(err, reports.ErrLimit):
-		err = &api.Error{Code: "rate_limited", Message: "Report capacity has been reached. Retry later or contact the operator."}
+		err = &api.Error{Code: "rate_limited", Message: "The server cannot accept more reports right now. Try again later or contact your administrator."}
 	case errors.Is(err, reports.ErrTaskNotFound):
 		err = monitoring.ErrNotFound
 	case errors.Is(err, reports.ErrRedactionUnavailable):
-		err = &api.Error{Code: "redaction_unavailable", Message: "Log-tail reports require an operator-configured value-aware redaction policy. Metadata reports remain available."}
+		err = &api.Error{Code: "redaction_unavailable", Message: "Reports that include recent logs are unavailable until your administrator configures sensitive-data removal. Reports without logs are still available."}
 	}
 	writeError(w, r, err)
 }

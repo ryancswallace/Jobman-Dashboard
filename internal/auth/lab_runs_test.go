@@ -117,8 +117,8 @@ func (r labRunsReader) get(ctx context.Context, path string, output any, status 
 		e, ok := labFaultDecodeError(raw)
 		id, decodeErr := hex.DecodeString(e.RequestID)
 		expected := map[int]struct{ code, message string }{
-			403: {"forbidden", "This scope is not currently authorized."},
-			404: {"not_found_or_inaccessible", "The resource is absent or inaccessible."},
+			403: {"forbidden", "You do not currently have permission to view this information."},
+			404: {"not_found_or_inaccessible", "This item could not be found, or you do not have access to it."},
 		}[status]
 		if !ok || decodeErr != nil || len(id) != 16 || hex.EncodeToString(id) != e.RequestID || e.Code != expected.code || e.Message != expected.message {
 			return errors.New("run acceptance denial contract differs")
@@ -677,7 +677,7 @@ func TestLabRunsReceiptsNeverOverwrite(t *testing.T) {
 
 func TestLabRunsExactSanitizedDenialsAndCancellation(t *testing.T) {
 	count, calls := 0, 0
-	raw := `{"code":"forbidden","message":"This scope is not currently authorized.","requestId":"00000000000000000000000000000000"}`
+	raw := `{"code":"forbidden","message":"You do not currently have permission to view this information.","requestId":"00000000000000000000000000000000"}`
 	status := 403
 	client := &http.Client{Transport: labRunsRoundTrip(func(r *http.Request) (*http.Response, error) {
 		calls++
@@ -701,7 +701,7 @@ func TestLabRunsExactSanitizedDenialsAndCancellation(t *testing.T) {
 			t.Fatal("ambiguous or private denial accepted")
 		}
 	}
-	raw = `{"code":"not_found_or_inaccessible","message":"The resource is absent or inaccessible.","requestId":"00000000000000000000000000000000"}`
+	raw = `{"code":"not_found_or_inaccessible","message":"This item could not be found, or you do not have access to it.","requestId":"00000000000000000000000000000000"}`
 	status = 404
 	if reader.get(t.Context(), path, nil, 404) != nil {
 		t.Fatal("exact404 absent run denied incorrectly")

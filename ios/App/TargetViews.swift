@@ -4,8 +4,8 @@ import SwiftUI
 struct TargetsView: View {
     var body: some View {
         List {
-            Section { ScopeMenu(); Text("Configured state describes policy, not agent connectivity or health. Capacity monitoring comes later.").font(.footnote)
-                Text("Grouped by source; newest targets first within each source.").font(.caption)
+            Section { ScopeMenu(); Text("A target is a system where jobs can run. These are its settings; they do not confirm that it is online or has free capacity.").font(.footnote)
+                Text("Grouped by deployment, with the newest targets first in each.").font(.caption)
             }
             TargetCatalogRows()
         }.navigationTitle("Targets")
@@ -22,17 +22,17 @@ private struct TargetCatalogRows: View {
     var body: some View {
         Section {
             if let page {
-                Text("\(page.total ?? "Unavailable") targets\(page.completeness == "partial" ? " in available sources (subtotal)" : "")").font(.caption)
+                Text("\(page.total ?? "Not available") targets\(page.completeness == "partial" ? " in available deployments (subtotal)" : "")").font(.caption)
                 ForEach(page.items) { target in
                     NavigationLink { TargetDetailView(selection: target) } label: {
                         VStack(alignment: .leading) { Text(target.name).font(.headline); Text("\(target.deploymentId) / \(target.namespaceId)").font(.caption)
-                            Text("\(target.state) · \(target.generation.executionBackend) · generation \(target.generation.number)").font(.caption)
+                            Text("\(target.state) · \(target.generation.executionBackend) · configuration \(target.generation.number)").font(.caption)
                         }
                     }
                 }
                 if !history.isEmpty { Button("Previous target page") { Task { let prior = history.last!; if await load(prior) { history.removeLast() } } }.disabled(loading) }
                 if let next = page.nextCursor { Button("Next target page") { Task { let prior = cursor; if await load(next) { history.append(prior) } } }.disabled(loading) }
-                DisclosureGroup("Source totals and observations") { ForEach(Array((page.totals ?? []).enumerated()), id: \.offset) { _, total in Text("\(total.deploymentId) / \(total.namespaceId): \(total.total) · \(total.asOf)").font(.caption) } }
+                DisclosureGroup("Totals by deployment") { ForEach(Array((page.totals ?? []).enumerated()), id: \.offset) { _, total in Text("\(total.deploymentId) / \(total.namespaceId): \(total.total) · \(total.asOf)").font(.caption) } }
                 SourceSummary(completeness: page.completeness, sources: page.sources, fetchedAt: page.fetchedAt)
             }
             if let error { ErrorMessage(error: error) }
@@ -62,7 +62,7 @@ struct TargetDetailView: View {
     @State private var refreshID = UUID()
     var body: some View {
         List {
-            Section { Text("\(selection.deploymentId) / \(selection.namespaceId)"); Text("Configuration describes policy, not agent health or capacity.").font(.footnote)
+            Section { Text("\(selection.deploymentId) / \(selection.namespaceId)"); Text("These settings do not confirm that the target is online or has free capacity.").font(.footnote)
                 Button("Refresh target") { Task { await load() } }.disabled(loading).accessibilityIdentifier("refreshTarget")
             }
             if let error { ErrorMessage(error: error) }
@@ -71,26 +71,26 @@ struct TargetDetailView: View {
                 let target = detail.target
                 Section("Configuration") {
                     LabeledContent("Target ID", value: target.targetId)
-                    LabeledContent("Kind / state", value: "\(target.kind) / \(target.state)")
-                    LabeledContent("Revision", value: target.revision)
-                    LabeledContent("Generation", value: target.generation.number).accessibilityIdentifier("targetGeneration")
-                    LabeledContent("Generation ID", value: target.generation.id)
-                    LabeledContent("Backend", value: target.generation.executionBackend)
-                    LabeledContent("Transport", value: target.generation.transport)
+                    LabeledContent("Type / status", value: "\(target.kind) / \(target.state)")
+                    LabeledContent("Record version", value: target.revision)
+                    LabeledContent("Configuration version", value: target.generation.number).accessibilityIdentifier("targetGeneration")
+                    LabeledContent("Configuration version ID", value: target.generation.id)
+                    LabeledContent("Execution system", value: target.generation.executionBackend)
+                    LabeledContent("Connection method", value: target.generation.transport)
                     LabeledContent("Provider", value: target.generation.provider.kind)
                     if let region = target.generation.provider.region {
                         LabeledContent("Region", value: String(region.prefix(512)))
                         if region.count > 512 { Text("Display truncated after 512 characters; the source value is preserved.").font(.caption) }
                     }
                     if let cluster = target.generation.provider.clusterName { LabeledContent("Cluster", value: cluster) }
-                    targetSet("Runtimes", target.generation.runtimes)
+                    targetSet("Execution runtimes", target.generation.runtimes)
                     targetSet("Operating systems", target.generation.operatingSystems)
-                    targetSet("Architectures", target.generation.architectures)
-                    targetSet("Capabilities", target.generation.capabilities)
-                    LabeledContent("Log store", value: target.generation.logStore.map { "\($0.name) · version \($0.version)" } ?? "None configured")
-                    DisclosureGroup("Artifact stores (\(target.generation.artifactStores.count))") { ForEach(target.generation.artifactStores, id: \.name) { store in Text("\(store.name) · version \(store.version)") } }
+                    targetSet("Processor architectures", target.generation.architectures)
+                    targetSet("Supported features", target.generation.capabilities)
+                    LabeledContent("Log storage", value: target.generation.logStore.map { "\($0.name) · version \($0.version)" } ?? "None configured")
+                    DisclosureGroup("Output file storage (\(target.generation.artifactStores.count))") { ForEach(target.generation.artifactStores, id: \.name) { store in Text("\(store.name) · version \(store.version)") } }
                     LabeledContent("Created", value: target.createdAt); LabeledContent("Updated", value: target.updatedAt)
-                    LabeledContent("Source observed", value: target.asOf)
+                    LabeledContent("Recorded by deployment", value: target.asOf)
                 }
                 Section("Partitions") {
                     Text("\(target.generation.partitions.count) of \(target.generation.partitionCount) partitions in preview\(target.generation.partitionsTruncated ? "; preview truncated" : "")").accessibilityIdentifier("targetPartitionPreview")
@@ -101,7 +101,7 @@ struct TargetDetailView: View {
             }
         }.navigationTitle(detail?.target.name ?? selection.name).task(id: store.foregroundGeneration) { await load(replacing: true) }.refreshable { await load() }
     }
-    private func targetSet(_ title: String, _ values: [String]) -> some View { DisclosureGroup("\(title) (\(values.count))") { ForEach(values, id: \.self) { Text($0) }; if values.isEmpty { Text("None advertised") } } }
+    private func targetSet(_ title: String, _ values: [String]) -> some View { DisclosureGroup("\(title) (\(values.count))") { ForEach(values, id: \.self) { Text($0) }; if values.isEmpty { Text("None reported") } } }
     private func load(replacing: Bool = false) async {
         guard let token = requests.begin(replacing: replacing) else { return }; defer { requests.finish(token) }
         do { let result: TargetDetail = try await store.request(path: selection.path); guard requests.accepts(token) else { return }; try result.validate(expected: selection); detail = result; refreshID = UUID(); error = nil }
@@ -120,7 +120,7 @@ private struct TargetPartitionsView: View {
     private var loading: Bool { requests.busy }
     var body: some View {
         List {
-            Section { Text("\(target.deploymentId) / \(target.namespaceId)"); Text("Generation \(target.generation.number)").font(.caption); Text("Each page verifies current access and target generation.").font(.footnote) }
+            Section { Text("\(target.deploymentId) / \(target.namespaceId)"); Text("Configuration version \(target.generation.number)").font(.caption); Text("Partitions are named groups of resources within a target. Each page checks your access and that the target configuration is unchanged.").font(.footnote) }
             if let page, !requiresRefresh {
                 Section("\(page.items.count) on this page · \(page.total) partitions") {
                     ForEach(page.items, id: \.name) { partition in Text(partition.name + (partition.isDefault ? " (default)" : "")) }
@@ -131,7 +131,7 @@ private struct TargetPartitionsView: View {
             }
             if let error { ErrorMessage(error: error) }
             if loading { ProgressView("Loading partitions…") }
-            Button("Refresh target and restart partitions") { Task { await restart() } }.disabled(loading).accessibilityIdentifier("restartTargetPartitions")
+            Button("Refresh target and partition list") { Task { await restart() } }.disabled(loading).accessibilityIdentifier("restartTargetPartitions")
         }.navigationTitle("Partitions").task(id: store.foregroundGeneration) { await load(cursor, replacing: true) }
     }
     private func restart() async {

@@ -17,7 +17,7 @@ type LogService interface {
 
 func (s *Server) logs(w http.ResponseWriter, r *http.Request) {
 	invalid := func() {
-		writeError(w, r, &api.Error{Code: "invalid_request", Message: "Choose a stream, optional run/cursor, and byte limit from 1 to 262144."})
+		writeError(w, r, &api.Error{Code: "invalid_request", Message: "The log request is invalid. Reopen the job and choose a log stream."})
 	}
 	q, err := url.ParseQuery(r.URL.RawQuery)
 	if err != nil {

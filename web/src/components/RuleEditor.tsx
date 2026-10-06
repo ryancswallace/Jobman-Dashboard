@@ -84,7 +84,7 @@ export function RuleEditor({
       setError(
         new APIError(
           "invalid_rule",
-          "Choose an authorized namespace and a canonical lowercase job UUID.",
+          "Choose a namespace you can access and paste the full job ID, using lowercase letters, from the job details page.",
         ),
       );
       return;
@@ -147,7 +147,7 @@ export function RuleEditor({
       if (rule && saved.id !== rule.id)
         throw new APIError(
           "invalid_response",
-          "The saved rule identity did not match this editor.",
+          "Dashboard returned a different rule than the one being edited. Close the editor and refresh the list.",
         );
       if (!controller.signal.aborted) onSaved();
     } catch (failure) {
@@ -186,7 +186,7 @@ export function RuleEditor({
       if (current.id !== rule.id || !editableRule(current))
         throw new APIError(
           "forbidden",
-          "This rule contains unavailable or unsupported selections. Close the editor, then refresh or revalidate the rule.",
+          "This rule contains unavailable or unsupported selections. Close the editor, then refresh the list or choose Check access and resume.",
         );
       if (!controller.signal.aborted) {
         setRule(current);
@@ -296,7 +296,8 @@ export function RuleEditor({
               nameBytes(draft.name) > 120 ? "rule-validation" : "muted small"
             }
           >
-            {nameBytes(draft.name)} / 120 UTF-8 bytes
+            Name size: {nameBytes(draft.name)} of 120 bytes. Some characters use
+            more than one byte.
           </p>
           <fieldset>
             <legend>Which jobs?</legend>
@@ -309,7 +310,7 @@ export function RuleEditor({
               [
                 "my_jobs",
                 "All my jobs",
-                "Current and future jobs with your verified submitting identity.",
+                "Current and future jobs submitted by your account.",
               ],
               [
                 "namespace_jobs",
@@ -332,7 +333,7 @@ export function RuleEditor({
             ))}
           </fieldset>
           <fieldset>
-            <legend>Authorized namespaces</legend>
+            <legend>Namespaces you can access</legend>
             <p className="muted small">
               Selections may span deployments. New namespaces are never added
               automatically. Removing a namespace also removes its watched jobs.
@@ -415,7 +416,7 @@ export function RuleEditor({
                     value={jobId}
                     maxLength={36}
                     onChange={(event) => setJobId(event.target.value)}
-                    placeholder="Exact lowercase UUID"
+                    placeholder="Paste the full job ID"
                   />
                 </label>
                 <button
@@ -458,7 +459,7 @@ export function RuleEditor({
             </fieldset>
           )}
           <fieldset>
-            <legend>Terminal outcomes</legend>
+            <legend>Final results</legend>
             <div className="preset-buttons">
               {[
                 {
@@ -471,7 +472,11 @@ export function RuleEditor({
                   mode: "selected",
                   values: ["success"],
                 },
-                { label: "All terminal", mode: "all_terminal", values: [] },
+                {
+                  label: "All final results",
+                  mode: "all_terminal",
+                  values: [],
+                },
               ].map((preset) => (
                 <button
                   key={preset.label}
@@ -501,7 +506,7 @@ export function RuleEditor({
                   })
                 }
               />
-              All terminal outcomes, including future unknown outcomes
+              All final results, including any added in future versions
             </label>
             <div className="namespace-choices">
               {outcomes.map((outcome) => (
@@ -542,9 +547,9 @@ export function RuleEditor({
           )}
         </fieldset>
         <p className="muted small">
-          New or changed monitoring starts from the source’s current event
-          checkpoint. Earlier history is not sent as new alerts. A source feed
-          outage may leave activation pending.{" "}
+          New or changed rules notify you about events recorded after monitoring
+          starts. Earlier job results do not create new alerts. Monitoring may
+          stay Pending while a Control server is unavailable.{" "}
           {rule &&
             "Use the rule’s Stop or Enable control to change whether it is enabled."}
         </p>

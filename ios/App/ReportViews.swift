@@ -21,24 +21,25 @@ struct ReportsView: View {
 
     var body: some View {
         List {
-            Section("Generate deterministic diagnosis") {
-                Text("Use recorded metadata, scheduler, and lifecycle facts. Commands, environment values, source files, and AI-provider calls are excluded from collection.").font(.footnote)
-                Toggle("Include bounded redacted log tails", isOn: $includeLogs).disabled(requesting)
-                if includeLogs { Text("Requires an operator-configured value-aware redaction policy. Up to 64 KiB per stream is selected; source offsets and omissions are recorded.").font(.footnote) }
-                TextField("Optional run UUID (blank = selected history)", text: $runID).textInputAutocapitalization(.never).autocorrectionDisabled().disabled(requesting)
+            Section("Create a diagnosis report") {
+                Text("Analyze recorded job details, scheduler observations and execution times using fixed rules. No AI service is called. Commands, environment values and source files are not collected.").font(.footnote)
+                Toggle("Include recent logs with redaction rules applied", isOn: $includeLogs).disabled(requesting)
+                if includeLogs { Text("An administrator must configure rules for removing sensitive text. Includes up to 64 KiB from the end of each log, with the original positions and any omissions recorded.").font(.footnote) }
+                Text("Leave the run ID blank to let the source select the job’s recorded run. Report history below includes all runs.").font(.footnote).foregroundStyle(.secondary)
+                TextField("Run ID (optional)", text: $runID).textInputAutocapitalization(.never).autocorrectionDisabled().disabled(requesting)
                 Button(requesting ? "Requesting…" : "Generate report") { Task { await generate() } }.disabled(requesting)
                 if let requested { NavigationLink("Open requested report · \(requested.state)") { ReportDetailView(ref: ref, taskID: requested.taskId) } }
                 if let requestError { ErrorMessage(error: requestError) }
             }
             Section("Report history") {
                 if let page {
-                    if page.items.isEmpty { Text("No report yet. Generate a report to analyze this job’s factual evidence.") }
+                    if page.items.isEmpty { Text("No reports yet. Generate one to analyze the recorded information about this job.") }
                     ForEach(page.items) { report in
                         NavigationLink { ReportDetailView(ref: ref, taskID: report.taskId) } label: {
                             VStack(alignment: .leading) {
                                 Text("Diagnosis · \(report.state)").font(.headline)
-                                if report.outdated { Text("Recorded snapshot is outdated").foregroundStyle(.orange) }
-                                Text("Revision \(report.sourceRevision) · \(report.profile)").font(.caption)
+                                if report.outdated { Text("Job details or analysis settings have changed").foregroundStyle(.orange) }
+                                Text("Job version \(report.sourceRevision) · \(InterfaceText.reportProfile(report.profile))").font(.caption)
                                 Text(report.createdAt).font(.caption)
                             }
                         }.accessibilityIdentifier("report-\(report.taskId)")
@@ -62,7 +63,7 @@ struct ReportsView: View {
     private func generate() async {
         guard store.active, !requesting else { return }
         let run = runID.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard run.isEmpty || UUID(uuidString: run) != nil else { requestError = "Enter the actual run UUID or leave it blank."; return }
+        guard run.isEmpty || UUID(uuidString: run) != nil else { requestError = "Enter a full run ID or leave it blank."; return }
         requesting = true; defer { requesting = false }
         let body = DashboardAPI.ReportRequest(profile: includeLogs ? "include_log_tail" : "metadata", runId: run.isEmpty ? nil : run.lowercased())
         do {
@@ -107,28 +108,28 @@ struct ReportDetailView: View {
     var body: some View {
         List {
             Section {
-                Text("Advice is informational. Dashboard does not execute job actions.").font(.footnote)
+                Text("These are suggestions for you to review. Dashboard will not run commands or change the job.").font(.footnote)
                 Text("\(ref.deploymentId) / \(ref.namespaceId) / \(ref.jobId)").font(.caption)
                 Button("Refresh report") { Task { await load() } }.disabled(loading)
                 if loading { ProgressView("Verifying report access…") }
                 if let error { ErrorMessage(error: error) }
             }
             if let report {
-                Section("Task and snapshot") {
-                    LabeledContent("State", value: report.state).accessibilityIdentifier("reportState")
-                    Text("Task: \(report.taskId)").font(.caption.monospaced()).textSelection(.enabled)
-                    LabeledContent("Source revision", value: report.sourceRevision)
-                    LabeledContent("Disclosure profile", value: report.profile)
+                Section("Report request and source details") {
+                    LabeledContent("Status", value: report.state).accessibilityIdentifier("reportState")
+                    Text("Request ID: \(report.taskId)").font(.caption.monospaced()).textSelection(.enabled)
+                    LabeledContent("Source record version", value: report.sourceRevision)
+                    LabeledContent("Information included", value: InterfaceText.reportProfile(report.profile))
                     if let run = report.runId { Text("Selected run: \(run)").font(.caption) }
                     TimestampRow(label: "Requested", value: report.createdAt)
-                    TimestampRow(label: "Cache expires", value: report.expiresAt)
-                    if report.outdated { Text("This report describes its recorded snapshot. The source or collection policy has changed.").foregroundStyle(.orange).accessibilityIdentifier("reportOutdated") }
-                    if let failure = report.failureCode { Text("Analysis failed: \(failure). Refresh or request a new report after resolving the cause.") }
+                    TimestampRow(label: "Saved report expires", value: report.expiresAt)
+                    if report.outdated { Text("This report uses earlier recorded information. The job source or analysis settings have changed since then.").foregroundStyle(.orange).accessibilityIdentifier("reportOutdated") }
+                    if let failure = report.failureCode { Text("The report could not be created (\(failure)). Try again, or contact your administrator with this code.") }
                 }
                 if let detail = report.detail {
                     ReportContents(ref: ref, report: report, detail: detail, expandedFindings: $expandedFindings) { failure in self.report = nil; self.error = failure }
-                } else if report.pending { Section { Text("Analysis is pending. This view checks for completion every five seconds.") } }
-                else if report.state == "ready" { Section { Text("Verified report detail is unavailable. Refresh to retrieve it.") } }
+                } else if report.pending { Section { Text("The report is being prepared. This screen checks for completion every five seconds.") } }
+                else if report.state == "ready" { Section { Text("The report is ready, but its details have not loaded. Refresh to try again.") } }
             }
         }.navigationTitle("Diagnosis report")
             .task(id: store.active) {
@@ -165,7 +166,7 @@ private struct ReportContents: View {
     let onCitationFailure: (String) -> Void
     var body: some View {
         Section("Findings") {
-            Text("Confidence scores are analyzer output, not calibrated probabilities.").font(.footnote)
+            Text("Confidence scores describe how strongly the analysis supports a finding. They are not the probability that it is correct.").font(.footnote)
             if detail.mode != "deterministic" { Label("This report contains generated hypotheses (\(detail.mode)).", systemImage: "exclamationmark.bubble") }
             ForEach(detail.findings) { finding in
                 DisclosureGroup(finding.title, isExpanded: Binding(get: { expandedFindings.contains(finding.id) }, set: { expanded in
@@ -182,40 +183,40 @@ private struct ReportContents: View {
                 }
             }
         }
-        Section("Suggested actions (text only)") {
+        Section("Suggested next steps") {
             ForEach(detail.actions) { action in
                 DisclosureGroup(action.summary) {
                     Text(action.description); Text("Kind: \(action.kind)").font(.caption)
-                    if action.requiresConfirmation { Text("This advice requires the appropriate operator’s confirmation.").font(.caption) }
+                    if action.requiresConfirmation { Text("Check with the responsible administrator before taking this action.").font(.caption) }
                     evidence("Supporting evidence", action.supportingEvidence)
                 }
             }
         }
         Section("Retry advice") {
-            LabeledContent("Verdict", value: detail.retry.verdict)
-            LabeledContent("Existing policy", value: detail.retry.existingPolicy)
+            LabeledContent("Recommendation", value: detail.retry.verdict)
+            LabeledContent("Current retry policy", value: detail.retry.existingPolicy)
             Text(detail.retry.rationale); confidence(detail.retry.confidence)
             ForEach(detail.retry.reasons, id: \.self) { Text($0) }
-            if let earliest = detail.retry.earliestAt { TimestampRow(label: "Earliest", value: earliest) }
+            if let earliest = detail.retry.earliestAt { TimestampRow(label: "Earliest retry time", value: earliest) }
             evidence("Supporting evidence", detail.retry.supportingEvidence)
         }
         Section("Missing evidence and limitations") {
-            if detail.missingEvidence.isEmpty { Text("No additional missing evidence identified by this report.") }
+            if detail.missingEvidence.isEmpty { Text("The report did not identify any other missing information.") }
             ForEach(Array(detail.missingEvidence.enumerated()), id: \.offset) { _, value in Text("\(value.description) (\(value.code))") }
             ForEach(Array(detail.warnings.enumerated()), id: \.offset) { _, value in Text("\(value.message) (\(value.code))").foregroundStyle(.orange) }
-            DisclosureGroup("Collection omissions (\(detail.omissions.count))") { ForEach(Array(detail.omissions.enumerated()), id: \.offset) { _, value in Text("\(value.code): \(value.affects.joined(separator: ", "))").font(.caption) } }
+            DisclosureGroup("Information left out (\(detail.omissions.count))") { ForEach(Array(detail.omissions.enumerated()), id: \.offset) { _, value in Text("\(value.code): \(value.affects.joined(separator: ", "))").font(.caption) } }
             DisclosureGroup("Redaction notices (\(detail.redactionNotices.count))") { ForEach(Array(detail.redactionNotices.enumerated()), id: \.offset) { _, value in Text("\(value.code) · \(value.count): \(value.affects.joined(separator: ", "))").font(.caption) } }
         }
-        Section("Immutable provenance") {
-            Text("Report: \(report.reportId ?? "Unavailable")").textSelection(.enabled).font(.caption.monospaced())
-            Text("Core evidence: \(report.evidenceId ?? "Unavailable")").textSelection(.enabled).font(.caption.monospaced())
-            Text("Analysis evidence: \(report.analysisEvidenceId ?? "Unavailable")").textSelection(.enabled).font(.caption.monospaced())
+        Section("Saved evidence and versions") {
+            Text("Report: \(report.reportId ?? "Not available")").textSelection(.enabled).font(.caption.monospaced())
+            Text("Core evidence: \(report.evidenceId ?? "Not available")").textSelection(.enabled).font(.caption.monospaced())
+            Text("Analysis evidence: \(report.analysisEvidenceId ?? "Not available")").textSelection(.enabled).font(.caption.monospaced())
             TimestampRow(label: "Captured", value: detail.capturedAt); TimestampRow(label: "Generated", value: detail.generatedAt)
-            LabeledContent("Phase / outcome", value: "\(detail.phase) / \(detail.outcome ?? "Unavailable")")
-            LabeledContent("Control instance", value: detail.controlInstanceId)
-            LabeledContent("Control / contract", value: "\(detail.controlVersion) / \(detail.contractVersion)")
-            LabeledContent("Collection platform", value: detail.platform)
-            ForEach(detail.runs, id: \.id) { run in Text("Run \(run.number) · \(run.id)\nExecution: \(run.executionId ?? "Unavailable")").font(.caption) }
+            LabeledContent("Job status / final result", value: "\(InterfaceText.jobStatus(detail.phase)) / \(detail.outcome.map(InterfaceText.finalResult) ?? "Not available")")
+            LabeledContent("Control service ID", value: detail.controlInstanceId)
+            LabeledContent("Control / API version", value: "\(detail.controlVersion) / \(detail.contractVersion)")
+            LabeledContent("Evidence collection platform", value: detail.platform)
+            ForEach(detail.runs, id: \.id) { run in Text("Run \(run.number) · \(run.id)\nExecution: \(run.executionId ?? "Not available")").font(.caption) }
             DisclosureGroup("Component versions") {
                 Text("Core \(detail.versions.jobman) · collector \(detail.versions.collector)")
                 Text("Companion \(detail.versions.companion) · engine \(detail.versions.engine)")
@@ -223,12 +224,12 @@ private struct ReportContents: View {
                 Text("Generation schema \(detail.versions.generationSchema) · proposal schema \(detail.versions.proposalSchema)")
                 ForEach(Array(detail.analyzers.enumerated()), id: \.offset) { _, analyzer in Text("\(analyzer.name) · \(analyzer.version)") }
             }
-            DisclosureGroup("Provider disclosure") {
-                Text("Invoked: \(detail.disclosure.providerInvoked ? "Yes" : "No"); generated content used: \(detail.disclosure.generatedContentUsed ? "Yes" : "No")")
-                Text("Locality: \(detail.disclosure.locality); profile: \(detail.disclosure.profile ?? "None")")
+            DisclosureGroup("AI service use") {
+                Text("AI service called: \(detail.disclosure.providerInvoked ? "Yes" : "No"); AI-generated content used: \(detail.disclosure.generatedContentUsed ? "Yes" : "No")")
+                Text("Processing location: \(detail.disclosure.locality); profile: \(detail.disclosure.profile ?? "None")")
                 if let provider = detail.disclosure.provider { Text("\(provider) / \(detail.disclosure.model ?? "Unknown model")") }
                 if let requestID = detail.disclosure.requestId { Text("Request ID: \(requestID)") }
-                Text("Classes: \(detail.disclosure.classes.joined(separator: ", "))")
+                Text("Types of information: \(detail.disclosure.classes.joined(separator: ", "))")
                 Text("Items: \(detail.disclosure.itemCount); artifacts: \(detail.disclosure.artifactCount); enrichment: \(detail.disclosure.enrichmentCount)")
                 Text("Artifact bytes: \(detail.disclosure.artifactBytes); enrichment bytes: \(detail.disclosure.enrichmentBytes); request bytes: \(detail.disclosure.requestBytes); redaction notices: \(detail.disclosure.redactionNoticeCount)")
                 ForEach(detail.disclosure.itemIds + detail.disclosure.artifactIds + detail.disclosure.enrichmentIds, id: \.self) { Text($0).font(.caption) }
@@ -238,7 +239,7 @@ private struct ReportContents: View {
     }
     @ViewBuilder private func confidence(_ value: DashboardAPI.ReportConfidence) -> some View {
         Text("Confidence: \(value.score)/100 (\(value.band))").font(.subheadline)
-        Text("Basis: \(value.basis)")
+        Text("Why this confidence level: \(value.basis)")
     }
     @ViewBuilder private func evidence(_ label: String, _ ids: [String]) -> some View {
         if !ids.isEmpty {
@@ -263,30 +264,30 @@ private struct ReportCitationView: View {
     @State private var error: String?
     var body: some View {
         List {
-            Section("Exact sealed evidence") {
+            Section("Saved evidence for this report") {
                 Text(reference.label).font(.headline)
-                Text("Report: \(report.reportId ?? "Unavailable")").font(.caption).textSelection(.enabled)
+                Text("Report: \(report.reportId ?? "Not available")").font(.caption).textSelection(.enabled)
                 Text("Citation: \(reference.id)").font(.caption).textSelection(.enabled)
                 if let citation {
                     Text("\(citation.kind) · \(citation.quality) · \(citation.disclosure)").font(.caption)
                     if let value = citation.valueJSON { Text(value).font(.system(.body, design: .monospaced)).textSelection(.enabled).accessibilityIdentifier("citationValue") }
                     if let bytes {
-                        Text("Sanitized artifact offsets \(citation.startOffset ?? "?")–\(citation.endOffset ?? "?")").font(.caption)
-                        if citation.originalOffsetsExact { Text("Original selected offsets \(citation.originalStartOffset ?? "?")–\(citation.originalEndOffset ?? "?")").font(.caption) }
-                        else { Text("Redaction changed byte lengths. Original source offsets cannot be mapped exactly.").font(.caption) }
+                        Text("Byte positions after redaction: \(citation.startOffset ?? "?")–\(citation.endOffset ?? "?")").font(.caption)
+                        if citation.originalOffsetsExact { Text("Original log byte positions: \(citation.originalStartOffset ?? "?")–\(citation.originalEndOffset ?? "?")").font(.caption) }
+                        else { Text("Exact positions in the original log are not available for this excerpt.").font(.caption) }
                         Text(String(decoding: bytes, as: UTF8.self)).font(.system(.body, design: .monospaced)).textSelection(.enabled).accessibilityIdentifier("citationBytes")
-                        if String(data: bytes, encoding: .utf8) == nil { Text("Invalid UTF-8 is displayed with replacement characters. Exact bytes remain available below.").font(.caption) }
-                        DisclosureGroup("Exact base64 bytes") { Text(citation.bytesBase64 ?? "").font(.caption.monospaced()).textSelection(.enabled) }
+                        if String(data: bytes, encoding: .utf8) == nil { Text("Some bytes could not be shown as text and use replacement characters. The exact saved bytes are available below as Base64.").font(.caption) }
+                        DisclosureGroup("Exact saved bytes (Base64 encoding)") { Text(citation.bytesBase64 ?? "").font(.caption.monospaced()).textSelection(.enabled) }
                         Text("Run \(citation.runNumber ?? "?") · \(citation.runId ?? "?")\nExecution \(citation.executionId ?? "?") · \(citation.stream ?? "?")").font(.caption)
                     }
                     if let entity = citation.sourceEntityId { Text("Source entity: \(entity)").font(.caption) }
                     if let revision = citation.sourceRevision { Text("Source revision: \(revision)").font(.caption) }
                     TimestampRow(label: "Captured", value: citation.capturedAt); TimestampRow(label: "Observed", value: citation.observedAt)
                 } else if let error { ErrorMessage(error: error) }
-                else { ProgressView("Reauthorizing and resolving sealed citation…") }
-                Text("This evidence is read from the report’s immutable stored pair. Current log contents are not consulted.").font(.footnote)
+                else { ProgressView("Checking access and loading saved evidence…") }
+                Text("This is the evidence saved with the report. It is not a fresh reading of the current logs.").font(.footnote)
             }
-        }.navigationTitle("Citation").task(id: store.active) {
+        }.navigationTitle("Evidence reference").task(id: store.active) {
             guard store.active else { citation = nil; bytes = nil; return }
             do {
                 let result: DashboardAPI.Citation = try await store.request(path: APIPath.job(ref) + "/reports/\(APIPath.component(report.taskId))/citations/\(APIPath.component(reference.id))")

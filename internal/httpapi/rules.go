@@ -42,9 +42,9 @@ func (s *Server) registerRuleRoutes(mux *http.ServeMux) {
 func writeRuleError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, notifications.ErrUnsupportedOutcome):
-		err = &api.Error{Code: "unsupported_outcome", Message: "This server does not support a selected individual outcome. Refresh the editor or choose all terminal outcomes."}
+		err = &api.Error{Code: "unsupported_outcome", Message: "This server does not support one of the selected job results. Reload the rule editor or choose all final results."}
 	case errors.Is(err, notifications.ErrInvalid), errors.Is(err, notifications.ErrTransition):
-		err = &api.Error{Code: "invalid_request", Message: "Send valid alert-rule fields and the current revision."}
+		err = &api.Error{Code: "invalid_request", Message: "The alert rule could not be saved. Reload the rule, check its settings, and try again."}
 	case errors.Is(err, notifications.ErrConflict):
 		err = &api.Error{Code: "revision_conflict", Message: "This rule changed. Reload it before editing."}
 	case errors.Is(err, notifications.ErrNotFound):
@@ -52,9 +52,9 @@ func writeRuleError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, notifications.ErrRateLimited):
 		err = &api.Error{Code: "rate_limited", Message: "Too many alert-rule edits. Retry later; disabling and deleting rules remain available."}
 	case errors.Is(err, notifications.ErrCapacity):
-		err = &api.Error{Code: "rule_capacity", Message: "Alert-rule or retained-history capacity has been reached. Disabling and deleting rules remain available; contact the operator about retained-history capacity."}
+		err = &api.Error{Code: "rule_capacity", Message: "The server has reached its alert rule or history limit. You can still disable or delete rules. Contact your administrator for help adding rules."}
 	case errors.Is(err, notifications.ErrInactiveFeed):
-		err = &api.Error{Code: "source_unavailable", Message: "The monitoring feed changed. Reload the rule and retry when the source is available."}
+		err = &api.Error{Code: "source_unavailable", Message: "Monitoring data changed. Reload the rule and try again when Jobman Control is available."}
 	}
 	writeError(w, r, err)
 }

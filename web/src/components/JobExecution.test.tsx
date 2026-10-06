@@ -38,7 +38,7 @@ it("renders and copies exact executable and argument boundaries without interpre
     />,
   );
   const text = screen.getByLabelText(
-    "Submitted command argument vector",
+    "Submitted command and arguments",
   ).textContent!;
   expect(JSON.parse(text)).toEqual(argv);
   expect(container.querySelector("script")).toBeNull();
@@ -69,7 +69,7 @@ it("offers selectable exact text when clipboard permission is unavailable", asyn
     expect(screen.getByRole("status")).toHaveTextContent("Select and copy"),
   );
   expect(
-    screen.getByLabelText("Submitted command argument vector"),
+    screen.getByLabelText("Submitted command and arguments"),
   ).toHaveAttribute("tabindex", "0");
   expect(screen.getByText("Not specified")).toBeVisible();
 });
@@ -97,7 +97,7 @@ it("makes invisible Unicode controls inspectable without changing displayed or c
     />,
   );
   const displayed = screen.getByLabelText(
-    "Submitted command argument vector",
+    "Submitted command and arguments",
   ).textContent!;
   expect(JSON.parse(displayed)).toEqual(argv);
   expect(displayed).not.toMatch(/[\p{Cf}\p{Zl}\p{Zp}\u007f-\u009f]/u);
@@ -110,11 +110,11 @@ it("makes invisible Unicode controls inspectable without changing displayed or c
 });
 
 it.each([
-  ["missing", "Control has no submitted execution specification"],
+  ["missing", "Control has no submitted command"],
   ["unsupported", "This Control deployment does not provide"],
   ["too_large", "No partial command is shown"],
-  ["future_reason", "The submitted execution specification is unavailable"],
-  [undefined, "The submitted execution specification is unavailable"],
+  ["future_reason", "The submitted command is unavailable"],
+  [undefined, "The submitted command is unavailable"],
 ])(
   "keeps unavailable specification (%s) distinct from an empty command",
   (reason, message) => {
@@ -126,7 +126,7 @@ it.each([
       screen.queryByRole("button", { name: "Copy command as JSON" }),
     ).toBeNull();
     expect(
-      screen.queryByLabelText("Submitted command argument vector"),
+      screen.queryByLabelText("Submitted command and arguments"),
     ).toBeNull();
   },
 );

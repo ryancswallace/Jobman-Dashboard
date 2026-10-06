@@ -358,7 +358,7 @@ func (e *Engine) TargetPartitions(ctx context.Context, a Actor, q TargetPartitio
 		q.Limit = 50
 	}
 	if q.Limit < 1 || q.Limit > 200 || q.TargetID == "" || len(q.TargetID) > 128 || q.GenerationID == "" || len(q.GenerationID) > 128 {
-		return out, failure("invalid_request", "A target generation and bounded page size are required.")
+		return out, failure("invalid_request", "The partition request is invalid. Refresh the target details and try again.")
 	}
 	authority, err := e.resourceAuthority(ctx, a, q.Scope, "targets.read")
 	if err != nil {

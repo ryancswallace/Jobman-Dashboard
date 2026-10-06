@@ -171,15 +171,15 @@ it("paginates actual run references and pins logs, artifacts and new reports to 
   expect(
     fetcher.mock.calls.find(([u]) => String(u).includes("/logs?"))?.[0],
   ).toContain("runNumber=2");
-  fireEvent.click(screen.getByRole("button", { name: "Artifacts" }));
-  await screen.findByText("No artifact metadata");
+  fireEvent.click(screen.getByRole("button", { name: "Output files" }));
+  await screen.findByText("No output file details");
   expect(screen.getByLabelText("Artifact run number")).toHaveValue("2");
   expect(screen.getByLabelText("Artifact run number")).toHaveAttribute(
     "readonly",
   );
   fireEvent.click(screen.getByRole("button", { name: "Diagnosis" }));
   await screen.findByRole("button", { name: "Generate report" });
-  expect(screen.getByLabelText("Report run UUID")).toHaveValue(old.id);
+  expect(screen.getByLabelText("Report run ID")).toHaveValue(old.id);
   await waitFor(() =>
     expect(
       screen.getByRole("button", { name: "Generate report" }),
@@ -198,11 +198,11 @@ it("paginates actual run references and pins logs, artifacts and new reports to 
     profile: "metadata",
     runId: old.id,
   });
-  fireEvent.click(screen.getByRole("button", { name: "Use current defaults" }));
+  fireEvent.click(screen.getByRole("button", { name: "Clear run selection" }));
   await screen.findByText(
-    "Current logs · all artifact runs · recent diagnosis evidence",
+    "Latest logs · output files from all runs · diagnosis of recent runs",
   );
-  expect(screen.getByLabelText("Report run UUID")).toHaveValue("");
+  expect(screen.getByLabelText("Report run ID")).toHaveValue("");
 });
 it("does not fall back to current logs when a historical reference is inaccessible", async () => {
   mount(`?runId=${id(99)}&tab=logs`);
@@ -211,13 +211,13 @@ it("does not fall back to current logs when a historical reference is inaccessib
     false,
   );
   expect(
-    screen.getByRole("button", { name: "Use current defaults" }),
+    screen.getByRole("button", { name: "Clear run selection" }),
   ).toBeVisible();
 });
 it("keeps historical run facts separate from current job metadata", async () => {
   mount(`?runId=${old.id}`);
   const heading = await screen.findByRole("heading", {
-    name: "Selected run facts · run 2",
+    name: "Selected run details · run 2",
   });
   const selected = within(heading.closest("section")!);
   expect(selected.getByText(old.executionId)).toBeVisible();
@@ -225,15 +225,15 @@ it("keeps historical run facts separate from current job metadata", async () => 
   expect(selected.getByText("Failure")).toBeVisible();
   expect(selected.getByText("Run record created")).toBeVisible();
   expect(
-    screen.getByRole("heading", { name: "Current job facts" }),
+    screen.getByRole("heading", { name: "Current job details" }),
   ).toBeVisible();
   expect(
-    screen.getByRole("heading", { name: "Current job reported timeline" }),
+    screen.getByRole("heading", { name: "Current job timeline" }),
   ).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "Use current defaults" }));
+  fireEvent.click(screen.getByRole("button", { name: "Clear run selection" }));
   await waitFor(() =>
     expect(
-      screen.queryByRole("heading", { name: "Selected run facts · run 2" }),
+      screen.queryByRole("heading", { name: "Selected run details · run 2" }),
     ).toBeNull(),
   );
   expect(screen.queryByText(old.executionId)).toBeNull();
@@ -254,13 +254,13 @@ it("shows scheduler-reported backend separately from execution placement", async
   );
   mount();
   const current = await screen.findByRole("heading", {
-    name: "Current job facts",
+    name: "Current job details",
   });
   expect(
     within(current.closest("section")!).getByText("placement-backend"),
   ).toBeVisible();
   const scheduler = screen.getByRole("heading", {
-    name: "Current job scheduler observations",
+    name: "Current job scheduler details",
   });
   expect(
     within(scheduler.closest("section")!).getByText("scheduler-backend"),

@@ -112,7 +112,5 @@ it("bounds unusually long provider text with an explicit disclosure", async () =
   const value = "us-" + "a".repeat(100000) + "-1";
   const { container } = render(<BoundedTargetText value={value} />);
   expect(container.textContent!.length).toBeLessThan(700);
-  expect(
-    screen.getByText(/Display truncated after 512 characters/),
-  ).toBeVisible();
+  expect(screen.getByText(/Showing the first 512 characters/)).toBeVisible();
 });

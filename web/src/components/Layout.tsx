@@ -6,7 +6,7 @@ import type { Scope } from "../lib/models";
 const navigation = [
   ["/", "Overview", "◫"],
   ["/jobs", "Jobs", "☷"],
-  ["/workloads", "Workloads", "▦"],
+  ["/workloads", "Job groups", "▦"],
   ["/targets", "Targets", "◎"],
   ["/inbox", "Inbox", "▱"],
   ["/alerts", "Alert rules", "♧"],
@@ -31,7 +31,7 @@ export function Layout() {
         scope.namespace.namespaceId,
       )
     : scope.deployments.length === bootstrap.sources.length
-      ? "All authorized namespaces"
+      ? "All available namespaces"
       : scope.deployments.length === 1
         ? sourceLabel(bootstrap.sources, scope.deployments[0])
         : `${scope.deployments.length} deployments`;
@@ -99,13 +99,13 @@ export function Layout() {
                 ▦
               </span>
               <span>
-                <small>MONITORING SCOPE</small>
+                <small>VIEWING</small>
                 <strong>{scopeTitle}</strong>
               </span>
               <span aria-hidden="true">⌄</span>
             </summary>
             <div className="scope-menu">
-              <h2>Choose your scope</h2>
+              <h2>Choose what to view</h2>
               <button
                 className="scope-option"
                 onClick={() =>
@@ -114,10 +114,12 @@ export function Layout() {
                   })
                 }
               >
-                All authorized namespaces
+                All available namespaces
               </button>
               <p className="muted small">
-                Combine deployments, or open one namespace.
+                Select one or more deployments (Jobman Control servers), or open
+                one namespace. A namespace groups jobs and their access
+                permissions.
               </p>
               {bootstrap.sources.map((source) => (
                 <div className="scope-source" key={source.deploymentId}>
@@ -175,14 +177,15 @@ export function Layout() {
         {bootstrap.mode && bootstrap.mode !== "production" && (
           <div className="development-banner" role="status">
             {bootstrap.mode === "fixture"
-              ? "Limited sample preview · synthetic monitoring data · settings, logs, reports and alerts require a configured server"
+              ? "Sample preview · example jobs only · connect a configured server to use settings, logs, reports and alerts"
               : `Environment: ${bootstrap.mode}`}
           </div>
         )}
         {bootstrap.completeness === "partial" && (
           <div className="development-banner" role="status">
-            Some Control connections could not verify current access. Available
-            scopes remain usable; aggregate coverage may be incomplete.
+            Some Jobman Control servers could not verify your access. You can
+            still browse available namespaces, but combined results may be
+            incomplete.
           </div>
         )}
         <main ref={main} id="main" className="main-content">
@@ -190,7 +193,7 @@ export function Layout() {
         </main>
         <footer className="workspace-footer">
           Jobman Dashboard
-          <span>Source-reported facts. Current namespace access.</span>
+          <span>Job information from your connected Control servers.</span>
         </footer>
       </div>
     </div>

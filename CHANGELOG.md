@@ -6,6 +6,9 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
+- Clarify web and iPhone navigation, job and run details, alerts, reports, and
+  recovery messages using consistent user-facing terminology.
+
 - Show complete submitted commands and working directories in authorized web and
   iPhone job details, retain additional shared status metadata, and separate
   historical-run facts from current job state.

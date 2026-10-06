@@ -50,7 +50,7 @@ it("does not issue another read when following is paused", async () => {
   await act(async () => {
     render(<LogViewer job={job} />);
   });
-  fireEvent.click(screen.getByRole("button", { name: "Pause following" }));
+  fireEvent.click(screen.getByRole("button", { name: "Pause live updates" }));
   await act(async () => {
     await vi.advanceTimersByTimeAsync(10000);
   });
@@ -170,7 +170,7 @@ it("pins selected run provenance and shows the last successful read independentl
     render(<LogViewer job={job} run={run} />);
   });
   const fetched = screen
-    .getByTitle("Last successful authorized log read")
+    .getByTitle("Last successful log refresh")
     .getAttribute("datetime");
   expect(fetched).toBeTruthy();
   expect(String(fetcher.mock.calls[0][0])).toContain(
@@ -190,9 +190,10 @@ it("pins selected run provenance and shows the last successful read independentl
   );
   expect(screen.getByLabelText("stdout log output")).toHaveTextContent("A");
   expect(screen.getByLabelText("stdout log output")).not.toHaveTextContent("B");
-  expect(
-    screen.getByTitle("Last successful authorized log read"),
-  ).toHaveAttribute("datetime", fetched!);
+  expect(screen.getByTitle("Last successful log refresh")).toHaveAttribute(
+    "datetime",
+    fetched!,
+  );
 });
 
 it("accepts factual no-execution runs without inventing an execution", async () => {
@@ -218,9 +219,7 @@ it("accepts factual no-execution runs without inventing an execution", async () 
   });
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   expect(screen.getByText("Not captured")).toBeVisible();
-  expect(
-    screen.getByTitle("Last successful authorized log read"),
-  ).toBeVisible();
+  expect(screen.getByTitle("Last successful log refresh")).toBeVisible();
 });
 
 it.each(["paused", "complete", "error"])(
@@ -259,7 +258,9 @@ it.each(["paused", "complete", "error"])(
       render(<LogViewer job={job} />);
     });
     if (mode === "paused")
-      fireEvent.click(screen.getByRole("button", { name: "Pause following" }));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Pause live updates" }),
+      );
     await act(async () => {
       visibility = "hidden";
       document.dispatchEvent(new Event("visibilitychange"));
@@ -279,13 +280,13 @@ it.each(["paused", "complete", "error"])(
       "A",
     );
     expect(
-      screen.getByRole("button", { name: "Resume following" }),
+      screen.getByRole("button", { name: "Resume live updates" }),
     ).toBeVisible();
-    expect(screen.getByText(/Source capture:/)).toHaveTextContent(
+    expect(screen.getByText(/Log captured:/)).toHaveTextContent(
       "2026-10-03T13:00:00Z",
     );
     expect(
-      screen.getByTitle("Last successful authorized log read"),
+      screen.getByTitle("Last successful log refresh"),
     ).not.toHaveAttribute("datetime", "2026-10-03T13:00:00Z");
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10000);
@@ -353,6 +354,6 @@ it("discards a pre-hide reply and keeps the selected run on foreground and onlin
   for (const call of fetcher.mock.calls)
     expect(String(call[0])).toContain("runNumber=5");
   expect(
-    screen.getByRole("button", { name: "Resume following" }),
+    screen.getByRole("button", { name: "Resume live updates" }),
   ).toBeVisible();
 });

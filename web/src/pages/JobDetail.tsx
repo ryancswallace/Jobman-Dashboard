@@ -1,3 +1,4 @@
+import { jobStatus, statusConfidence } from "../lib/format";
 import { useMemo } from "react";
 import { RunSelector } from "../components/RunSelector";
 import { runDetailForJob, validRunId } from "../lib/runs";
@@ -114,32 +115,43 @@ export function JobDetailPage() {
           <>
             <div className="status-strip">
               <div>
-                <span>Execution phase</span>
-                <Status value={job.phase} />
+                <span>Job status</span>
+                <Status value={job.phase} label={jobStatus(job.phase)} />
               </div>
               <div>
-                <span>Terminal outcome</span>
+                <span>Final result</span>
                 <Status value={job.outcome} />
               </div>
               <div>
-                <span>Desired state</span>
+                <span>Requested state</span>
                 <Status value={job.desiredState} />
               </div>
               <div>
-                <span>Observation confidence</span>
-                <Status value={job.observationConfidence} />
+                <span>Status confidence</span>
+                <Status
+                  value={job.observationConfidence}
+                  label={statusConfidence(job.observationConfidence)}
+                />
               </div>
             </div>
+            <p className="panel-note">
+              Requested state shows whether Control has been asked to run or
+              cancel the job. Status confidence describes how current and
+              reliable its latest execution observations are. Outdated means
+              Control has not heard recently from the execution agent. It does
+              not prove the job has stopped.
+            </p>
             {job.desiredState === "cancel" && job.outcome !== "cancelled" && (
               <p className="notice warning">
-                Cancellation is requested. A cancelled terminal outcome has not
-                been reported.
+                Cancellation is requested. Control has not yet confirmed that
+                the job was cancelled.
               </p>
             )}
             {job.imported && (
               <p className="notice subtle">
-                Imported history. Original ownership and lifecycle facts are
-                shown only when reported by Control.
+                This job was imported from earlier records. Submitter, start,
+                and completion details are shown only when Control provides
+                them.
               </p>
             )}
             <RunSelector
@@ -151,9 +163,7 @@ export function JobDetailPage() {
             {selectedRunId && !validRunId(selectedRunId) && (
               <p role="alert">
                 The selected run ID is invalid.{" "}
-                <button onClick={() => selectRun()}>
-                  Use current defaults
-                </button>
+                <button onClick={() => selectRun()}>Clear run selection</button>
               </p>
             )}
             {runResult.error && (
@@ -166,7 +176,7 @@ export function JobDetailPage() {
                   className="button secondary"
                   onClick={() => selectRun()}
                 >
-                  Use current defaults
+                  Clear run selection
                 </button>
               </>
             )}
@@ -185,7 +195,9 @@ export function JobDetailPage() {
                     setSearch(next);
                   }}
                 >
-                  {t[0].toUpperCase() + t.slice(1)}
+                  {t === "artifacts"
+                    ? "Output files"
+                    : t[0].toUpperCase() + t.slice(1)}
                 </button>
               ))}
             </nav>
@@ -200,7 +212,7 @@ export function JobDetailPage() {
                 )}
                 <section className="panel">
                   <div className="panel-heading">
-                    <h2>Current job facts</h2>
+                    <h2>Current job details</h2>
                   </div>
                   <dl className="facts">
                     <div>
@@ -224,29 +236,29 @@ export function JobDetailPage() {
                       <dd>{job.partition ?? "Unavailable"}</dd>
                     </div>
                     <div>
-                      <dt>Workload digest</dt>
+                      <dt>Workload checksum</dt>
                       <dd className="mono">
                         {job.workloadDigest ?? "Unavailable"}
                       </dd>
                     </div>
                     <div>
-                      <dt>Target generation</dt>
+                      <dt>Target configuration version</dt>
                       <dd>{job.target?.generation ?? "Unavailable"}</dd>
                     </div>
                     <div>
-                      <dt>Backend</dt>
+                      <dt>Execution system</dt>
                       <dd>{job.target?.backend ?? "Unavailable"}</dd>
                     </div>
                     <div>
-                      <dt>Target generation ID</dt>
+                      <dt>Target configuration ID</dt>
                       <dd>{job.target?.generationId ?? "Unavailable"}</dd>
                     </div>
                     <div>
-                      <dt>Graph disposition</dt>
+                      <dt>Dependency decision</dt>
                       <dd>{title(job.disposition)}</dd>
                     </div>
                     <div>
-                      <dt>Revision</dt>
+                      <dt>Record version</dt>
                       <dd>{job.revision}</dd>
                     </div>
                     <div>
@@ -303,10 +315,16 @@ export function JobDetailPage() {
                       </div>
                     ))}
                   </dl>
+                  <p className="panel-note">
+                    The execution system is the software that runs the job, such
+                    as Slurm. The target configuration version identifies the
+                    settings selected for this job. The workload checksum
+                    identifies its submitted workload definition.
+                  </p>
                 </section>
                 <section className="panel">
                   <div className="panel-heading">
-                    <h2>Current job reported timeline</h2>
+                    <h2>Current job timeline</h2>
                   </div>
                   <dl className="facts">
                     {[
@@ -314,7 +332,7 @@ export function JobDetailPage() {
                       ["Started", job.startedAt],
                       ["Completed", job.completedAt],
                       ["Record updated", job.updatedAt],
-                      ["Confidence updated", job.confidenceUpdatedAt],
+                      ["Status confidence updated", job.confidenceUpdatedAt],
                       ["Start recorded", job.lifecycle?.startedRecordedAt],
                       [
                         "Completion recorded",
@@ -329,30 +347,30 @@ export function JobDetailPage() {
                       </div>
                     ))}
                     <div>
-                      <dt>Start provenance</dt>
+                      <dt>Start time source</dt>
                       <dd>{title(job.lifecycle?.startedProvenance)}</dd>
                     </div>
                     <div>
-                      <dt>Completion provenance</dt>
+                      <dt>Completion time source</dt>
                       <dd>{title(job.lifecycle?.completedProvenance)}</dd>
                     </div>
                   </dl>
                   <p className="panel-note">
-                    Record updates are not execution heartbeats. Missing
-                    lifecycle observations stay unavailable. Recorded times
-                    indicate when Control stored an observation, separately from
-                    when execution started or completed.
+                    Started and completed times describe the job’s execution.
+                    Recorded times show when Control saved those observations. A
+                    record update does not confirm that the job is still
+                    running. Missing times remain unavailable.
                   </p>
                 </section>
                 <section className="panel wide">
                   <div className="panel-heading">
-                    <h2>Current job scheduler observations</h2>
+                    <h2>Current job scheduler details</h2>
                   </div>
                   {job.scheduler ? (
                     <dl className="facts compact">
                       {[
-                        ["Native job ID", job.scheduler.nativeId],
-                        ["Backend", job.scheduler.backend],
+                        ["Scheduler job ID", job.scheduler.nativeId],
+                        ["Execution system", job.scheduler.backend],
                         ["State", job.scheduler.state],
                         ["Reason", job.scheduler.reason],
                         ["Cluster", job.scheduler.cluster],
@@ -372,7 +390,7 @@ export function JobDetailPage() {
                     </dl>
                   ) : (
                     <p className="panel-body muted">
-                      No scheduler evidence is available for this job.
+                      No scheduler details have been reported for this job.
                     </p>
                   )}
                 </section>

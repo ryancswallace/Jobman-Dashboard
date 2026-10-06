@@ -30,10 +30,10 @@ export function validateRule(input: RuleInput): RuleInput {
     /[\u0000-\u001f\u007f-\u009f]/.test(name)
   )
     throw invalid(
-      "Use a rule name of 1–120 UTF-8 bytes without control characters.",
+      "Enter a short rule name without line breaks or control characters (up to 120 bytes; some characters use more than one byte).",
     );
   if (!["watched_jobs", "my_jobs", "namespace_jobs"].includes(input.scope))
-    throw invalid("Choose a supported job scope.");
+    throw invalid("Choose which jobs this rule should watch.");
   if (
     !input.namespaces.length ||
     input.namespaces.length > 320 ||
@@ -64,7 +64,9 @@ export function validateRule(input: RuleInput): RuleInput {
           !selected.has(namespaceKey(ref)),
       )
     )
-      throw invalid("Select 1–100 canonical job IDs in the chosen namespaces.");
+      throw invalid(
+        "Select 1–100 jobs using their full IDs from the chosen namespaces.",
+      );
     jobs = [
       ...new Map(
         input.jobs.map((ref) => [
@@ -79,7 +81,7 @@ export function validateRule(input: RuleInput): RuleInput {
     ];
   }
   if (!["selected", "all_terminal"].includes(input.outcomeMode))
-    throw invalid("Choose selected outcomes or all terminal outcomes.");
+    throw invalid("Choose specific final results or all final results.");
   const selectedOutcomes =
     input.outcomeMode === "all_terminal" ? [] : [...new Set(input.outcomes)];
   if (
@@ -89,9 +91,7 @@ export function validateRule(input: RuleInput): RuleInput {
         (outcome) => !(outcomes as readonly string[]).includes(outcome),
       ))
   )
-    throw invalid(
-      "Select at least one of the six supported terminal outcomes.",
-    );
+    throw invalid("Select at least one final result.");
   return {
     name,
     enabled: input.enabled,
@@ -129,7 +129,7 @@ export function editableRule(rule: Rule): boolean {
 export function ruleDraft(rule: Rule): RuleInput {
   if (!editableRule(rule))
     throw invalid(
-      "Refresh or revalidate this rule before editing its hidden or unsupported selections.",
+      "Refresh the rule list or choose Check access and resume before editing this rule.",
     );
   return validateRule({ ...rule, namespaces: rule.scopes });
 }

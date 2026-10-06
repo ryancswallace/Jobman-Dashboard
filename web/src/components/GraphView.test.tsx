@@ -48,7 +48,7 @@ it("names diagram controls and supports keyboard selection", async () => {
   await user.tab();
   expect(screen.getByRole("region")).toHaveFocus();
   await user.tab();
-  expect(screen.getByRole("button", { name: /job, running/ })).toHaveFocus();
+  expect(screen.getByRole("button", { name: /job, Running/ })).toHaveFocus();
   await user.keyboard("{Enter} ");
   expect(select.mock.calls).toEqual([["job"], ["job"]]);
 });
@@ -57,19 +57,19 @@ it("hides removed-node layouts and ignores obsolete replies after a page replace
   const view = render(<GraphView nodes={[node("old")]} onSelect={select} />);
   const old = ControlledWorker.instances[0];
   act(() => old.finish("old"));
-  expect(screen.getByRole("button", { name: /old, running/ })).toBeVisible();
+  expect(screen.getByRole("button", { name: /old, Running/ })).toBeVisible();
   view.rerender(<GraphView nodes={[node("new")]} onSelect={select} />);
   expect(old.terminate).toHaveBeenCalledOnce();
   expect(
     screen.queryByRole("group", { name: "Source-reported dependencies" }),
   ).not.toBeInTheDocument();
-  expect(screen.getByText("Laying out this node page…")).toBeVisible();
+  expect(screen.getByText("Drawing connected jobs…")).toBeVisible();
   act(() => ControlledWorker.instances[1].finish("new"));
-  expect(screen.getByRole("button", { name: /new, running/ })).toBeVisible();
+  expect(screen.getByRole("button", { name: /new, Running/ })).toBeVisible();
   act(() => old.finish("old"));
-  expect(screen.getByRole("button", { name: /new, running/ })).toBeVisible();
+  expect(screen.getByRole("button", { name: /new, Running/ })).toBeVisible();
   expect(
-    screen.queryByRole("button", { name: /old, running/ }),
+    screen.queryByRole("button", { name: /old, Running/ }),
   ).not.toBeInTheDocument();
 });
 it("invalidates a layout when dependency edges change with the same nodes", () => {

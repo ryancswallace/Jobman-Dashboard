@@ -164,7 +164,7 @@ func (b *Broker) Read(ctx context.Context, a monitoring.Actor, r Request) (resul
 		return result, &api.Error{Code: "rate_limited", Message: "Log readers are busy. Retry shortly."}
 	}
 	if !uuid(r.Scope.DeploymentID) || !uuid(r.Scope.NamespaceID) || !uuid(r.JobID) || a.Account.ID == "" || !uuid(a.DirectoryID) || (r.Stream != "stdout" && r.Stream != "stderr") || (r.RunNumber != "" && !positive(r.RunNumber)) || r.LimitBytes < 1 || r.LimitBytes > MaxChunkBytes || len(r.Cursor) > 4096 {
-		return result, &api.Error{Code: "invalid_request", Message: "Choose a valid job, run, stream and bounded log range."}
+		return result, &api.Error{Code: "invalid_request", Message: "The log request is invalid. Reopen the job and choose a run and log stream."}
 	}
 	source := b.sources[r.Scope.DeploymentID]
 	if source == nil {

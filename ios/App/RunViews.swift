@@ -14,8 +14,8 @@ struct RunPickerView: View {
     var body: some View {
         List {
             Section {
-                Button("Use current run / all artifact metadata") { selection = nil; dismiss() }
-                Text("A selected run pins logs, artifact metadata and new diagnosis requests to its actual source run. Created and updated dates describe run metadata, not execution start or completion.").font(.footnote)
+                Button("Use current run / all output files") { selection = nil; dismiss() }
+                Text("Each run is an attempt to execute this job. Choosing a run shows its logs and output file details, and uses it for new diagnosis reports. Record dates are separate from execution start and end times.").font(.footnote)
             }
             if let page {
                 Section("\(page.total) recorded runs") {
@@ -25,21 +25,21 @@ struct RunPickerView: View {
                         } label: {
                             VStack(alignment: .leading, spacing: 5) {
                                 Text("Run \(run.number)").font(.headline)
-                                Text("\(run.phase) · \(run.outcome ?? "No outcome")")
+                                Text("\(InterfaceText.jobStatus(run.phase)) · \(run.outcome.map(InterfaceText.finalResult) ?? "No final result")")
                                 Text(run.id).font(.caption)
                                 if let execution = run.executionId { Text("Execution \(execution)").font(.caption) }
-                                Text("Metadata updated \(run.updatedAt)").font(.caption)
+                                Text("Record updated \(run.updatedAt)").font(.caption)
                             }
                         }.accessibilityIdentifier("selectRun-\(run.number)")
                     }
                     if page.items.isEmpty { Text("No recorded runs") }
-                    Text("Fetched \(page.fetchedAt)").font(.caption)
+                    Text("Refreshed \(page.fetchedAt)").font(.caption)
                     if page.completeness != "complete" { Text("Run results are partial.").foregroundStyle(.orange) }
                 }
                 Section {
                     if history.canGoBack { Button("Previous run page") { Task { var previous = history; let prior = previous.previous(); if await load(prior) { history = previous } } }.disabled(requests.busy) }
                     if let next = page.nextCursor { Button("Next run page") { Task { let prior = cursor; if await load(next) { history.record(prior) } } }.disabled(requests.busy) }
-                    if history.discardedPages > 0 { Text("Earlier back-page cursors were discarded; restart remains available.").font(.caption) }
+                    if history.discardedPages > 0 { Text("Older pages are no longer kept in memory. Restart to return to the first page.").font(.caption) }
                 }
             }
             if let error { ErrorMessage(error: error) }

@@ -38,28 +38,28 @@ export function OverviewPage() {
       "Active jobs",
       data?.active,
       "phase=active",
-      "Across every nonterminal phase",
+      "All jobs that have not finished",
       "purple",
     ],
     [
       "Awaiting execution",
       data?.awaitingExecution,
       "phase=awaiting",
-      "Execution not yet reported running",
+      "Not yet reported as running",
       "blue",
     ],
     [
       "Running",
       data?.running,
       "phase=running",
-      "With separately reported confidence",
+      "Reported as running by Control",
       "green",
     ],
     [
-      "Evidence needs attention",
+      "Status needs attention",
       data?.evidenceAttention,
       "attention=true",
-      "Stale, uncertain, or lost observations",
+      "Status updates are outdated, uncertain, or lost",
       "amber",
     ],
   ];
@@ -68,11 +68,11 @@ export function OverviewPage() {
       <PageHeader
         eyebrow="YOUR WORK, AT A GLANCE"
         title="Overview"
-        description="A clear view of activity across your authorized namespaces."
+        description="Activity across the deployments and namespaces you can access."
         actions={
           <>
             <label className="inline-field">
-              <span className="sr-only">Terminal result window</span>
+              <span className="sr-only">Finished jobs time range</span>
               <select
                 value={windowHours}
                 onChange={(e) => {
@@ -103,7 +103,7 @@ export function OverviewPage() {
           loading={summary.loading}
           error={!!summary.error}
         />
-        <span>Counts come from complete source summaries</span>
+        <span>Counts cover the selected deployments and namespaces</span>
       </div>
       {summary.error && (
         <ErrorNotice error={summary.error} retry={summary.refresh} />
@@ -133,13 +133,13 @@ export function OverviewPage() {
         <section className="panel">
           <div className="panel-heading">
             <div>
-              <h2>Terminal results</h2>
+              <h2>Finished jobs</h2>
               <p>
                 {timestamp(data.window.from, bootstrap.preferences.timezone)} —{" "}
                 {timestamp(data.window.to, bootstrap.preferences.timezone)}
               </p>
             </div>
-            <span className="badge neutral">By actual completion time</span>
+            <span className="badge neutral">By reported completion time</span>
           </div>
           <div className="outcome-grid">
             {Object.entries(data.terminal).map(([outcome, value]) => (
@@ -163,9 +163,9 @@ export function OverviewPage() {
             ))}
           </div>
           <p className="panel-note">
-            Missing completion time: {count(data.missingCompletionTime)}. These
-            jobs are excluded from the time window. Attention indicators may
-            overlap activity counts.
+            Jobs without a completion time: {count(data.missingCompletionTime)}.
+            These jobs are excluded from the time window. Jobs needing attention
+            may also appear in the activity counts above.
           </p>
         </section>
       )}
@@ -173,7 +173,7 @@ export function OverviewPage() {
         <div className="panel-heading">
           <div>
             <h2>Recent jobs</h2>
-            <p>Newest submissions in the selected scope</p>
+            <p>Newest submissions in your current view</p>
           </div>
           <Link className="text-link" to={link({})}>
             View all jobs →
@@ -186,8 +186,8 @@ export function OverviewPage() {
           <JobTable jobs={jobs.data.data} />
         ) : (
           <Empty title="No jobs to show">
-            Jobs will appear here when they are reported in your authorized
-            scope.
+            Jobs will appear here when Control reports them in a namespace you
+            can access.
           </Empty>
         )}
       </section>

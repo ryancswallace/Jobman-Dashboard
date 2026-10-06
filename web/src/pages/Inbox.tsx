@@ -66,7 +66,10 @@ function useReadState(key: string, refresh: () => void, clear: () => void) {
       const problem =
         error instanceof APIError
           ? error
-          : new APIError("request_failed", "Read state could not be updated.");
+          : new APIError(
+              "request_failed",
+              "The notification could not be marked read or unread. Refresh and try again.",
+            );
       setState({ key, error: problem });
       if (
         authorizationErrors.has(problem.code) ||
@@ -142,7 +145,7 @@ function InboxEntry({
             </div>
           )}
           <div>
-            <dt>Inbox expiry</dt>
+            <dt>Removed from inbox on</dt>
             <dd>{timestamp(item.expiresAt, bootstrap.preferences.timezone)}</dd>
           </div>
         </dl>
@@ -153,8 +156,8 @@ function InboxEntry({
         ) : (
           <p className="notice subtle">
             {item.jobAvailability === "missing"
-              ? "Current job detail is no longer available. This authorized historical event is retained."
-              : "Current job detail is temporarily unavailable. This event contains no cached job name."}
+              ? "Current job detail is no longer available. You can still view this earlier notification."
+              : "Current job detail is temporarily unavailable. The job name is hidden until its current details can be checked."}
           </p>
         )}
         <details className="inbox-context" open={detail}>
@@ -168,26 +171,28 @@ function InboxEntry({
                 <strong>{rule.name}</strong> · revision {rule.revision} ·{" "}
                 {title(rule.scope)} ·{" "}
                 {rule.outcomeMode === "all_terminal"
-                  ? "All terminal outcomes"
+                  ? "All final results"
                   : rule.outcomes.map(title).join(", ")}
               </li>
             ))}
           </ul>
           <p className="small muted">
-            Original matching context is retained when a rule is renamed,
-            stopped or deleted.
+            These are the rule settings that matched this event, even if the
+            rule was later renamed, stopped, or deleted.
           </p>
         </details>
         <p className="small muted">
           {item.delivery.total === "0"
-            ? "No push was queued; the inbox remains available."
-            : `Push handoff: ${Object.entries(item.delivery.byState)
+            ? "No iPhone notification was queued. The update is still available here."
+            : `iPhone notification delivery: ${Object.entries(
+                item.delivery.byState,
+              )
                 .map(
                   ([state, n]) => `${count(n)} ${title(state).toLowerCase()}`,
                 )
                 .join(
                   " · ",
-                )}. Provider acceptance does not confirm phone presentation.`}
+                )}. Acceptance by Apple’s delivery service does not confirm that the notification appeared on your phone.`}
         </p>
         {detail && (
           <p className="small mono">
@@ -239,7 +244,7 @@ export function InboxPage() {
     <>
       <PageHeader
         title="Inbox"
-        description="Your currently authorized job updates, retained for 30 days after insertion. Push settings do not hide your history."
+        description="Job notifications you can currently access, kept for 30 days after they enter your inbox. Turning off iPhone notifications does not hide this history."
         actions={
           <>
             <button className="button secondary" onClick={refresh}>
@@ -269,7 +274,7 @@ export function InboxPage() {
         </label>
         <span aria-live="polite">
           {page
-            ? `${count(page.unreadCount)} unread${page.completeness === "partial" ? " in verified scopes (subtotal)" : ""}`
+            ? `${count(page.unreadCount)} unread${page.completeness === "partial" ? " in available namespaces (partial count)" : ""}`
             : "Unread count unavailable"}
         </span>
         <Freshness
@@ -285,17 +290,17 @@ export function InboxPage() {
         <div className="notice" role="status">
           This inbox is incomplete.{" "}
           {page.unavailableSources > 0 &&
-            `${page.unavailableSources} source(s) could not verify current access. `}
+            `${page.unavailableSources} deployment(s) could not verify your access. `}
           {page.inaccessibleScopes > 0 &&
-            `${page.inaccessibleScopes} selected scope(s) are no longer accessible. `}
-          Counts include only verified scopes; some current job details may be
-          unavailable.
+            `${page.inaccessibleScopes} selected namespace(s) are no longer accessible. `}
+          Counts include only namespaces you can currently access; some job
+          details may be unavailable.
         </div>
       )}
       {!page && result.loading ? (
         <Spinner label="Loading your inbox" />
       ) : page?.items.length ? (
-        <section className="panel inbox-list" aria-label="Authorized updates">
+        <section className="panel inbox-list" aria-label="Job notifications">
           {page.items.map((item) => (
             <InboxEntry
               key={item.id}
@@ -306,7 +311,7 @@ export function InboxPage() {
           ))}
           {page.nextCursor && (
             <div className="pagination">
-              <span>Older authorized history is available.</span>
+              <span>Older notifications are available.</span>
               <button
                 className="button secondary"
                 disabled={!!read.busy}
@@ -327,13 +332,13 @@ export function InboxPage() {
           <Empty
             title={
               page.completeness === "partial"
-                ? "No updates in verified scopes"
+                ? "No updates in available namespaces"
                 : "You’re caught up"
             }
           >
             {page.completeness === "partial"
-              ? "Unavailable sources may contain additional history."
-              : `No ${search.get("unread") === "true" ? "unread " : ""}updates match this scope. Alerts appear after an active rule matches a new event.`}
+              ? "Unavailable deployments may contain more notifications."
+              : `No ${search.get("unread") === "true" ? "unread " : ""}updates match the selected namespaces. Notifications appear when a job result matches an active alert rule.`}
           </Empty>
         )
       )}
@@ -361,7 +366,7 @@ export function InboxDetailPage() {
     <>
       <PageHeader
         title="Job update"
-        description="A retained event with current authorization and refreshed job availability."
+        description="An earlier job notification. Access and links to the job are checked when you open it."
         actions={
           <>
             {result.data && !result.error && (
@@ -391,7 +396,7 @@ export function InboxDetailPage() {
         />
       )}{" "}
       {!result.data && result.loading ? (
-        <Spinner label="Opening authorized update" />
+        <Spinner label="Opening job notification" />
       ) : (
         result.data && (
           <section className="panel inbox-list">

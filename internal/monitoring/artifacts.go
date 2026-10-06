@@ -67,7 +67,7 @@ func (e *Engine) Artifacts(ctx context.Context, a Actor, q ArtifactQuery, cursor
 		q.Limit = 50
 	}
 	if q.JobID == "" || len(q.JobID) > 128 || q.Limit < 1 || q.Limit > 100 || q.RunNumber != "" && !positiveInt64(q.RunNumber) {
-		return out, failure("invalid_request", "The artifact selector or page size is invalid.")
+		return out, failure("invalid_request", "The output file request is invalid. Refresh the list and check your filters.")
 	}
 	authority, err := e.resourceAuthority(ctx, a, q.Scope, "artifacts.read")
 	if err != nil {
@@ -75,7 +75,7 @@ func (e *Engine) Artifacts(ctx context.Context, a Actor, q ArtifactQuery, cursor
 	}
 	src, ok := e.sources[q.Scope.DeploymentID].(ArtifactSource)
 	if !ok {
-		return out, failure("unsupported_contract", "This source does not support bounded artifact metadata.")
+		return out, failure("unsupported_contract", "This Jobman Control deployment does not support output file details. Ask your administrator about upgrading it.")
 	}
 	q.Cursor = ""
 	state := artifactCursor{CursorIdentity: CursorIdentity{AccountID: a.Account.ID, QueryHash: groupHash(struct {

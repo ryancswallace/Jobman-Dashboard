@@ -71,7 +71,7 @@ func (e *Engine) Runs(ctx context.Context, a Actor, q RunQuery, cursor string) (
 		q.Limit = 50
 	}
 	if !ValidRunID(q.JobID) || q.Limit < 1 || q.Limit > 100 {
-		return out, failure("invalid_request", "The run selector or page size is invalid.")
+		return out, failure("invalid_request", "The run history request is invalid. Refresh the list and select a run.")
 	}
 	authority, err := e.resourceAuthority(ctx, a, q.Scope, "jobs.read")
 	if err != nil {
@@ -79,7 +79,7 @@ func (e *Engine) Runs(ctx context.Context, a Actor, q RunQuery, cursor string) (
 	}
 	src, ok := e.sources[q.Scope.DeploymentID].(RunSource)
 	if !ok {
-		return out, failure("unsupported_contract", "This source does not support bounded run monitoring.")
+		return out, failure("unsupported_contract", "This Jobman Control deployment does not support run history. Ask your administrator about upgrading it.")
 	}
 	q.Cursor = ""
 	state := runCursor{CursorIdentity: CursorIdentity{AccountID: a.Account.ID, QueryHash: groupHash(struct {
@@ -174,7 +174,7 @@ func (e *Engine) Run(ctx context.Context, a Actor, scope api.Scope, jobID, runID
 	}
 	src, ok := e.sources[scope.DeploymentID].(RunSource)
 	if !ok {
-		return out, failure("unsupported_contract", "This source does not support bounded run monitoring.")
+		return out, failure("unsupported_contract", "This Jobman Control deployment does not support run history. Ask your administrator about upgrading it.")
 	}
 	var detail RunSourceDetail
 	err = e.call(ctx, scope.DeploymentID, func(c context.Context) error {

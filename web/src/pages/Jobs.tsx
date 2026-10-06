@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { useSession } from "../lib/session";
 import { apiQuery } from "../lib/transport";
-import { scopeQuery, localDateValue } from "../lib/format";
+import { scopeQuery, localDateValue, jobStatus } from "../lib/format";
 import { useResource } from "../lib/useResource";
 import { decodeJobs } from "../lib/api";
 import { outcomes } from "../lib/models";
@@ -61,7 +61,7 @@ export function JobsPage() {
     <>
       <PageHeader
         title="Jobs"
-        description="Follow every job in your namespace, including work submitted by teammates."
+        description="Follow jobs in the selected namespaces, including work submitted by teammates."
         actions={
           <button
             className="button secondary"
@@ -82,12 +82,12 @@ export function JobsPage() {
         }}
       >
         <label>
-          Phase
+          Job status
           <select
             value={values.phase ?? ""}
             onChange={(e) => set("phase", e.target.value)}
           >
-            <option value="">All phases</option>
+            <option value="">All statuses</option>
             <option value="active">All active</option>
             <option value="awaiting">Awaiting execution</option>
             {[
@@ -98,18 +98,18 @@ export function JobsPage() {
               "terminal",
             ].map((p) => (
               <option key={p} value={p}>
-                {p.replace(/_/g, " ")}
+                {jobStatus(p)}
               </option>
             ))}
           </select>
         </label>
         <label>
-          Outcome
+          Final result
           <select
             value={values.outcome ?? ""}
             onChange={(e) => set("outcome", e.target.value)}
           >
-            <option value="">All outcomes</option>
+            <option value="">All final results</option>
             {outcomes.map((o) => (
               <option key={o} value={o}>
                 {o.replace(/_/g, " ")}
@@ -197,14 +197,14 @@ export function JobsPage() {
       </form>
       {(values.from || values.to) && (
         <p className="notice subtle">
-          Completion window: {values.from ?? "Any start"} to{" "}
-          {values.to ?? "Any end"} (UTC, end exclusive).
+          Completion time range: {values.from ?? "Any start"} to{" "}
+          {values.to ?? "Any end"} (UTC; the ending time is not included).
         </p>
       )}
       {values.attention && (
         <p className="notice subtle">
-          Showing nonterminal jobs with stale, uncertain, or lost observation
-          confidence.
+          Showing unfinished jobs whose status updates are outdated, uncertain,
+          or lost.
         </p>
       )}
       <div className="page-meta">
@@ -215,6 +215,11 @@ export function JobsPage() {
         />
         <span>Newest first · up to 50 per page</span>
       </div>
+      <p className="panel-note">
+        Status confidence describes Control’s execution observations. Outdated
+        means it has not heard recently from the execution agent; this does not
+        prove that the job has stopped.
+      </p>
       {result.error && (
         <ErrorNotice
           error={result.error}
@@ -233,16 +238,16 @@ export function JobsPage() {
               title={filtered ? "No jobs match these filters" : "No jobs yet"}
             >
               {filtered
-                ? "Try another phase, outcome, or exact ID."
-                : "Submitted jobs in this scope will appear here."}
+                ? "Try another status, result, or job ID."
+                : "Submitted jobs in the selected namespaces will appear here."}
             </Empty>
           )
         )}
         {result.data && (
           <div className="pagination">
             <span>
-              {result.data.data.length} jobs on this page · results reflect
-              current source state
+              Jobs on this page: {result.data.data.length} · results reflect the
+              latest information from Control
             </span>
             <div>
               {values.cursor && (

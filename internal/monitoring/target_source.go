@@ -44,5 +44,5 @@ type TargetSource interface {
 	TargetPartitions(context.Context, Actor, TargetPartitionQuery) (TargetPartitionSourcePage, error)
 }
 
-var ErrTargetChanged = failure("target_changed", "The target generation changed. Refresh the target before browsing partitions.")
-var errTargetsUnsupported = failure("unsupported_contract", "This source does not support bounded target monitoring.")
+var ErrTargetChanged = failure("target_changed", "The target configuration changed. Refresh the target before viewing its partitions.")
+var errTargetsUnsupported = failure("unsupported_contract", "This Jobman Control deployment does not support target details. Ask your administrator about upgrading it.")

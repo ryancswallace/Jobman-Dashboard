@@ -8,7 +8,7 @@ const decimal = (v: string) => /^(0|[1-9][0-9]{0,39})$/.test(v);
 function invalid(): never {
   throw new APIError(
     "invalid_response",
-    "Target metadata did not match the requested source or generation.",
+    "The target details could not be verified for this deployment and configuration version. Refresh the target.",
   );
 }
 export function targetPath(

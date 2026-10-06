@@ -290,8 +290,8 @@ func labFaultError(e api.Error, status int, code string) bool {
 		return false
 	}
 	messages := map[string][]string{
-		"authorization_unavailable": {"Current source authorization could not be verified."},
-		"source_unavailable":        {"The source is unavailable. Retry when private connectivity is restored.", "The request could not be completed. Retry or contact the operator with the request ID."},
+		"authorization_unavailable": {"Your access could not be checked with Jobman Control. Try again shortly."},
+		"source_unavailable":        {"Monitoring data is unavailable. Check your private network or VPN connection. If the problem continues, contact your administrator.", "The request could not be completed. Retry or contact the operator with the request ID."},
 	}
 	return slices.Contains(messages[code], e.Message)
 }
@@ -1022,7 +1022,7 @@ func (s *labFaultState) database() {
 }
 
 func TestLabFaultErrorRejectsCredentialAndTransportMisclassification(t *testing.T) {
-	good := api.Error{Code: "source_unavailable", Message: "The source is unavailable. Retry when private connectivity is restored.", RequestID: strings.Repeat("a", 32)}
+	good := api.Error{Code: "source_unavailable", Message: "Monitoring data is unavailable. Check your private network or VPN connection. If the problem continues, contact your administrator.", RequestID: strings.Repeat("a", 32)}
 	if !labFaultError(good, 503, "source_unavailable") {
 		t.Fatal("safe unavailable error rejected")
 	}
@@ -1039,7 +1039,7 @@ func TestLabFaultErrorRejectsCredentialAndTransportMisclassification(t *testing.
 }
 
 func TestLabFaultHTTPRejectsUnexpectedSensitiveShapeAndCookieChanges(t *testing.T) {
-	good := `{"code":"source_unavailable","message":"The source is unavailable. Retry when private connectivity is restored.","requestId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
+	good := `{"code":"source_unavailable","message":"Monitoring data is unavailable. Check your private network or VPN connection. If the problem continues, contact your administrator.","requestId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
 	for _, test := range []struct {
 		name, body, cookie string
 		status             int
@@ -1116,9 +1116,9 @@ func TestLabFaultBrokerRecoveryRequiresPositiveSameCredentialRead(t *testing.T) 
 					t.Fatal("recovery changed credentials or requested range")
 				}
 				status := 503
-				message := "The source is unavailable. Retry when private connectivity is restored."
+				message := "Monitoring data is unavailable. Check your private network or VPN connection. If the problem continues, contact your administrator."
 				if code == "authorization_unavailable" {
-					message = "Current source authorization could not be verified."
+					message = "Your access could not be checked with Jobman Control. Try again shortly."
 				}
 				body, _ := json.Marshal(api.Error{Code: code, Message: message, RequestID: strings.Repeat("a", 32)})
 				if calls == 3 {
@@ -1142,7 +1142,7 @@ func TestLabFaultBrokerRecoveryRequiresPositiveSameCredentialRead(t *testing.T) 
 }
 
 func TestLabFaultBrokerRecoveryRejectsInvalidErrorsAndKeepsOutputAtomic(t *testing.T) {
-	good := `{"code":"authorization_unavailable","message":"Current source authorization could not be verified.","requestId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
+	good := `{"code":"authorization_unavailable","message":"Your access could not be checked with Jobman Control. Try again shortly.","requestId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
 	for _, test := range []struct {
 		name, body, cookie string
 		status             int
@@ -1187,7 +1187,7 @@ func TestLabFaultBrokerRecoveryDeadlineAndAttemptBounds(t *testing.T) {
 			calls := 0
 			client := &http.Client{Transport: labMixedRoundTripper(func(r *http.Request) (*http.Response, error) {
 				calls++
-				return &http.Response{StatusCode: 503, Header: http.Header{"Cache-Control": {"no-store"}}, Body: io.NopCloser(strings.NewReader(`{"code":"source_unavailable","message":"The source is unavailable. Retry when private connectivity is restored.","requestId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`))}, nil
+				return &http.Response{StatusCode: 503, Header: http.Header{"Cache-Control": {"no-store"}}, Body: io.NopCloser(strings.NewReader(`{"code":"source_unavailable","message":"Monitoring data is unavailable. Check your private network or VPN connection. If the problem continues, contact your administrator.","requestId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`))}, nil
 			})}
 			c := labFaultHTTP{client: client, mu: &mutex, samples: &samples}
 			limit, interval := time.Second, time.Millisecond

@@ -13,12 +13,12 @@ struct AlertRulesView: View {
     var body: some View {
         List {
             Section {
-                Text("Rules are opt-in. Choose explicit namespaces and outcomes. Signing in or gaining a new namespace never creates a rule.").font(.footnote)
+                Text("Create rules only for the jobs and final results you want to follow. Signing in or gaining access to a namespace does not create alerts.").font(.footnote)
             }
             if let error { Section { ErrorMessage(error: error); Button("Refresh rules") { Task { await load(reset: true) } } } }
             if loading { ProgressView("Checking current rules…") }
             if let page {
-                if page.items.isEmpty { ContentUnavailableView("No alert rules", systemImage: "bell", description: Text("Create a rule to choose which future terminal events to follow.")) }
+                if page.items.isEmpty { ContentUnavailableView("No alert rules", systemImage: "bell", description: Text("Create a rule to be notified about future job results.")) }
                 ForEach(page.items) { rule in
                     NavigationLink { AlertRuleDetailView(id: rule.id) } label: { RuleSummary(rule: rule) }
                         .accessibilityIdentifier("rule-\(rule.id)")
@@ -59,8 +59,8 @@ private struct RuleSummary: View {
         VStack(alignment: .leading, spacing: 5) {
             Text(rule.name).font(.headline)
             Text("\(rule.enabled ? "Enabled" : "Stopped") · \(ruleScopeLabel(rule.scope))").font(.subheadline)
-            Text(rule.outcomeMode == "all_terminal" ? "Every terminal outcome, including future outcomes" : rule.outcomes.map(ruleOutcomeLabel).joined(separator: ", ")).font(.caption)
-            if rule.hiddenScopeCount > 0 { Text("\(rule.hiddenScopeCount) scope references hidden").font(.caption).foregroundStyle(.secondary) }
+            Text(rule.outcomeMode == "all_terminal" ? "All final results, including new result types" : rule.outcomes.map(ruleOutcomeLabel).joined(separator: ", ")).font(.caption)
+            if rule.hiddenScopeCount > 0 { Text("\(rule.hiddenScopeCount) selected namespaces are not visible").font(.caption).foregroundStyle(.secondary) }
         }.padding(.vertical, 4)
     }
 }
@@ -80,18 +80,18 @@ struct AlertRuleDetailView: View {
     var body: some View {
         List {
             if let error { Section { ErrorMessage(error: error) } }
-            if guardState.conflict { Section { Text("This rule changed elsewhere. Reload and review its current settings before another change."); Button("Reload current rule") { Task { await load() } } } }
+            if guardState.conflict { Section { Text("This rule changed elsewhere. Refresh and review its current settings before another change."); Button("Refresh current rule") { Task { await load() } } } }
             if busy && rule == nil { ProgressView("Checking current rule…") }
             if let rule {
-                Section("Personal monitoring") {
+                Section("Your alert rule") {
                     RuleSummary(rule: rule)
-                    LabeledContent("Revision", value: rule.revision)
+                    LabeledContent("Record version", value: rule.revision)
                     Button(rule.enabled ? "Stop monitoring" : "Enable monitoring") { mutate(.enabled(!rule.enabled)) }
                         .disabled(busy || guardState.conflict).accessibilityIdentifier("ruleEnabled")
-                    Button("Revalidate selected scopes") { mutate(.revalidate) }.disabled(busy || guardState.conflict || !rule.enabled)
-                    Text("Revalidation checks current access and establishes fresh monitoring where needed. It does not backfill historical terminal jobs.").font(.footnote)
+                    Button("Check access and resume") { mutate(.revalidate) }.disabled(busy || guardState.conflict || !rule.enabled)
+                    Text("Check access and resume monitoring in the selected namespaces where possible. This will not send alerts for jobs that already ended.").font(.footnote)
                 }
-                Section("Selected scope status") {
+                Section("Monitoring by namespace") {
                     ForEach(rule.scopes, id: \.namespaceRef) { scope in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(ruleNamespaceLabel(scope.namespaceRef, store: store))
@@ -99,8 +99,8 @@ struct AlertRuleDetailView: View {
                             if let activated = scope.activatedAt { TimestampRow(label: "Monitoring since", value: activated) }
                         }
                     }
-                    if rule.inaccessibleScopes > 0 { Text("\(rule.inaccessibleScopes) scope references hidden because access is unavailable or no longer permitted.") }
-                    if rule.unavailableScopes > 0 { Text("\(rule.unavailableScopes) scope references hidden while their source or authorization service is unavailable.") }
+                    if rule.inaccessibleScopes > 0 { Text("\(rule.inaccessibleScopes) selected namespaces are hidden because access cannot be confirmed or is no longer permitted.") }
+                    if rule.unavailableScopes > 0 { Text("\(rule.unavailableScopes) selected namespaces are hidden while their deployment or access-check service is unavailable.") }
                 }
                 if !rule.jobs.isEmpty {
                     Section("Watched jobs") {
@@ -115,7 +115,7 @@ struct AlertRuleDetailView: View {
                     Button("Delete alert rule", role: .destructive) { deleting = true }.disabled(busy || guardState.conflict)
                     TimestampRow(label: "Last updated", value: rule.updatedAt)
                 }
-            } else if !busy { Button("Reload current rule") { Task { await load() } } }
+            } else if !busy { Button("Refresh current rule") { Task { await load() } } }
         }.navigationTitle("Alert rule").navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $editing, onDismiss: { Task { await load() } }) { AlertEditor(ruleID: id) }
             .confirmationDialog("Delete this alert rule? Other matching rules will continue to apply.", isPresented: $deleting) { Button("Delete rule", role: .destructive) { mutate(.delete) } }
@@ -190,24 +190,24 @@ struct AlertEditor: View {
         NavigationStack {
             Form {
                 if let error { Section { ErrorMessage(error: error) } }
-                if guardState.conflict { Section { Text("This rule changed elsewhere. Your edits have not overwritten it."); Button("Discard edits and reload") { Task { await reload() } } } }
-                if guardState.uncertainCreation { Section { Text("The create response was uncertain. Close this editor and check the refreshed rule list before creating another rule.").accessibilityIdentifier("uncertainRuleCreation") } }
+                if guardState.conflict { Section { Text("This rule changed elsewhere. Your edits have not overwritten it."); Button("Discard edits and refresh") { Task { await reload() } } } }
+                if guardState.uncertainCreation { Section { Text("We could not confirm whether the rule was created. Close this form and refresh the rule list before creating another one.").accessibilityIdentifier("uncertainRuleCreation") } }
                 if ready && saving { Section { ProgressView("Saving rule…").accessibilityIdentifier("savingRule") } }
                 if ready {
                     Section("Rule") {
                         TextField("Name", text: $draft.name).focused($focusedField, equals: .name).submitLabel(.done).onSubmit { focusedField = nil }.accessibilityIdentifier("ruleName")
-                        Text("\(draft.name.utf8.count) / 120 UTF-8 bytes").font(.caption).foregroundStyle(.secondary)
+                        Text("Name size: \(draft.name.utf8.count) / 120 bytes. Some characters use more than one byte.").font(.caption).foregroundStyle(.secondary)
                         Toggle("Enabled", isOn: $draft.enabled)
-                        Picker("Scope", selection: Binding(get: { draft.scope }, set: { draft.selectScope($0) })) {
-                            Text("All my jobs").tag("my_jobs"); Text("Watched jobs").tag("watched_jobs"); Text("Namespace jobs").tag("namespace_jobs")
+                        Picker("Jobs to follow", selection: Binding(get: { draft.scope }, set: { draft.selectScope($0) })) {
+                            Text("All my jobs").tag("my_jobs"); Text("Watched jobs").tag("watched_jobs"); Text("All jobs in selected namespaces").tag("namespace_jobs")
                         }.accessibilityIdentifier("ruleScope")
-                        Text(draft.scope == "my_jobs" ? "Follow current and future jobs submitted by you in the selected namespaces." : draft.scope == "namespace_jobs" ? "Follow every member’s eligible jobs in the selected namespaces." : "Follow only the explicit jobs listed below.").font(.footnote)
+                        Text(draft.scope == "my_jobs" ? "Follow current and future jobs submitted by you in the selected namespaces." : draft.scope == "namespace_jobs" ? "Follow all eligible jobs in the selected namespaces, regardless of who submitted them." : "Follow only the jobs you add below.").font(.footnote)
                     }
                     namespaceSection
                     if draft.scope == "watched_jobs" { jobsSection }
                     outcomeSection
-                    Section { Text("Monitoring starts after an established source checkpoint. An outage can leave individual namespaces pending. Changing scope or outcomes starts new monitoring intervals.").font(.footnote) }
-                } else if saving { ProgressView("Checking full rule access…") }
+                    Section { Text("Monitoring starts when Dashboard can confirm a starting point with each deployment. Unavailable namespaces may remain pending. Changing the selected jobs or results starts monitoring again from a new starting point.").font(.footnote) }
+                } else if saving { ProgressView("Checking access to all parts of this rule…") }
             }.scrollDismissesKeyboard(.interactively).disabled(saving).navigationTitle(ruleID == nil ? "New alert rule" : "Edit alert rule").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("Done") { focusedField = nil }.accessibilityIdentifier("ruleKeyboardDone") }
@@ -222,7 +222,7 @@ struct AlertEditor: View {
     private var namespaceSection: some View {
         Section("Selected namespaces") {
             if !store.hasFreshNamespaceOptions {
-                Text("Namespace choices are unavailable until access can be refreshed. Existing rule controls remain available from the current rule page.").font(.footnote)
+                Text("Refresh access to choose namespaces. You can still stop or delete an existing rule from its details page.").font(.footnote)
                 ForEach(draft.namespaces) { ref in Text(ruleNamespaceLabel(ref, store: store)).font(.caption) }
             }
             ForEach(store.hasFreshNamespaceOptions ? (store.bootstrap?.deployments ?? []) : []) { deployment in
@@ -246,7 +246,7 @@ struct AlertEditor: View {
                 Text("Choose namespace").tag(Optional<NamespaceRef>.none)
                 ForEach(draft.namespaces) { ref in Text(ruleNamespaceLabel(ref, store: store)).tag(Optional(ref)) }
             }
-            TextField("Full job UUID", text: $watchJobID).focused($focusedField, equals: .job).submitLabel(.done).onSubmit { focusedField = nil }.textInputAutocapitalization(.never).autocorrectionDisabled().accessibilityIdentifier("watchJobID")
+            TextField("Full job ID", text: $watchJobID).focused($focusedField, equals: .job).submitLabel(.done).onSubmit { focusedField = nil }.textInputAutocapitalization(.never).autocorrectionDisabled().accessibilityIdentifier("watchJobID")
             Button("Add job") {
                 do { if let watchNamespace { try draft.addJob(id: watchJobID, namespace: watchNamespace); watchJobID = ""; error = nil } }
                 catch { self.error = error.localizedDescription }
@@ -254,11 +254,11 @@ struct AlertEditor: View {
         }
     }
     private var outcomeSection: some View {
-        Section("Terminal events") {
-            Toggle("Every terminal outcome", isOn: Binding(get: { draft.outcomeMode == "all_terminal" }, set: { draft.selectAllTerminal($0) }))
-            if draft.outcomeMode == "all_terminal" { Text("Includes success, unsuccessful outcomes, cancellation, and future unknown terminal outcomes.").font(.footnote) }
+        Section("Final results to notify you about") {
+            Toggle("Every final result", isOn: Binding(get: { draft.outcomeMode == "all_terminal" }, set: { draft.selectAllTerminal($0) }))
+            if draft.outcomeMode == "all_terminal" { Text("Includes success, failure, timeout, abort, lost execution, cancellation and any new final result types.").font(.footnote) }
             else {
-                Button("Select unsuccessful outcomes") { draft.outcomes = RuleDraft.unsuccessful }
+                Button("Select unsuccessful results") { draft.outcomes = RuleDraft.unsuccessful }
                 Button("Select success only") { draft.outcomes = ["success"] }
                 Button("Select cancellation only") { draft.outcomes = ["cancelled"] }
                 ForEach(RuleDraft.knownOutcomes, id: \.self) { outcome in
@@ -308,7 +308,7 @@ struct AlertEditor: View {
 }
 
 private func ruleScopeLabel(_ scope: String) -> String {
-    switch scope { case "my_jobs": "All my jobs"; case "watched_jobs": "Watched jobs"; case "namespace_jobs": "Namespace jobs"; default: scope }
+    switch scope { case "my_jobs": "All my jobs"; case "watched_jobs": "Watched jobs"; case "namespace_jobs": "All jobs in selected namespaces"; default: scope }
 }
 private func ruleOutcomeLabel(_ value: String) -> String { value.replacingOccurrences(of: "_", with: " ").capitalized }
 @MainActor private func ruleNamespaceLabel(_ ref: NamespaceRef, store: DashboardStore) -> String {

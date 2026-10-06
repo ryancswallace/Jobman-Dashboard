@@ -30,7 +30,7 @@ export async function request<T>(
   if (!path.startsWith("/api/v1/") || path.includes("://"))
     throw new APIError(
       "invalid_route",
-      "The requested route is not a Dashboard API route.",
+      "This link does not point to a supported Dashboard operation.",
     );
   const headers = new Headers({ Accept: "application/json" });
   if (options.body !== undefined)
@@ -79,7 +79,7 @@ export async function request<T>(
     if (!contentType.includes("application/json"))
       throw new APIError(
         "invalid_response",
-        "Dashboard returned an unexpected response. Try again or contact your operator.",
+        "Dashboard returned an unexpected response. Try again or contact your Dashboard administrator.",
         response.status,
       );
     const maximumBytes = 4 * 1024 * 1024;

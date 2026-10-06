@@ -45,13 +45,13 @@ func (s *Server) registerDeviceRoutes(mux *http.ServeMux) {
 func writeDeviceError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, notifications.ErrDeviceInvalid), errors.Is(err, notifications.ErrInvalid):
-		err = &api.Error{Code: "invalid_request", Message: "Send valid device fields, explicit binding intent, and the required current revision."}
+		err = &api.Error{Code: "invalid_request", Message: "The device settings could not be saved. Refresh the device list, check your choices, and try again."}
 	case errors.Is(err, notifications.ErrDeviceNotFound):
 		err = monitoring.ErrNotFound
 	case errors.Is(err, notifications.ErrDeviceConflict):
-		err = &api.Error{Code: "revision_conflict", Message: "The device binding or revision changed. Refresh its state before trying again."}
+		err = &api.Error{Code: "revision_conflict", Message: "The device settings changed. Refresh the device list before trying again."}
 	case errors.Is(err, notifications.ErrDeviceCapacity):
-		err = &api.Error{Code: "device_capacity", Message: "Device or retained-installation capacity has been reached. Stopping or removing a device remains available; contact the operator about retained capacity."}
+		err = &api.Error{Code: "device_capacity", Message: "The server has reached its device record limit. You can still stop iPhone notifications or remove a device. Contact your administrator for help adding devices."}
 	case errors.Is(err, notifications.ErrDeviceRateLimited):
 		err = &api.Error{Code: "rate_limited", Message: "Too many device changes. Retry later; stopping, muting, detaching, and removing a device remain available."}
 	}

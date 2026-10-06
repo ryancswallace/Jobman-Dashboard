@@ -91,8 +91,8 @@ export function citationPreview(citation: Citation): {
       text: visibleControls(citation.valueJSON.slice(0, 65536)),
       note:
         citation.valueJSON.length > 65536
-          ? "Metadata JSON display limited to the first 65,536 characters. Numeric values are preserved exactly."
-          : "Sealed metadata JSON. Numeric values are preserved exactly.",
+          ? "Showing the first 65,536 characters of the saved job details in JSON format. Numeric values are preserved exactly."
+          : "Saved job details in JSON format. Numeric values are preserved exactly.",
     };
   }
   const encoded = citation.bytesBase64;
@@ -112,14 +112,14 @@ export function citationPreview(citation: Citation): {
     const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
     return {
       text: visibleControls(text.slice(0, 65536)),
-      note: `${bytes.length.toLocaleString()} sealed bytes decoded as UTF-8.${text.length > 65536 ? " Display limited to the first 65,536 characters." : ""} Control characters are escaped for display.`,
+      note: `${bytes.length.toLocaleString()} saved bytes displayed as text.${text.length > 65536 ? " Display limited to the first 65,536 characters." : ""} Hidden control characters are shown as escape sequences.`,
     };
   } catch {
     return {
       text: Array.from(bytes.slice(0, 2048), (byte) =>
         byte.toString(16).padStart(2, "0"),
       ).join(" "),
-      note: `${bytes.length.toLocaleString()} sealed bytes; binary hexadecimal ${bytes.length > 2048 ? "preview limited to the first 2,048 bytes" : "display"}.`,
+      note: `${bytes.length.toLocaleString()} saved bytes; not readable as text. Hexadecimal ${bytes.length > 2048 ? "preview limited to the first 2,048 bytes" : "display"}.`,
     };
   }
 }

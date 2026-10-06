@@ -77,7 +77,7 @@ func labControlSources(sources []api.SourceStatus, primary, secondary api.Scope)
 		seen[source.Scope] = true
 		switch source.Scope {
 		case primary:
-			if source.Status != "authorization_unavailable" || source.AsOf != nil || source.Message != "This source contribution is unavailable. Refresh to retry." {
+			if source.Status != "authorization_unavailable" || source.AsOf != nil || source.Message != "Data from this deployment or namespace is unavailable. Refresh to try again." {
 				return errors.New("paused primary contribution was not explicitly unavailable")
 			}
 		case secondary:
@@ -297,7 +297,7 @@ func TestLabControlChecksRejectsSuccessfulReturnAfterCancellation(t *testing.T) 
 func TestLabControlPartialProofRejectsPrimaryBytesAndHiddenSubtotals(t *testing.T) {
 	now := time.Now().UTC()
 	primary, secondary := api.Scope{DeploymentID: "primary", NamespaceID: "research"}, api.Scope{DeploymentID: "secondary", NamespaceID: "research"}
-	sources := []api.SourceStatus{{Scope: primary, Status: "authorization_unavailable", FetchedAt: now, Message: "This source contribution is unavailable. Refresh to retry."}, {Scope: secondary, Status: "available", FetchedAt: now, AsOf: &now}}
+	sources := []api.SourceStatus{{Scope: primary, Status: "authorization_unavailable", FetchedAt: now, Message: "Data from this deployment or namespace is unavailable. Refresh to try again."}, {Scope: secondary, Status: "available", FetchedAt: now, AsOf: &now}}
 	page := api.Page[api.Job]{Items: []api.Job{{Scope: secondary, ID: "secondary-fact"}}, Sources: sources, Completeness: "partial"}
 	baseline := page
 	baseline.Completeness = "complete"
@@ -408,9 +408,9 @@ func TestLabControlSensitiveErrorsNeverReturnSuccessOrCredentials(t *testing.T) 
 	for _, code := range []string{"source_unavailable", "authorization_unavailable"} {
 		for _, status := range []int{200, 401, 403, 503} {
 			t.Run(fmt.Sprintf("%s-%d", code, status), func(t *testing.T) {
-				message := "The source is unavailable. Retry when private connectivity is restored."
+				message := "Monitoring data is unavailable. Check your private network or VPN connection. If the problem continues, contact your administrator."
 				if code == "authorization_unavailable" {
-					message = "Current source authorization could not be verified."
+					message = "Your access could not be checked with Jobman Control. Try again shortly."
 				}
 				raw, _ := json.Marshal(api.Error{Code: code, Message: message, RequestID: strings.Repeat("a", 32)})
 				var mu sync.Mutex

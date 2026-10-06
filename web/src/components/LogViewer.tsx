@@ -86,12 +86,12 @@ export function LogViewer({ job, run }: { job: JobRef; run?: Wire.JobRun }) {
           )
             throw new APIError(
               "stream_changed",
-              "The response no longer matches the selected run. Refresh run selection.",
+              "The response no longer matches the selected run. Refresh the run list and select the run again.",
             );
           if (execution.current && chunk.executionId !== execution.current)
             throw new APIError(
               "stream_changed",
-              "The execution changed. Reopen Logs to read a fresh tail.",
+              "The job’s execution changed. Refresh to load its latest log output.",
             );
           if (
             end.current &&
@@ -107,7 +107,7 @@ export function LogViewer({ job, run }: { job: JobRef; run?: Wire.JobRun }) {
           if (end.current && chunk.startOffset !== end.current)
             throw new APIError(
               "log_gap",
-              "A byte range is missing. Reopen Logs to request a fresh tail.",
+              "Part of the log is missing. Refresh to load the latest output.",
             );
           const raw = atob(chunk.bytesBase64),
             bytes = Uint8Array.from(raw, (c) => c.charCodeAt(0));
@@ -118,7 +118,7 @@ export function LogViewer({ job, run }: { job: JobRef; run?: Wire.JobRun }) {
           )
             throw new APIError(
               "invalid_response",
-              "Log byte count does not match its declared offsets.",
+              "The log response is inconsistent and cannot be displayed. Try refreshing.",
             );
           const text = decoder.current.decode(bytes, {
             stream: chunk.state !== "complete",
@@ -229,7 +229,7 @@ export function LogViewer({ job, run }: { job: JobRef; run?: Wire.JobRun }) {
               className={stream === s ? "selected" : ""}
               onClick={() => setStream(s)}
             >
-              {s}
+              {s === "stdout" ? "Output (stdout)" : "Errors (stderr)"}
             </button>
           ))}
         </div>
@@ -245,7 +245,7 @@ export function LogViewer({ job, run }: { job: JobRef; run?: Wire.JobRun }) {
           className="button secondary"
           onClick={() => setFollowing((v) => !v)}
         >
-          {following ? "Pause following" : "Resume following"}
+          {following ? "Pause live updates" : "Resume live updates"}
         </button>
         <button className="button secondary" onClick={refresh}>
           Refresh
@@ -254,17 +254,18 @@ export function LogViewer({ job, run }: { job: JobRef; run?: Wire.JobRun }) {
       {error && <ErrorNotice error={error} retry={refresh} />}
       {buffer.gap && (
         <p className="notice warning">
-          The stream changed or a byte range is missing. Reopen Logs to request
-          a new tail.
+          The log changed or part of it is missing. Reopen Logs to load the
+          latest output.
         </p>
       )}
       {buffer.evicted && (
         <p className="notice subtle">
-          Earlier rendered text was removed to keep this view within 2 MiB.
+          Earlier lines have been removed from this view to keep it responsive.
+          This view shows up to 2 MiB of text.
         </p>
       )}
       {loading && !buffer.text ? (
-        <Spinner label="Reading authorized log tail" />
+        <Spinner label="Loading recent log output" />
       ) : (
         <pre
           ref={view}
@@ -283,23 +284,20 @@ export function LogViewer({ job, run }: { job: JobRef; run?: Wire.JobRun }) {
         >
           {buffer.text ||
             (state === "complete"
-              ? "This stream is complete and empty."
-              : "No log bytes are currently available.")}
+              ? "This log is complete and contains no output."
+              : "No log text is currently loaded.")}
         </pre>
       )}
       <div className="log-footer">
         <Status value={state} />
         <Freshness fetchedAt={fetchedAt} loading={loading} error={!!error} />
         {fetchedAt && (
-          <time
-            dateTime={fetchedAt}
-            title="Last successful authorized log read"
-          >
+          <time dateTime={fetchedAt} title="Last successful log refresh">
             {fetchedAt}
           </time>
         )}
         <span>
-          Source capture:{" "}
+          Log captured:{" "}
           {capturedAt ? (
             <time dateTime={capturedAt}>{capturedAt}</time>
           ) : (
@@ -308,7 +306,7 @@ export function LogViewer({ job, run }: { job: JobRef; run?: Wire.JobRun }) {
         </span>
         <span>
           Original byte range {buffer.startOffset ?? "—"}–
-          {buffer.endOffset ?? "—"} · {following ? "Following" : "Paused"}
+          {buffer.endOffset ?? "—"} · {following ? "Live updates on" : "Paused"}
         </span>
         <span aria-live="polite">
           {search

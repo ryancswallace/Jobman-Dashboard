@@ -24,16 +24,16 @@ export function JobExecution({ job }: { job: Job }) {
   );
   const unavailable =
     job.executionUnavailableReason === "unsupported"
-      ? "This Control deployment does not provide the submitted execution specification."
+      ? "This Control deployment does not provide the submitted command."
       : job.executionUnavailableReason === "too_large"
-        ? "The submitted execution specification exceeds the display limit. No partial command is shown."
+        ? "The submitted command exceeds the display limit. No partial command is shown."
         : job.executionUnavailableReason === "missing"
-          ? "Control has no submitted execution specification for this job."
-          : "The submitted execution specification is unavailable.";
+          ? "Control has no submitted command for this job."
+          : "The submitted command is unavailable.";
   return (
     <section className="panel wide" aria-labelledby="execution-heading">
       <div className="panel-heading">
-        <h2 id="execution-heading">Submitted execution specification</h2>
+        <h2 id="execution-heading">Submitted command</h2>
         {command !== undefined && (
           <button
             className="button secondary"
@@ -55,19 +55,18 @@ export function JobExecution({ job }: { job: Job }) {
       {execution ? (
         <>
           <p className="panel-note">
-            The immutable submitted command, not an observation of the running
-            process. The first JSON item is the executable; remaining items are
-            its ordered arguments. Quotes, empty arguments and line breaks are
-            preserved. Shell syntax is passed literally unless the submitted
-            executable interprets it. Invisible direction and format controls
-            appear as Unicode escapes; copied JSON preserves the original
-            values.
+            This is the command saved when the job was submitted. The first item
+            is the program; the remaining items are its arguments, in order.
+            JSON keeps spaces, empty arguments, and line breaks intact. This is
+            not a command to paste directly into a terminal. Hidden
+            text-formatting characters are shown as Unicode escapes; copying
+            preserves the original values.
           </p>
           <div className="panel-body">
             <pre
               className="execution-command"
               tabIndex={0}
-              aria-label="Submitted command argument vector"
+              aria-label="Submitted command and arguments"
             >
               <code>{displayedCommand}</code>
             </pre>
@@ -82,9 +81,9 @@ export function JobExecution({ job }: { job: Job }) {
             </div>
           </dl>
           <p className="panel-note">
-            This is the submitted path, which may use a logical workspace
-            location. The resolved directory on the execution host is not
-            reported here.
+            The folder requested at submission. A path such as workspace:/
+            refers to the job’s workspace; the actual folder on the execution
+            host is not shown.
           </p>
         </>
       ) : (

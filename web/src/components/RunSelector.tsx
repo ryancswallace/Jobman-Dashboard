@@ -1,3 +1,4 @@
+import { jobStatus } from "../lib/format";
 import { useMemo, useState } from "react";
 import type * as Wire from "../../../contracts/typescript/dashboard.generated";
 import type { JobRef } from "../lib/models";
@@ -41,7 +42,7 @@ export function RunSelector({
           <p>
             {selected
               ? `Run ${selected.number} · ${selected.id}`
-              : "Current logs · all artifact runs · recent diagnosis evidence"}
+              : "Latest logs · output files from all runs · diagnosis of recent runs"}
           </p>
         </div>
         <button
@@ -53,18 +54,19 @@ export function RunSelector({
         </button>
         {selected && (
           <button className="button secondary" onClick={() => select()}>
-            Use current defaults
+            Clear run selection
           </button>
         )}
       </div>
       {selected && (
         <div className="panel-body">
-          <Status value={selected.phase} />
+          <Status value={selected.phase} label={jobStatus(selected.phase)} />
           <Status value={selected.outcome} />
           <p>
-            Run metadata updated{" "}
+            Run details updated{" "}
             {timestamp(selected.updatedAt, bootstrap.preferences.timezone)}.
-            This is not an execution lifecycle time.
+            This is when the record changed, not when the run started or
+            finished.
           </p>
           {selected.executionId ? (
             <p>
@@ -79,8 +81,9 @@ export function RunSelector({
       {open && (
         <div className="panel-body">
           <p>
-            Run references are newest first. This selection applies to logs,
-            artifact metadata and new diagnosis requests.
+            Each run is an attempt to execute this job. Runs are listed newest
+            first. Selecting a run filters its logs, output file details, and
+            new diagnosis reports.
           </p>
           <Freshness
             fetchedAt={result.fetchedAt}
@@ -106,14 +109,11 @@ export function RunSelector({
             />
           )}
           {!result.data && result.loading ? (
-            <Spinner label="Loading run references" />
+            <Spinner label="Loading runs" />
           ) : (
             result.data && (
               <>
-                <p>
-                  {result.data.data.total} recorded runs at the start of this
-                  traversal.
-                </p>
+                <p>{result.data.data.total} runs when this list was opened.</p>
                 {!result.data.data.items.length && (
                   <p>
                     No run has been recorded. An unassigned job or imported
@@ -132,7 +132,7 @@ export function RunSelector({
                       >
                         Select run {run.number}
                       </button>{" "}
-                      · {run.phase}
+                      · {jobStatus(run.phase)}
                       {run.outcome ? ` / ${run.outcome}` : ""}
                       <span className="secondary-line mono">{run.id}</span>
                     </li>

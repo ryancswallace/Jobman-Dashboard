@@ -38,12 +38,12 @@ public enum RuleDraftError: Error, LocalizedError, Equatable {
     case hiddenReferences, unsupported, name, namespaces, watchedJobs, outcomes
     public var errorDescription: String? {
         switch self {
-        case .hiddenReferences: "Some rule references are hidden while access is unavailable. You can stop or delete this rule; reload full access before editing its scope."
+        case .hiddenReferences: "Some selected jobs or namespaces are hidden because access cannot be confirmed. You can stop or delete this rule. Refresh access before editing all its settings."
         case .unsupported: "This rule uses an option this app cannot edit. You can still stop or delete it."
-        case .name: "Enter a rule name using at most 120 UTF-8 bytes, without control characters."
-        case .namespaces: "Choose 1–320 explicit namespaces across at most 32 deployments."
-        case .watchedJobs: "Add 1–100 full job UUIDs in the selected namespaces."
-        case .outcomes: "Choose at least one terminal outcome, or choose every terminal outcome."
+        case .name: "Enter a rule name up to 120 bytes, without control characters. Some characters use more than one byte."
+        case .namespaces: "Choose 1–320 namespaces from no more than 32 deployments."
+        case .watchedJobs: "Add 1–100 full job IDs (UUIDs) from the selected namespaces."
+        case .outcomes: "Choose at least one final result, or choose every final result."
         }
     }
 }

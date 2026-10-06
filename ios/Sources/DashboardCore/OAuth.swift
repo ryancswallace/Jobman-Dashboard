@@ -39,11 +39,11 @@ public enum OAuthError: Error, Equatable, LocalizedError {
     case invalidConfiguration, randomGeneration, invalidCallback, rejected, invalidTokens
     public var errorDescription: String? {
         switch self {
-        case .invalidConfiguration: "The organization's native sign-in configuration is incomplete or incompatible."
+        case .invalidConfiguration: "Sign-in for this app is not set up correctly. Contact your administrator."
         case .randomGeneration: "Secure sign-in could not be started."
         case .invalidCallback: "The sign-in response did not match this sign-in attempt."
         case .rejected: "The identity service did not complete sign-in."
-        case .invalidTokens: "The identity service did not issue a usable API access token."
+        case .invalidTokens: "Your organization did not grant a usable sign-in session for Dashboard. Try signing in again or contact your administrator."
         }
     }
 }

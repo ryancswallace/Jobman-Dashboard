@@ -159,7 +159,9 @@ it("renders immutable context, exact counts and source-qualified refreshed desti
     `/deployments/${id(2)}/namespaces/${id(3)}/jobs/${id(4)}`,
   );
   expect(
-    screen.getByText(/Provider acceptance does not confirm phone presentation/),
+    screen.getByText(
+      /does not confirm that the notification appeared on your phone/,
+    ),
   ).toBeInTheDocument();
 });
 it("shows partial authorized subtotal and missing current job without a stale name", async () => {
@@ -170,7 +172,7 @@ it("shows partial authorized subtotal and missing current job without a stale na
   await screen.findByText(/Current job detail is no longer available/);
   expect(screen.queryByText("Synthetic job")).not.toBeInTheDocument();
   expect(
-    screen.getByText(/1 unread in verified scopes \(subtotal\)/),
+    screen.getByText(/1 unread in available namespaces \(partial count\)/),
   ).toBeInTheDocument();
   expect(
     screen.queryByRole("link", { name: /Open current job/ }),

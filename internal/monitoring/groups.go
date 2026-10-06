@@ -16,7 +16,7 @@ import (
 	"github.com/ryancswallace/jobman-dashboard/internal/api"
 )
 
-var errGroupsUnsupported = failure("unsupported_contract", "This source does not support bounded workload monitoring.")
+var errGroupsUnsupported = failure("unsupported_contract", "This Jobman Control deployment does not support job groups. Ask your administrator about upgrading it.")
 
 func groupHash(v any) string {
 	b, _ := json.Marshal(v)
@@ -502,7 +502,7 @@ func (e *Engine) GraphEdges(ctx context.Context, a Actor, scope api.Scope, id st
 func (e *Engine) GraphNeighborhood(ctx context.Context, a Actor, scope api.Scope, id, node string, maxNodes, maxEdges int) (api.GraphNeighborhood, error) {
 	out := api.GraphNeighborhood{}
 	if id == "" || node == "" || maxNodes < 1 || maxNodes > 200 || maxEdges < 1 || maxEdges > 500 {
-		return out, failure("invalid_request", "Neighborhood identity or bounds are invalid.")
+		return out, failure("invalid_request", "The dependency graph request is invalid. Reopen the job group and try again.")
 	}
 	src, authority, err := e.authorizedGroup(ctx, a, scope)
 	if err != nil {

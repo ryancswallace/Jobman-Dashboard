@@ -22,23 +22,26 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("Display") {
-                Picker("Appearance", selection: $appearance) { Text("System").tag("system"); Text("Light").tag("light"); Text("Dark").tag("dark") }
-                TextField("IANA timezone", text: $timezone).autocorrectionDisabled().textInputAutocapitalization(.never)
-                Picker("Data refresh", selection: $refresh) { Text("Manual").tag(0); Text("5 seconds").tag(5); Text("10 seconds").tag(10); Text("30 seconds").tag(30) }
-                Button("Save preferences") { Task { await save() } }
+                Picker("Appearance", selection: $appearance) { Text("Use device setting").tag("system"); Text("Light").tag("light"); Text("Dark").tag("dark") }
+                TextField("Time zone, e.g. America/New_York", text: $timezone).autocorrectionDisabled().textInputAutocapitalization(.never)
+                Text("Use a time zone name such as America/New_York, Europe/London or UTC.").font(.footnote).foregroundStyle(.secondary)
+                Picker("Automatic refresh", selection: $refresh) { Text("Manual only").tag(0); Text("5 seconds").tag(5); Text("10 seconds").tag(10); Text("30 seconds").tag(30) }
+                Text("Manual only stops routine data refreshes. Access checks continue, and active log following or a report being prepared may still refresh.").font(.footnote).foregroundStyle(.secondary)
+                Button("Save settings") { Task { await save() } }
                 if let error { ErrorMessage(error: error) }
             }
             Section("Notifications") {
                 NavigationLink("Manage notification devices") { DevicesView() }
-                Text("Notifications contain a generic update. Job details require your private network and current access.").font(.footnote)
+                Text("Notifications show a generic message. To view job details, connect to your private network and sign in with permission to view the job.").font(.footnote)
             }
             Section("Account and access") {
-                Text(store.bootstrap?.account.displayName ?? "Unavailable")
+                Text("A deployment is a connected Jobman Control service. A namespace groups jobs within a deployment and has its own access permissions.").font(.footnote).foregroundStyle(.secondary)
+                Text(store.bootstrap?.account.displayName ?? "Not available")
                 ForEach(store.bootstrap?.deployments ?? []) { deployment in
                     ForEach(deployment.namespaces) { namespace in
                         DisclosureGroup("\(deployment.name) / \(namespace.name)") {
-                            Text("Contributing roles: \(namespace.roles.joined(separator: ", "))")
-                            Text("Effective capabilities: \(namespace.capabilities.joined(separator: ", "))")
+                            Text("Your roles: \(namespace.roles.joined(separator: ", "))")
+                            Text("Permissions from these roles: \(namespace.capabilities.joined(separator: ", "))")
                         }
                     }
                 }
@@ -52,7 +55,7 @@ struct SettingsView: View {
     }
     private func save() async {
         guard var value = store.bootstrap?.preferences else { return }
-        guard TimeZone(identifier: timezone) != nil else { error = "Enter a valid timezone, such as America/New_York or UTC."; return }
+        guard TimeZone(identifier: timezone) != nil else { error = "Enter a time zone such as America/New_York or UTC."; return }
         value.appearance = appearance; value.timezone = timezone; value.refreshSeconds = refresh
         do {
             let _: Preferences = try await store.request(path: "/api/v1/preferences", method: "PUT", body: JSONEncoder().encode(value), revision: value.revision)

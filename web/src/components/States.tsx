@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import type { ReactNode } from "react";
 import type { Meta } from "../lib/models";
-import { relative, safeReturnPath, title } from "../lib/format";
+import { errorHeading, relative, safeReturnPath, title } from "../lib/format";
 import { useSession } from "../lib/session";
 export function Spinner({ label = "Loading" }: { label?: string }) {
   return (
@@ -39,7 +39,7 @@ export function ErrorNotice({
   return (
     <div className="notice error" role="alert">
       <div>
-        <strong>{session ? "Sign in again" : title(error.code)}</strong>
+        <strong>{errorHeading(error.code)}</strong>
         <p>{error.message}</p>
         {error.requestId && <small>Reference: {error.requestId}</small>}
       </div>
@@ -93,8 +93,8 @@ export function ConnectionScreen({
           </a>
         )}
         <p className="muted small">
-          Use your organization’s private network or VPN. Your Active Directory
-          sign-in stays with your identity provider.
+          Use your organization’s private network or VPN. Sign in using your
+          organization’s account.
         </p>
       </div>
     </main>
@@ -114,8 +114,9 @@ export function Completeness({ meta }: { meta?: Meta }) {
           <div>
             <strong>Partial results</strong>
             <p>
-              Counts and rows include available sources only. Unavailable
-              contributions are not counted as zero.
+              Some deployments or namespaces could not be loaded. Totals include
+              only the available results; missing results do not mean there are
+              no jobs.
             </p>
             <ul>
               {issues.map((source, i) => (
@@ -150,12 +151,20 @@ export function Freshness({
         : error
           ? "Refresh failed · showing last known data"
           : fetchedAt
-            ? `Fetched ${relative(fetchedAt)}`
-            : "Not yet fetched"}
+            ? `Updated ${relative(fetchedAt)}`
+            : "Not yet loaded"}
     </span>
   );
 }
-export function Status({ value, tone }: { value?: string; tone?: string }) {
+export function Status({
+  value,
+  tone,
+  label,
+}: {
+  value?: string;
+  tone?: string;
+  label?: string;
+}) {
   const color =
     tone ??
     (value === "running" || value === "current" || value === "success"
@@ -182,7 +191,7 @@ export function Status({ value, tone }: { value?: string; tone?: string }) {
   return (
     <span className={`badge ${color}`}>
       <span aria-hidden="true" className="status-dot" />
-      {title(value)}
+      {label ?? title(value)}
     </span>
   );
 }

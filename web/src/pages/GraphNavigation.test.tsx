@@ -65,10 +65,10 @@ function view() {
   );
 }
 const nodesTable = () =>
-  screen.getByRole("columnheader", { name: "Node / child" }).closest("table")!;
+  screen.getByRole("columnheader", { name: "Node / job" }).closest("table")!;
 const edgeTable = () =>
   screen
-    .getByRole("columnheader", { name: "Predicate state" })
+    .getByRole("columnheader", { name: "Condition status" })
     .closest("table")!;
 const rows = (table: HTMLTableElement) =>
   within(table).getAllByRole("row").slice(1);
@@ -142,11 +142,11 @@ it("navigates a ceiling graph with bounded tables, omissions, keyboard recenteri
   ).toHaveAttribute("aria-current", "true");
   expect(
     screen.getByText(
-      /Not shown in this neighborhood: 9,950 nodes, 99,900 edges/,
+      /Not shown in this diagram: 9,950 nodes, 99,900 dependency links/,
     ),
   ).toBeVisible();
   const neighborhood = screen.getByRole("region", {
-    name: "Neighborhood node list",
+    name: "Connected job list",
   });
   const recenter = within(neighborhood).getByRole("button", {
     name: graphNodeName(1),
@@ -165,11 +165,11 @@ it("navigates a ceiling graph with bounded tables, omissions, keyboard recenteri
   ).toHaveAttribute("aria-current", "true");
   expect(
     within(
-      screen.getByRole("region", { name: "Neighborhood node list" }),
+      screen.getByRole("region", { name: "Connected job list" }),
     ).getByRole("button", { name: graphNodeName(1) }),
   ).toHaveAttribute("aria-current", "true");
   expect(
-    screen.getByText(/Returned 12 of 12 nodes and 66 of 66 edges/),
+    screen.getByText(/Returned 12 of 12 nodes and 66 of 66 dependency links/),
   ).toBeVisible();
   expect(
     within(nodesTable()).getByRole("link", { name: "Synthetic job 1" }),
@@ -190,7 +190,9 @@ it("audits populated ceiling graph exploration with the unchanged accessibility 
   fireEvent.click(
     within(nodesTable()).getByRole("button", { name: graphNodeName(1) }),
   );
-  await screen.findByText(/Returned 12 of 12 nodes and 66 of 66 edges/);
+  await screen.findByText(
+    /Returned 12 of 12 nodes and 66 of 66 dependency links/,
+  );
   await auditAccessibility();
 });
 
@@ -210,9 +212,9 @@ it("replaces dependency pages and resets the cursor when direction changes", asy
   // Paging checks inspect actual table membership; role and keyboard semantics
   // are covered above. Rebuilding the complete accessibility tree for each
   // row assertion measures jsdom's query oracle, not client navigation.
-  expect(traversalRows("Predicate state")).toHaveLength(100);
+  expect(traversalRows("Condition status")).toHaveLength(100);
   await clickPage("Next dependency page →");
-  const edges = traversalRows("Predicate state");
+  const edges = traversalRows("Condition status");
   expect(edges).toHaveLength(100);
   expect(edges[0]).toHaveTextContent(graphNodeName(101));
   expect(
@@ -233,17 +235,17 @@ it("replaces dependency pages and resets the cursor when direction changes", asy
 it("replaces child pages and returns to the first page without accumulating rows", async () => {
   render(view());
   await screen.findByRole("heading", { name: "Synthetic ceiling graph" });
-  expect(traversalRows("Node / child")).toHaveLength(50);
+  expect(traversalRows("Node / job")).toHaveLength(50);
   await clickPage("Next page →");
-  const nodes = traversalRows("Node / child");
+  const nodes = traversalRows("Node / job");
   expect(nodes).toHaveLength(50);
   expect(nodes[0]).toHaveTextContent(graphNodeName(50));
   expect(
     within(nodesTable()).queryByText(graphNodeName(0), { selector: "button" }),
   ).not.toBeInTheDocument();
   await clickPage("First page");
-  expect(traversalRows("Node / child")).toHaveLength(50);
-  expect(traversalRows("Node / child")[0]).toHaveTextContent(graphNodeName(0));
+  expect(traversalRows("Node / job")).toHaveLength(50);
+  expect(traversalRows("Node / job")[0]).toHaveTextContent(graphNodeName(0));
 });
 
 it("clears private graph content on lost authority and ignores a cancelled old-account response", async () => {
@@ -388,7 +390,7 @@ async function renderCeilingDiagram() {
   expect(diagram.querySelectorAll("path.graph-edge")).toHaveLength(500);
   expect(
     screen.getByText(
-      /Not shown in this neighborhood: 9,800 nodes, 99,500 edges/,
+      /Not shown in this diagram: 9,800 nodes, 99,500 dependency links/,
     ),
   ).toBeVisible();
 }
@@ -433,11 +435,11 @@ it.runIf(import.meta.env.VITE_GRAPH_CEILING_ACCEPTANCE === "1")(
     const nodes = new Set<string>();
     for (let page = 0; page < 200; page++) {
       await waitFor(() =>
-        expect(traversalRows("Node / child")[0]).toHaveTextContent(
+        expect(traversalRows("Node / job")[0]).toHaveTextContent(
           graphNodeName(page * 50),
         ),
       );
-      const current = traversalRows("Node / child");
+      const current = traversalRows("Node / job");
       expect(current).toHaveLength(50);
       for (const row of current) {
         const links = row.querySelectorAll("a");
@@ -458,11 +460,11 @@ it.runIf(import.meta.env.VITE_GRAPH_CEILING_ACCEPTANCE === "1")(
     for (let page = 0; page < 1000; page++) {
       const expected = graphFixtureEdge(page * 100);
       await waitFor(() => {
-        const row = traversalRows("Predicate state")[0];
+        const row = traversalRows("Condition status")[0];
         expect(row).toHaveTextContent(expected.from);
         expect(row).toHaveTextContent(expected.to);
       });
-      const current = traversalRows("Predicate state");
+      const current = traversalRows("Condition status");
       expect(current).toHaveLength(100);
       for (const row of current) {
         const links = row.querySelectorAll("a");

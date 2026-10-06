@@ -111,7 +111,7 @@ export function deviceSettings(
   )
     throw new APIError(
       "invalid_device",
-      "Use a device label of 1–120 UTF-8 bytes without control characters.",
+      "Enter a short device name without line breaks or control characters (up to 120 bytes; some characters use more than one byte).",
     );
   return result;
 }
