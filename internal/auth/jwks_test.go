@@ -9,6 +9,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -102,11 +103,33 @@ func (f *jwksFixture) token(t *testing.T, audience string, signer jose.Signer) s
 	return value
 }
 
-func (f *jwksFixture) authenticate(token string) error {
-	r := httptest.NewRequest("GET", "https://dashboard.example/api/v1/bootstrap", nil)
+func (f *jwksFixture) authenticate(ctx context.Context, token string) error {
+	r := httptest.NewRequestWithContext(ctx, "GET", "https://dashboard.example/api/v1/bootstrap", nil)
 	r.Header.Set("Authorization", "Bearer "+token)
 	_, err := f.o.Authenticate(r)
 	return err
+}
+
+func (f *jwksFixture) requireRecovery(t *testing.T, token string) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	for {
+		err := f.authenticate(ctx, token)
+		if err == nil {
+			return
+		}
+		if !errors.Is(err, monitoring.ErrSource) {
+			t.Fatalf("same signed token did not recover with provider: %v", err)
+		}
+		if ctx.Err() != nil {
+			t.Fatalf("provider recovery exceeded deadline: %v (last authentication error: %v)", ctx.Err(), err)
+		}
+		// RemoteKeySet wakes callers before clearing its completed in-flight
+		// fetch. An immediate retry can still receive that fetch's source error;
+		// yield until a new fetch observes recovery, without changing the token.
+		runtime.Gosched()
+	}
 }
 
 func TestRealJWKSFailureRecoversWithoutInvalidatingAuthentication(t *testing.T) {
@@ -114,20 +137,22 @@ func TestRealJWKSFailureRecoversWithoutInvalidatingAuthentication(t *testing.T) 
 		t.Run(map[int32]string{1: "http503", 2: "transport", 3: "malformed", 4: "oversized"}[mode], func(t *testing.T) {
 			f := newJWKSFixture(t, mode)
 			token := f.token(t, "api", f.signer)
-			if err := f.authenticate(token); !errors.Is(err, monitoring.ErrSource) || f.fetches.Load() == 0 {
+			if err := f.authenticate(t.Context(), token); !errors.Is(err, monitoring.ErrSource) || f.fetches.Load() == 0 {
 				t.Fatal("real go-oidc key fetch failure became invalid credentials")
 			}
 			webToken := f.token(t, "web", f.signer)
 			if _, err := f.o.webVerifier.Verify(t.Context(), webToken); !verifierUnavailable(t.Context(), err) {
 				t.Fatal("browser key verifier lost dependency failure classification")
 			}
+			failedFetches := f.fetches.Load()
 			f.mode.Store(0)
-			if err := f.authenticate(token); err != nil {
-				t.Fatal("same signed token did not recover with provider")
+			f.requireRecovery(t, token)
+			if f.fetches.Load() <= failedFetches {
+				t.Fatal("provider recovery did not fetch fresh signing keys")
 			}
 			fetches := f.fetches.Load()
 			f.mode.Store(1)
-			if err := f.authenticate(token); err != nil || f.fetches.Load() != fetches {
+			if err := f.authenticate(t.Context(), token); err != nil || f.fetches.Load() != fetches {
 				t.Fatal("verified library cache was discarded")
 			}
 		})
@@ -144,7 +169,7 @@ func TestRealJWKSInvalidSignatureAndConcurrentMalformedTokenRemainUnauthorized(t
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := f.authenticate(f.token(t, "api", signer)); !errors.Is(err, ErrUnauthenticated) {
+	if err := f.authenticate(t.Context(), f.token(t, "api", signer)); !errors.Is(err, ErrUnauthenticated) {
 		t.Fatal("invalid signature became dependency unavailability")
 	}
 	// A different fresh verifier has no cached key. Its failed fetch cannot
@@ -153,13 +178,13 @@ func TestRealJWKSInvalidSignatureAndConcurrentMalformedTokenRemainUnauthorized(t
 	f.mode.Store(5)
 	token := f.token(t, "api", f.signer)
 	finished := make(chan error, 1)
-	go func() { finished <- f.authenticate(token) }()
+	go func() { finished <- f.authenticate(t.Context(), token) }()
 	select {
 	case <-f.entered:
 	case <-time.After(time.Second):
 		t.Fatal("remote fetch did not start")
 	}
-	if err := f.authenticate("malformed"); !errors.Is(err, ErrUnauthenticated) {
+	if err := f.authenticate(t.Context(), "malformed"); !errors.Is(err, ErrUnauthenticated) {
 		t.Fatal("another request's outage tainted an invalid token")
 	}
 	close(f.release)
