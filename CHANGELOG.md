@@ -6,6 +6,9 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
+- Verify each container architecture by its own immutable manifest digest so
+  release checks also work with Docker image stores that load one platform per digest.
+
 - Add controlled candidate publication, versioned Linux packages and containers,
   package lifecycle verification, SPDX inventories and GitHub attestations.
   Pin the embedded Jobman collector to published v1.9.0 and Diagnose to its
