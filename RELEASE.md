@@ -17,7 +17,9 @@ Do not reuse an existing version/output or silently include untracked files.
 
 The existing `Dashboard CI` dispatch accepts candidate and explicit native version
 inputs, builds Linux bundles twice and compares checksums, and retains an unsigned
-native archive. It does not publish or sign. Follow the complete
+native archive. That validation-only path does not publish or sign. The separate manual
+`release.yml` workflow builds, verifies, attests and publishes an engineering RC;
+see [distribution](docs/DISTRIBUTION.md). Follow the complete
 [candidate procedure](docs/FINAL_CANDIDATE.md) for review, artifact verification and
 separately authorized GitHub prerelease publication. Existing accepted evidence
 must remain bound to its exact bytes and source tuple.
@@ -43,11 +45,12 @@ metadata as a claim of reproducible, accepted release bytes.
 
 Actual AD FS/direct AD, real APNs, signing/internal distribution, company-managed
 phone and pilot checks remain required. Compatible reviewed upstream releases and
-explicit dependency repinning also remain necessary. No semantic-release hook,
-`latest` repair, package-registry upload, Homebrew formula, Apple distribution,
-Sigstore attestation or stable tag is automatically produced by this scaffold.
-Add those only against the accepted final artifact contract and configured
-publisher identities. [Repository parity](docs/REPOSITORY_SCAFFOLDING.md) records
+explicit dependency repinning also remain necessary. No semantic-release hook, `latest` update, Homebrew formula, Apple distribution
+or stable tag is automatically produced by this scaffold.
+The controlled RC publisher adds versioned GHCR images, canonical Linux packages,
+SPDX inventories and GitHub attestations. Optional Cloudsmith distribution uses a
+separate configured publisher identity. Stable publication, Homebrew and Apple
+distribution remain outside that RC-only workflow. [Repository parity](docs/REPOSITORY_SCAFFOLDING.md) records
 these intentional differences from the sibling CLI/service releases.
 
 Production deployment/migration, organizational identity/network changes, company

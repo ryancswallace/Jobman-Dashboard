@@ -1,0 +1,219 @@
+name: Publish Dashboard RC
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: New immutable engineering candidate (vX.Y.Z-rc.N)
+        required: true
+        type: string
+      nativeBuild:
+        description: Explicit unsigned iPhone build number
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dashboard-release
+  cancel-in-progress: false
+
+jobs:
+  gates:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Require unused RC and successful latest exact-commit checks
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: python3 scripts/publish-release.py preflight
+
+  linux:
+    needs: gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.version
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: node.version
+      - run: npm install --global "npm@$(cat npm.version)" --ignore-scripts --no-audit --fund=false
+      - name: Build canonical Linux bytes twice
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          python3 scripts/build-release.py --version "$RELEASE_VERSION" --output-directory "$RUNNER_TEMP/first"
+          python3 scripts/build-release.py --version "$RELEASE_VERSION" --output-directory "$RUNNER_TEMP/second"
+          cmp "$RUNNER_TEMP/first/SHA256SUMS" "$RUNNER_TEMP/second/SHA256SUMS"
+      - name: Install pinned nFPM and package canonical bytes
+        run: |
+          GOBIN="$PWD/bin" go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0
+          python3 scripts/package-release.py --input-directory "$RUNNER_TEMP/first" --output-directory "$RUNNER_TEMP/packages" --nfpm "$PWD/bin/nfpm"
+          python3 scripts/package-release.py --input-directory "$RUNNER_TEMP/second" --output-directory "$RUNNER_TEMP/packages-second" --nfpm "$PWD/bin/nfpm"
+          cmp "$RUNNER_TEMP/packages/SHA256SUMS" "$RUNNER_TEMP/packages-second/SHA256SUMS"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rc-linux
+          path: ${{ runner.temp }}/first/*
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rc-packages
+          path: ${{ runner.temp }}/packages/*
+          if-no-files-found: error
+          retention-days: 30
+
+  package-smoke:
+    needs: linux
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-latest
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: rc-packages
+          path: ${{ runner.temp }}/packages
+      - name: Install, reinstall and remove packages in all three distributions
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: ./devel/release-package-smoke.sh "$RUNNER_TEMP/packages" "$ARCHITECTURE"
+
+  native:
+    needs: gates
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Archive unsigned exact-source iPhone candidate
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          NATIVE_BUILD: ${{ inputs.nativeBuild }}
+        run: |
+          marketing="${RELEASE_VERSION#v}"
+          python3 ios/scripts/package-app.py unsigned --version "${marketing%-rc.*}" --build "$NATIVE_BUILD" --output "$RUNNER_TEMP/native"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rc-native
+          path: |
+            ${{ runner.temp }}/native/JobmanDashboard-unsigned.xcarchive.tar.gz
+            ${{ runner.temp }}/native/build-receipt.json
+            ${{ runner.temp }}/native/archive-files.json
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    needs: [linux, native, package-smoke]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: main
+    permissions:
+      actions: read
+      contents: write
+      packages: write
+      attestations: write
+      artifact-metadata: write
+      id-token: write
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Recheck approved exact source and release gates
+        run: python3 scripts/publish-release.py preflight
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: rc-linux
+          path: ${{ runner.temp }}/linux
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: rc-packages
+          path: ${{ runner.temp }}/packages
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: rc-native
+          path: ${{ runner.temp }}/native
+      - uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
+        with:
+          image: tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        with:
+          driver-opts: image=moby/buildkit@sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5abd3a657af0b7e26ec
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: anchore/sbom-action/download-syft@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          syft-version: v1.46.0
+      - name: Assemble exact canonical context and sanitized assets
+        run: |
+          python3 scripts/publish-release.py context --input "$RUNNER_TEMP/linux" --output "$RUNNER_TEMP/context"
+          python3 scripts/publish-release.py assemble --input "$RUNNER_TEMP/linux" --packages "$RUNNER_TEMP/packages" --native "$RUNNER_TEMP/native" --output "$RUNNER_TEMP/assets"
+      - name: Push only the unused versioned multiarchitecture container
+        id: image
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          python3 scripts/check-image-unused.py "${image}:${RELEASE_VERSION}"
+          docker buildx build "$RUNNER_TEMP/context" --platform linux/amd64,linux/arm64 \
+            --build-arg "VERSION=$RELEASE_VERSION" --build-arg "REVISION=$GITHUB_SHA" \
+            --provenance=mode=max --tag "${image}:${RELEASE_VERSION}" \
+            --metadata-file "$RUNNER_TEMP/image-metadata.json" --push
+          digest=$(jq -er '."containerimage.digest" | select(test("^sha256:[a-f0-9]{64}$"))' "$RUNNER_TEMP/image-metadata.json")
+          python3 scripts/publish-release.py verify-container --input "$RUNNER_TEMP/context" --output "$RUNNER_TEMP/assets" --image "$image" --image-digest "$digest" --runtime-architecture all
+          echo "name=$image" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+      - name: Generate SPDX inventories for all distributable payloads
+        env:
+          IMAGE_NAME: ${{ steps.image.outputs.name }}
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          for asset in "$RUNNER_TEMP/assets/"*.tar.gz "$RUNNER_TEMP/assets/"*.deb "$RUNNER_TEMP/assets/"*.rpm "$RUNNER_TEMP/assets/"*.apk; do
+            syft scan "$asset" --output "spdx-json=${asset}.spdx.json"
+          done
+          syft scan "registry:${IMAGE_NAME}@${IMAGE_DIGEST}" --platform linux/amd64 --output "spdx-json=$RUNNER_TEMP/assets/container-amd64.spdx.json"
+          syft scan "registry:${IMAGE_NAME}@${IMAGE_DIGEST}" --platform linux/arm64 --output "spdx-json=$RUNNER_TEMP/assets/container-arm64.spdx.json"
+          python3 scripts/publish-release.py checksums --input "$RUNNER_TEMP/assets"
+      - name: Attest all release files including checksum manifest and SBOMs
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ${{ runner.temp }}/assets/*
+      - name: Attest immutable container manifest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ steps.image.outputs.name }}
+          subject-digest: ${{ steps.image.outputs.digest }}
+          push-to-registry: true
+      - name: Stage immutable draft, verify downloaded bytes and attestations, publish RC
+        run: |
+          python3 scripts/publish-release.py stage --input "$RUNNER_TEMP/assets"
+          python3 scripts/publish-release.py publish --input "$RUNNER_TEMP/assets"

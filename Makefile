@@ -28,7 +28,7 @@ contracts-check: ## Verify contract generation and compatibility tests.
 	python3 -m unittest discover -s contracts -p 'test_*.py'
 
 package-check: ## Verify candidate packaging boundaries.
-	python3 -m unittest discover -s scripts -p 'test_release.py'
+	python3 -m unittest discover -s scripts -p 'test_*.py'
 	python3 -m unittest discover -s devel -p 'test_*.py'
 	python3 -m unittest discover -s deploy/postgres -p 'test_*.py'
 
@@ -74,12 +74,14 @@ GOLANGCI_LINT_VERSION := v2.12.2
 GOVULNCHECK_VERSION := v1.6.0
 ACTIONLINT_VERSION := v1.7.12
 GORELEASER_VERSION := v2.17.0
+NFPM_VERSION := v2.47.0
 SYFT_VERSION := v1.46.0
 CSPELL_VERSION := 10.0.1
 GOLANGCI_LINT ?= bin/golangci-lint
 GOVULNCHECK ?= bin/govulncheck
 ACTIONLINT ?= bin/actionlint
 GORELEASER ?= bin/goreleaser
+NFPM ?= bin/nfpm
 SYFT ?= bin/syft
 COVERAGE_MIN ?= 30
 FUZZ_TIME ?= 10s
@@ -222,3 +224,17 @@ tools: tool-golangci-lint tool-govulncheck tool-actionlint tool-goreleaser tool-
 .PHONY: package-smoke
 package-smoke: artifact-check ## Inspect native package layouts (requires dpkg-deb and rpm).
 	./devel/package-smoke.sh dist
+
+.PHONY: tool-nfpm release-packages release-package-smoke
+tool-nfpm:
+	@if ! go version -m '$(NFPM)' 2>/dev/null | grep -Fq '$(NFPM_VERSION)'; then \
+		mkdir -p bin; GOBIN='$(abspath bin)' go install github.com/goreleaser/nfpm/v2/cmd/nfpm@$(NFPM_VERSION); \
+	fi
+
+release-packages: tool-nfpm ## Package verified canonical candidate archives (INPUT_DIR and OUTPUT_DIR required).
+	@test -n "$$INPUT_DIR" -a -n "$$OUTPUT_DIR" || (echo 'Set INPUT_DIR and new OUTPUT_DIR.'; exit 1)
+	python3 scripts/package-release.py --input-directory "$$INPUT_DIR" --output-directory "$$OUTPUT_DIR" --nfpm '$(abspath $(NFPM))'
+
+release-package-smoke: ## Exercise candidate packages in disposable containers (PACKAGES_DIR, ARCH, optional PREVIOUS_PACKAGES_DIR).
+	@test -n "$$PACKAGES_DIR" -a -n "$$ARCH" || (echo 'Set PACKAGES_DIR and ARCH=amd64 or arm64.'; exit 1)
+	./devel/release-package-smoke.sh "$$PACKAGES_DIR" "$$ARCH" "$${PREVIOUS_PACKAGES_DIR:-$$PACKAGES_DIR}"

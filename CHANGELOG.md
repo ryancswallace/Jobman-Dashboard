@@ -6,6 +6,11 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
+- Add controlled candidate publication, versioned Linux packages and containers,
+  package lifecycle verification, SPDX inventories and GitHub attestations.
+  Pin the embedded Jobman collector to published v1.9.0 and Diagnose to its
+  compatible v0.7.0-rc.1 candidate; stable Diagnose acceptance remains open.
+
 - Clarify web and iPhone navigation, job and run details, alerts, reports, and
   recovery messages using consistent user-facing terminology.
 

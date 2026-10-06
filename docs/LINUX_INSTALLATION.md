@@ -16,6 +16,10 @@ sequence, compatible upstream tags and unsigned native provenance. The bundled
 [run-selection contract](RUN_SELECTION.md) and [release gap audit](RELEASE_GAP_AUDIT.md)
 retain the behavior and acceptance boundaries used for review.
 
+Versioned DEB/RPM/APK packages and GHCR images are described in
+[candidate distribution](DISTRIBUTION.md). Those release packages contain the same
+canonical archive bytes; local GoReleaser snapshots remain a separate facility.
+
 ## Build and verify an exact candidate
 
 Use a clean committed checkout, the exact versions in `go.version`, `node.version`

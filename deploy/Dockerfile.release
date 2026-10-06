@@ -1,0 +1,20 @@
+# Runtime assembled only from verified canonical release bytes; no compilation.
+FROM alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 AS certificates
+FROM scratch
+ARG TARGETARCH
+COPY --from=certificates /etc/ssl/cert.pem /etc/ssl/certs/ca-certificates.crt
+COPY ${TARGETARCH}/bin/ /usr/local/bin/
+COPY ${TARGETARCH}/web/ /usr/share/jobman-dashboard/web/
+COPY ${TARGETARCH}/LICENSE ${TARGETARCH}/THIRD_PARTY_NOTICES.md /usr/share/licenses/jobman-dashboard/
+COPY ${TARGETARCH}/build.json /usr/share/jobman-dashboard/build.json
+ARG VERSION
+ARG REVISION
+LABEL org.opencontainers.image.title="jobman-dashboard" \
+    org.opencontainers.image.source="https://github.com/ryancswallace/Jobman-Dashboard" \
+    org.opencontainers.image.version="$VERSION" \
+    org.opencontainers.image.revision="$REVISION" \
+    org.opencontainers.image.licenses="MIT"
+USER 10001:10001
+WORKDIR /
+STOPSIGNAL SIGTERM
+ENTRYPOINT ["/usr/local/bin/jobman-dashboard"]

@@ -72,3 +72,5 @@ old destructive scenarios. Use the [Lab catalog](LAB_RUN_CATALOG.md).
 - [Troubleshooting](TROUBLESHOOTING.md)
 - [Upgrading and recovery](UPGRADING.md)
 - [Watchdog acceptance denial contract](WATCHDOG_DENIAL_CONTRACT.md)
+
+- [Candidate distribution](DISTRIBUTION.md): attested Linux packages, containers, publisher setup and versioned installation.

@@ -4,6 +4,30 @@ Updated: 2026-10-06. Release state: **engineering prerelease v0.1.0-rc.7 remains
 
 The adopted [implementation prompt](IMPLEMENTATION_PROMPT.md), [requirements](REQUIREMENTS.md), and [design](DESIGN.md) govern this work. A passing local slice is not release acceptance. The tables and chronological checkpoints retain their original evidence; later dated checkpoints supersede older merge, browser-connectivity and test-count statements.
 
+## Distribution work — October 6
+
+Current packaging work implements controlled candidate publication, versioned
+DEB/RPM/APK packages from canonical Linux archives, an amd64/arm64 container from
+the same bytes, SPDX inventories and GitHub attestations. See
+[distribution](DISTRIBUTION.md) for the artifact contract and operator procedure.
+The published RC7 remains immutable until a new candidate is verified/published.
+
+Jobman v1.9.0 and Control v0.2.0 are published. Dashboard now pins Core v1.9.0;
+Diagnose [PR12](https://github.com/ryancswallace/Jobman-Diagnose/pull/12) aligns its
+collector with that release and adds a released-version compatibility lane.
+Diagnose stable publication retains its live-provider evaluation gates; the
+reviewed dependency update is merged at `d9021503db6346d363a82d381bd400da1542f04f`
+and its `v0.7.0-rc.1` engineering candidate is being built. Both
+isolated Dashboard Lab Control instances now run the attested v0.2.0 executable;
+46 bounded authenticated job reads and eight namespace denials passed, with no
+schema change or job creation. Final candidate deployment remains separate.
+
+The Dashboard `main` release environment is restricted to main and requires the
+existing maintainer's approval. Cloudsmith upload requires a separately configured
+`CLOUDSMITH_API_KEY` and non-stable repository; neither is assumed present. This
+packaging work does not close corporate identity, APNs, managed-device or pilot
+acceptance gates.
+
 ## Current next actions
 
 Expanded job inspection and compatible target pagination pass live two-Control Lab verification. [Dashboard PR17](https://github.com/ryancswallace/Jobman-Dashboard/pull/17) records final CI and merge state. [Control PR31](https://github.com/ryancswallace/Jobman-Control/pull/31) is merged at `733dea9001116ebd9327351e40168491f780b870`; all required checks passed and original branch protections were restored. Earlier ecosystem PR approval/merge cleanup is complete.
