@@ -140,9 +140,9 @@ the permissions of its Cloudsmith user; it is not restricted to Dashboard merely
 because it is stored in the Dashboard repository.
 
 1. Sign into Cloudsmith with the personal account used to publish Jobman packages.
-   Ensure that user has at least **Write** access to the `jobman/dashboard`
-   repository. Create that repository under the existing account's available
-   capacity if it does not exist. Keep RC packages separate from `jobman/stable`.
+   Ensure that user has at least **Write** access to the `jobman/stable`
+   repository shared with the other Jobman ecosystem publishers. No separate
+   Dashboard repository is required.
 2. Open the user icon at the top right, then **Personal API Keys**, or open
    [Personal API Keys](https://app.cloudsmith.com/settings/api-keys) directly.
    Reuse the current key from your password manager if available. Cloudsmith's
@@ -156,7 +156,7 @@ because it is stored in the Dashboard repository.
    `CLOUDSMITH_API_KEY` with the personal key. Never put the key in a configuration
    variable, repository file, command argument, issue, log or chat. GitHub does
    not reveal an existing secret's value for copying from a sibling repository.
-4. The default destination is `jobman/dashboard`. If another approved non-stable
+4. The default destination is `jobman/stable`. If another approved
    repository is needed, add the **environment variable** `CLOUDSMITH_REPOSITORY`
    in the same `main` environment with the value `owner/repository`. This variable
    contains only the destination, not a credential.
@@ -181,8 +181,9 @@ This workflow accepts only published RCs, verifies the GitHub publisher and asse
 hashes, refuses conflicting registry entries, and checks registry synchronization.
 Cloudsmith may add its repository signature to RPMs; the publisher compares the
 downloaded RPM header and payload with the source, allowing only the RPM signature
-section to differ. Other formats must retain the uploaded checksum. It never
-sends candidates to a repository named `stable`. Use the repository's
+section to differ. Other formats must retain the uploaded checksum. The shared repository's name does not promote a Dashboard RC to a stable
+release: package names and versions retain their RC identity, registry tags
+include `rc`, and the GitHub release remains a prerelease. Use the repository's
 Cloudsmith-generated APT/YUM/APK setup instructions and signing key for repository
 installation. GitHub release downloads remain available if the optional package
 registry is not configured.

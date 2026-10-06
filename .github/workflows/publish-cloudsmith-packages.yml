@@ -23,7 +23,7 @@ jobs:
     timeout-minutes: 20
     environment: main
     env:
-      CLOUDSMITH_REPOSITORY: ${{ vars.CLOUDSMITH_REPOSITORY || 'jobman/dashboard' }}
+      CLOUDSMITH_REPOSITORY: ${{ vars.CLOUDSMITH_REPOSITORY || 'jobman/stable' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

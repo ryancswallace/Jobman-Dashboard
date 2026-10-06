@@ -49,7 +49,8 @@ explicit dependency repinning also remain necessary. No semantic-release hook, `
 or stable tag is automatically produced by this scaffold.
 The controlled RC publisher adds versioned GHCR images, canonical Linux packages,
 SPDX inventories and GitHub attestations. Optional Cloudsmith distribution uses a
-separate configured publisher identity. Stable publication, Homebrew and Apple
+personal API key and the shared `jobman/stable` repository. Dashboard RC identity
+is retained there. Stable release publication, Homebrew and Apple
 distribution remain outside that RC-only workflow. [Repository parity](docs/REPOSITORY_SCAFFOLDING.md) records
 these intentional differences from the sibling CLI/service releases.
 

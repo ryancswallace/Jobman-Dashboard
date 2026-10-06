@@ -6,6 +6,9 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
+- Publish Dashboard RC Linux packages to the shared `jobman/stable` Cloudsmith
+  repository, retaining RC package names, versions, tags and GitHub prerelease status.
+
 - Document Cloudsmith personal API-key publishing for the free account, including
   GitHub environment setup and coordinated key rotation across Jobman publishers.
 

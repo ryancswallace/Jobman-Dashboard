@@ -160,6 +160,49 @@ class PublicationTests(unittest.TestCase):
         for code, stderr in ((0, ''), (1, 'unauthorized'), (1, 'network timeout'), (1, 'DNS host not found'), (1, '500 internal server error')):
             self.assertFalse(registry.absent(subprocess.CompletedProcess([], code, '', stderr)))
 
+    def test_cloudsmith_shared_repository_keeps_rc_identity_and_verifies_six_packages(self):
+        packages = {f'jobman-dashboard_{VERSION}_linux_{arch}.{kind}':
+                    f'{arch}-{kind}'.encode() for arch in ('amd64', 'arm64') for kind in ('deb', 'rpm', 'apk')}
+        checksums = {name: release.hashlib.sha256(data).hexdigest() for name, data in packages.items()}
+        stored, uploads = {}, []
+
+        def run(args, **kwargs):
+            if args[:3] == ['gh', 'release', 'download']:
+                root = Path(args[args.index('--dir') + 1])
+                for name, data in packages.items():
+                    (root / name).write_bytes(data)
+                return
+            self.assertEqual(args[:2], ['cloudsmith', 'push'])
+            self.assertTrue(args[3].startswith('jobman/stable/'))
+            name = Path(args[4]).name
+            self.assertEqual(args[5:], ['--tags', 'rc,source-sha256-' + checksums[name]])
+            uploads.append(name)
+            stored[name] = {'filename': name, 'checksum_sha256': checksums[name], 'is_sync_completed': True}
+
+        def capture(args):
+            self.assertEqual(args[:4], ['cloudsmith', 'list', 'packages', 'jobman/stable'])
+            return json.dumps({'data': list(stored.values())})
+
+        def api(path):
+            if '/releases/tags/' in path:
+                return {'draft': False, 'prerelease': True, 'tag_name': VERSION}
+            return {'object': {'type': 'commit', 'sha': REVISION}}
+
+        with patch.dict(os.environ, {'CLOUDSMITH_API_KEY': 'synthetic-test-key', 'GITHUB_REPOSITORY': REPO}, clear=True), \
+             patch('sys.argv', ['publish-cloudsmith.py', '--version', VERSION]), \
+             patch.object(cloudsmith.release, 'api', side_effect=api), \
+             patch.object(cloudsmith.release, 'run', side_effect=run), \
+             patch.object(cloudsmith.release, 'capture', side_effect=capture), \
+             patch.object(cloudsmith.release, 'attest') as attest, \
+             patch.object(cloudsmith.release, 'read_checksums', return_value=checksums), \
+             patch('builtins.print'):
+            cloudsmith.main()
+            self.assertEqual(set(uploads), set(packages))
+            self.assertEqual(len(uploads), 6)
+            self.assertEqual(attest.call_count, 7)
+            cloudsmith.main()
+            self.assertEqual(len(uploads), 6, 'a verified rerun must not upload duplicates')
+
     def test_cloudsmith_idempotence_requires_completed_checksum_or_rpm_comparison(self):
         self.assertEqual(cloudsmith.package_state({'data': []}, 'candidate.deb', 'a' * 64)[0], 'missing')
         item = {'filename': 'candidate.deb', 'checksum_sha256': 'a' * 64, 'is_sync_completed': True}
@@ -207,10 +250,10 @@ class PublicationTests(unittest.TestCase):
                     output.write_bytes(stored)
                 with patch.object(cloudsmith.release, 'run', side_effect=download):
                     if accepted:
-                        cloudsmith.verify_stored_package(record, source, 'jobman/dashboard', VERSION)
+                        cloudsmith.verify_stored_package(record, source, 'jobman/stable', VERSION)
                     else:
                         with self.assertRaisesRegex(ValueError, 'outside its signature'):
-                            cloudsmith.verify_stored_package(record, source, 'jobman/dashboard', VERSION)
+                            cloudsmith.verify_stored_package(record, source, 'jobman/stable', VERSION)
 
     def image_index(self):
         return {'manifests': [
