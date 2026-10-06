@@ -6,6 +6,9 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
+- Upgrade the web build to Vite 8 together with its required React plugin 6 peer,
+  retaining the explicit ES2022 output target and static deployment model.
+
 - Clarify the limited sample preview and add an opt-in smoke for the configured
   Lab's current monitoring, investigation and personal alert workflows.
 
