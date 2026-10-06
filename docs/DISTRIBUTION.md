@@ -181,7 +181,9 @@ This workflow accepts only published RCs, verifies the GitHub publisher and asse
 hashes, refuses conflicting registry entries, and checks registry synchronization.
 Cloudsmith may add its repository signature to RPMs; the publisher compares the
 downloaded RPM header and payload with the source, allowing only the RPM signature
-section to differ. Other formats must retain the uploaded checksum. The shared repository's name does not promote a Dashboard RC to a stable
+section to differ. Cloudsmith normalizes Alpine filenames; the publisher matches
+the exact package name, version and architecture and requires the original APK
+checksum. DEB packages must also retain their uploaded checksum. The shared repository's name does not promote a Dashboard RC to a stable
 release: package names and versions retain their RC identity, registry tags
 include `rc`, and the GitHub release remains a prerelease. Use the repository's
 Cloudsmith-generated APT/YUM/APK setup instructions and signing key for repository

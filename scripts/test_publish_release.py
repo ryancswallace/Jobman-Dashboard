@@ -178,12 +178,19 @@ class PublicationTests(unittest.TestCase):
             self.assertEqual(args[5:], ['--tags', 'rc,source-sha256-' + checksums[name]])
             uploads.append(name)
             stored[name] = {'filename': name, 'checksum_sha256': checksums[name], 'is_sync_completed': True}
+            if name.endswith('.apk'):
+                stored[name].update({'filename': 'jobman-dashboard-0-1-0-rc-8-0.1.0_rc.8-r1.apk',
+                                     'name': 'jobman-dashboard-0-1-0-rc-8', 'version': '0.1.0_rc.8-r1', 'format': 'alpine',
+                                     'architectures': [{'name': 'x86_64' if 'amd64' in name else 'aarch64'}]})
 
         def capture(args):
             self.assertEqual(args[:4], ['cloudsmith', 'list', 'packages', 'jobman/stable'])
             query = args[args.index('--query') + 1]
-            names = [name for name in packages if query == 'filename:^' + name + '$']
-            self.assertEqual(len(names), 1, 'Cloudsmith requires its native filename query without Python regex escapes')
+            if query == 'format:alpine AND name:^jobman-dashboard-0-1-0-rc-8$ AND version:^0.1.0_rc.8-r1$':
+                names = [name for name in packages if name.endswith('.apk')]
+            else:
+                names = [name for name in packages if query == 'filename:^' + name + '$']
+                self.assertEqual(len(names), 1, 'Cloudsmith requires its native filename query without Python regex escapes')
             return json.dumps({'data': [stored[name] for name in names if name in stored]})
 
         def api(path):
@@ -205,6 +212,20 @@ class PublicationTests(unittest.TestCase):
             self.assertEqual(attest.call_count, 7)
             cloudsmith.main()
             self.assertEqual(len(uploads), 6, 'a verified rerun must not upload duplicates')
+
+    def test_alpine_normalization_requires_architecture_and_unchanged_bytes(self):
+        filename = 'jobman-dashboard_v0.1.0-rc.10_linux_amd64.apk'
+        item = {'filename': 'jobman-dashboard-0-1-0-rc-10-0.1.0_rc.10-r1.apk',
+                'name': 'jobman-dashboard-0-1-0-rc-10', 'version': '0.1.0_rc.10-r1', 'format': 'alpine',
+                'architectures': [{'name': 'x86_64'}], 'is_sync_completed': True, 'checksum_sha256': 'a' * 64}
+        other_arch = item | {'architectures': [{'name': 'aarch64'}], 'checksum_sha256': 'b' * 64}
+        self.assertEqual(cloudsmith.package_state({'data': [item, other_arch]}, filename, 'a' * 64)[0], 'present')
+        self.assertEqual(cloudsmith.package_state({'data': [other_arch]}, filename, 'a' * 64)[0], 'missing')
+        for records in ([item, item], [item | {'checksum_sha256': 'b' * 64}],
+                        [item | {'architectures': []}], [item | {'format': 'deb'}],
+                        [item | {'name': 'unrelated'}], [item | {'version': '0.1.0-r1'}]):
+            with self.subTest(records=records), self.assertRaises(ValueError):
+                cloudsmith.package_state({'data': records}, filename, 'a' * 64)
 
     def test_cloudsmith_idempotence_requires_completed_checksum_or_rpm_comparison(self):
         self.assertEqual(cloudsmith.package_state({'data': []}, 'candidate.deb', 'a' * 64)[0], 'missing')
