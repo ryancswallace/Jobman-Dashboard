@@ -544,7 +544,7 @@ describe("group monitoring workflows", () => {
       ]),
     );
     expect(
-      screen.getByText("2 job groups in available deployments (partial count)"),
+      screen.getByText("Job groups: 2 in available deployments (partial count)"),
     ).toBeVisible();
   });
 });
