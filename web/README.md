@@ -6,6 +6,8 @@ React, TypeScript, and Vite client for the private Dashboard API. The production
 
 Use the repository's pinned Node toolchain when provided (initial local validation: Node 26.5.1, npm 11.17.0).
 
+Vite 8 and `@vitejs/plugin-react` 6 are upgraded together because the React plugin requires Vite 8. The client uses the standard React transform without custom Babel plugins; its production target remains explicitly `es2022`. Review the [Vite migration guide](https://vite.dev/guide/migration) before adding custom bundler or transform options.
+
 ```sh
 cd web
 npm ci
