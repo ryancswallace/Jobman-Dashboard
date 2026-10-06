@@ -103,7 +103,9 @@ def main():
                 release.need(name in checksums, "Published RC package set is incomplete")
                 package = directory / name
                 release.attest(package, args)
-                command = ["cloudsmith", "list", "packages", args.destination, "--output-format", "json", "--query", "filename:^" + re.escape(name) + "$"]
+                # Match the sibling publishers: Cloudsmith query parsing does not
+                # accept Python regex escapes. package_state enforces exact identity.
+                command = ["cloudsmith", "list", "packages", args.destination, "--output-format", "json", "--query", "filename:^" + name + "$"]
                 state, record = package_state(json.loads(release.capture(command)), name, checksums[name])
                 if state == "missing":
                     release.run(["cloudsmith", "push", kind, args.destination + "/" + distro + "/any-version", str(package), "--tags", "rc,source-sha256-" + checksums[name]], timeout=600)
