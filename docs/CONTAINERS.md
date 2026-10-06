@@ -1,5 +1,17 @@
 # Containers
 
+## Published candidate image
+
+The controlled release workflow publishes versioned amd64/arm64 GHCR images
+assembled from verified canonical Linux archives. These images use a minimal
+scratch runtime, UID/GID10001:10001, and `/usr/local/bin/jobman-dashboard` directly
+as their entry point. Use `/usr/local/bin/jobman-log-broker` for the broker.
+There is no shell or `tini` in this release image. Pin the attested digest and
+follow [candidate distribution](DISTRIBUTION.md) for verification and private
+configuration/data mounts. No prerelease updates a `latest` tag.
+
+## Local source image
+
 `make docker-image` builds a local, non-root Linux image containing both Go
 executables, compiled web assets and license notices. Base images and toolchains
 are pinned. `make docker-check docker-smoke` validates definitions, version output,

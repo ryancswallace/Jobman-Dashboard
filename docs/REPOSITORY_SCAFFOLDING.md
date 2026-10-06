@@ -38,16 +38,17 @@ remain authoritative; scaffolding is not a new production-readiness claim.
   unused-code checks, race tests and formatting gate the current implementation.
 - Linux amd64/arm64 are service release targets. Native macOS/Windows service
   packages are not implied by the siblings' CLI support.
-- The existing committed-source candidate builder remains canonical. GoReleaser
-  snapshots add packaging practice without replacing its reproducibility and
-  final-eligibility checks. A separate `Dockerfile.goreleaser` would duplicate the
-  source-built image path without a configured image publication pipeline.
-- Automatic semantic version publication, retained-draft publishing/recovery,
-  `latest` repair, SLSA/Sigstore release attestations, Homebrew and Cloudsmith
-  publication are deliberately not activated or represented as completed. They
-  require a final artifact/publisher contract after existing acceptance gates close.
-  Current CI retains unsigned engineering artifacts and never promotes a stable
-  release. See [release engineering](../RELEASE.md).
+- The committed-source candidate builder remains canonical. GoReleaser snapshots
+  remain separate. Controlled RC distribution packages the canonical bytes and
+  assembles its published image with `deploy/Dockerfile.release`; the root
+  Dockerfile still supports local source builds.
+- The main-only release workflow publishes verified engineering RC assets,
+  versioned GHCR images, SPDX inventories and GitHub attestations. A separate
+  Cloudsmith workflow requires a configured non-stable repository and upload key.
+  Automatic semantic version publication, stable/latest promotion, Homebrew and
+  Apple distribution remain gated. Failed partial releases retain their version;
+  repairs use a new candidate rather than replacing artifacts. See
+  [release engineering](../RELEASE.md) and [distribution](DISTRIBUTION.md).
 - Documentation is organized around the existing `deploy/` and `scripts/` paths,
   rather than duplicating files under sibling `etc/`/`devel/updates/` paths. There
   is no generic cleanup that could erase developer evidence or configuration.
