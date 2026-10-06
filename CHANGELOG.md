@@ -6,7 +6,8 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
-No additional changes recorded after RC10.
+- Document Cloudsmith personal API-key publishing for the free account, including
+  GitHub environment setup and coordinated key rotation across Jobman publishers.
 
 ## v0.1.0-rc.10
 

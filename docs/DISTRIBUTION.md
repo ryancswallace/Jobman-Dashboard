@@ -133,12 +133,44 @@ installation and activation are deliberately separate operator actions.
 
 ## Cloudsmith setup
 
-The optional `publish-cloudsmith-packages.yml` workflow requires an upload-capable
-API key in the Dashboard `main` environment secret `CLOUDSMITH_API_KEY`. The default
-repository is `jobman/dashboard`; set the GitHub `main` environment configuration variable
-`CLOUDSMITH_REPOSITORY` to another approved non-stable `owner/repository` if needed.
-Keep it within existing account capacity; a new paid plan is not required by the
-workflow. Keys must never be posted in issues, logs or chat.
+The optional `publish-cloudsmith-packages.yml` workflow uses a **personal
+Cloudsmith API key**, matching the other Jobman repositories. A service account,
+OIDC integration or paid plan is not required by this workflow. The key acts with
+the permissions of its Cloudsmith user; it is not restricted to Dashboard merely
+because it is stored in the Dashboard repository.
+
+1. Sign into Cloudsmith with the personal account used to publish Jobman packages.
+   Ensure that user has at least **Write** access to the `jobman/dashboard`
+   repository. Create that repository under the existing account's available
+   capacity if it does not exist. Keep RC packages separate from `jobman/stable`.
+2. Open the user icon at the top right, then **Personal API Keys**, or open
+   [Personal API Keys](https://app.cloudsmith.com/settings/api-keys) directly.
+   Reuse the current key from your password manager if available. Cloudsmith's
+   **Refresh** action creates a new key and permanently disables the old one;
+   do not refresh simply to add Dashboard if other publishers already use it.
+   If rotation is necessary, save the new key and update every GitHub secret and
+   other integration using the old key, including Jobman, Control and Diagnose.
+   See the current [Cloudsmith API-key instructions](https://docs.cloudsmith.com/accounts-and-teams/api-key).
+3. Open [Dashboard environment settings](https://github.com/ryancswallace/Jobman-Dashboard/settings/environments),
+   select **main**, and under **Environment secrets** add or update
+   `CLOUDSMITH_API_KEY` with the personal key. Never put the key in a configuration
+   variable, repository file, command argument, issue, log or chat. GitHub does
+   not reveal an existing secret's value for copying from a sibling repository.
+4. The default destination is `jobman/dashboard`. If another approved non-stable
+   repository is needed, add the **environment variable** `CLOUDSMITH_REPOSITORY`
+   in the same `main` environment with the value `owner/repository`. This variable
+   contains only the destination, not a credential.
+5. Open **Actions → Publish Dashboard RC Linux packages → Run workflow**, choose
+   branch **main**, and enter the published RC tag, currently `v0.1.0-rc.10`.
+   Complete the existing `main` environment approval if prompted. Alternatively,
+   use the command below. Successful completion verifies authentication, uploads
+   missing packages, and verifies all six DEB/RPM/APK packages for both architectures.
+
+The pinned Cloudsmith action receives `secrets.CLOUDSMITH_API_KEY` through its
+`api-key` input; the publisher receives the same secret through its environment.
+Neither step needs a service-account name, username, password or entitlement token.
+An entitlement token is for package downloads and cannot replace this publishing
+API key. Keep existing environment protection and release verification enabled.
 
 ```sh
 gh workflow run publish-cloudsmith-packages.yml \
