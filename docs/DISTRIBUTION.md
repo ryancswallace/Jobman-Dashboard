@@ -118,7 +118,7 @@ installation and activation are deliberately separate operator actions.
 
 The optional `publish-cloudsmith-packages.yml` workflow requires an upload-capable
 API key in the Dashboard `main` environment secret `CLOUDSMITH_API_KEY`. The default
-repository is `jobman/dashboard`; set environment variable
+repository is `jobman/dashboard`; set the GitHub `main` environment configuration variable
 `CLOUDSMITH_REPOSITORY` to another approved non-stable `owner/repository` if needed.
 Keep it within existing account capacity; a new paid plan is not required by the
 workflow. Keys must never be posted in issues, logs or chat.
