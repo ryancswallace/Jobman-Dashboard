@@ -71,9 +71,12 @@ Final acceptance remains open for corporate AD FS/direct AD, real APNs, signed
 company-managed-device delivery, manual accessibility and pilot/operating owners,
 plus stable Diagnose acceptance. The earlier synthetic Lab Chrome-access blocker
 and old PR-approval backlog are resolved; their RC7 statements below are historical.
-Cloudsmith distribution is blocked on publisher setup: the Dashboard `main`
-environment still lacks `CLOUDSMITH_API_KEY`, checked on October 6. No Cloudsmith
-upload is claimed. No production or company-device distribution approval is implied.
+The Dashboard `main` environment now has its personal Cloudsmith API key.
+Authentication passed in run `37522208724`, but the original `jobman/dashboard`
+destination was unavailable. The operator selected the existing `jobman/stable`
+repository used by sibling publishers. RC package upload and verification remain
+pending. This destination does not change Dashboard prerelease status or imply
+production or company-device distribution approval.
 
 ## Historical RC7 handoff — retained unchanged
 

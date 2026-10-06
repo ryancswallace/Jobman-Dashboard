@@ -46,9 +46,12 @@ Later checkpoints supersede earlier merge, version and connectivity statements.
   all six packages contain the verified 88-file payload and native build `11`
   passed. RC9 remains unpublished as draft ID `405033021`; no prior version was
   overwritten or promoted. Earlier failure records remain below.
-- Cloudsmith distribution remains blocked on publisher setup: the Dashboard
-  `main` environment still lacks `CLOUDSMITH_API_KEY` (checked October 6), so no
-  registry upload is claimed. Remaining Dashboard inputs are actual corporate
+- The Dashboard `main` environment now has a personal `CLOUDSMITH_API_KEY`.
+  Authentication passed in run `37522208724`; its package listing failed because
+  the original `jobman/dashboard` destination was unavailable. The operator has
+  selected the existing shared `jobman/stable` repository, matching sibling
+  publishers. RC upload and verification are pending; no upload is claimed yet.
+  Remaining Dashboard inputs are actual corporate
   identity, APNs and managed-device access, manual accessibility and pilot/
   operations acceptance. Production and company-device distribution approvals
   remain separate. Earlier Lab Chrome-access and PR-approval blockers are resolved.

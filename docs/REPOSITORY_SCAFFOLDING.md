@@ -44,7 +44,7 @@ remain authoritative; scaffolding is not a new production-readiness claim.
   Dockerfile still supports local source builds.
 - The main-only release workflow publishes verified engineering RC assets,
   versioned GHCR images, SPDX inventories and GitHub attestations. A separate
-  Cloudsmith workflow requires a configured non-stable repository and upload key.
+  Cloudsmith workflow uses the shared `jobman/stable` repository and a personal API key.
   Automatic semantic version publication, stable/latest promotion, Homebrew and
   Apple distribution remain gated. Failed partial releases retain their version;
   repairs use a new candidate rather than replacing artifacts. See
