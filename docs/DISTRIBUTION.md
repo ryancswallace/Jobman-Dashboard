@@ -42,7 +42,7 @@ candidate and a greater native build number. For example:
 
 ```sh
 gh workflow run release.yml --repo ryancswallace/Jobman-Dashboard --ref main \
-  -f version=v0.1.0-rc.9 -f nativeBuild=11
+  -f version=v0.1.0-rc.10 -f nativeBuild=12
 ```
 
 Review and approve the concrete `main` deployment after builds complete. The
@@ -53,7 +53,7 @@ Verify anonymous pulls before advertising a public container; publishing must
 not silently change repository access policy.
 
 The versioned image is
-`ghcr.io/ryancswallace/jobman-dashboard:v0.1.0-rc.9`. Deployment should pin the
+`ghcr.io/ryancswallace/jobman-dashboard:v0.1.0-rc.10`. Deployment should pin the
 `sha256:` digest in the release's attested `container.json`. It has no shell or
 package manager, uses UID/GID `10001:10001`, and contains the web tree at
 `/usr/share/jobman-dashboard/web`. Supply explicit private configuration, trust
@@ -64,6 +64,23 @@ with `/usr/local/bin/jobman-log-broker` for the broker role. The API/worker use
 all service credentials into a common container. See [process modes](PROCESS_MODES.md)
 and [Linux installation](LINUX_INSTALLATION.md).
 
+## Inspect a retained draft
+
+The publisher locates drafts through GitHub's authenticated release list and
+checks the exact release ID. A read-only check can repeat the full downloaded
+asset, attestation and image verification without publishing or changing it:
+
+```sh
+python3 scripts/publish-release.py verify-draft \
+  --repository ryancswallace/Jobman-Dashboard --version v0.1.0-rc.9 \
+  --revision d47ea417a4ae77a0bb0e6872bbbbcb6cd3ae5627 \
+  --input /absolute/path/to/downloaded-draft-assets
+```
+
+This example inspects the retained RC9 draft. Success reports `published: false`;
+it does not turn a failed publication into an accepted release. The next run
+still selects a new candidate rather than replacing retained tags or artifacts.
+
 ## Verify downloads
 
 Download the candidate into a new empty directory. Resolve its tag to the full
@@ -71,8 +88,8 @@ source commit and verify the checksum manifest's attestation against the approve
 release workflow and that commit before trusting its contents:
 
 ```sh
-gh release download v0.1.0-rc.9 --repo ryancswallace/Jobman-Dashboard --dir ./rc9
-cd rc9
+gh release download v0.1.0-rc.10 --repo ryancswallace/Jobman-Dashboard --dir ./rc10
+cd rc10
 gh attestation verify SHA256SUMS --repo ryancswallace/Jobman-Dashboard \
   --signer-workflow ryancswallace/Jobman-Dashboard/.github/workflows/release.yml \
   --source-ref refs/heads/main --source-digest <full-approved-commit> \
@@ -88,7 +105,7 @@ integrity; the attestation binds those checksums to the publisher and source.
 
 ## Install, upgrade and remove native Linux packages
 
-Packages are version-named, for example `jobman-dashboard-0-1-0-rc-9`. Install the
+Packages are version-named, for example `jobman-dashboard-0-1-0-rc-10`. Install the
 verified architecture-specific DEB/RPM/APK with the host's package manager. An APK
 from GitHub is unsigned; `apk add --allow-untrusted <verified-file.apk>` is only
 appropriate after the publisher attestation and checksum checks above. Prefer a
@@ -125,7 +142,7 @@ workflow. Keys must never be posted in issues, logs or chat.
 
 ```sh
 gh workflow run publish-cloudsmith-packages.yml \
-  --repo ryancswallace/Jobman-Dashboard --ref main -f version=v0.1.0-rc.9
+  --repo ryancswallace/Jobman-Dashboard --ref main -f version=v0.1.0-rc.10
 ```
 
 This workflow accepts only published RCs, verifies the GitHub publisher and asset
