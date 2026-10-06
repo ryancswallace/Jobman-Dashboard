@@ -70,7 +70,7 @@ func (s *Server) handler(requestTimeout time.Duration) http.Handler {
 	mux.HandleFunc("GET /api/v1/deployments/{deployment}/namespaces/{namespace}/jobs/{job}/runs/{run}", s.run)
 	mux.HandleFunc("GET /api/v1/deployments/{deployment}/namespaces/{namespace}/jobs/{job}", s.job)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
-		writeError(w, r, &api.Error{Code: "not_found_or_inaccessible", Message: "This API operation is not available."})
+		writeError(w, r, &api.Error{Code: "not_found_or_inaccessible", Message: "This feature is unavailable on this Dashboard server. Ask your administrator to check the server version and configuration."})
 	})
 	if s.Static != nil {
 		assets := http.FileServerFS(s.Static)
@@ -155,7 +155,7 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 	_ = json.NewEncoder(w).Encode(value)
 }
 func writeError(w http.ResponseWriter, _ *http.Request, err error) {
-	ae := &api.Error{Code: "source_unavailable", Message: "The request could not be completed. Retry or contact the operator with the request ID."}
+	ae := &api.Error{Code: "source_unavailable", Message: "The request could not be completed. Try again, or contact your administrator with the request ID."}
 	var known *api.Error
 	if errors.As(err, &known) {
 		copy := *known

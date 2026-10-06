@@ -66,7 +66,7 @@ function ReportBrowser({ job, run }: { job: JobRef; run?: Wire.JobRun }) {
       setError(
         new APIError(
           "invalid_request",
-          "Enter an actual run UUID, or leave it blank to select recent runs.",
+          "Paste the full run ID from the run list, or leave this blank to use recent runs.",
         ),
       );
       return;
@@ -98,7 +98,7 @@ function ReportBrowser({ job, run }: { job: JobRef; run?: Wire.JobRun }) {
       setTaskId(report.taskId);
       setCursors([]);
       setNotice(
-        "Report request accepted. Its status and sealed findings appear below.",
+        "Report request accepted. Its progress and findings appear below.",
       );
       results.refresh();
     } catch (failure) {
@@ -138,10 +138,11 @@ function ReportBrowser({ job, run }: { job: JobRef; run?: Wire.JobRun }) {
     <>
       <section className="panel report-request">
         <div>
-          <h2>Explain the available evidence</h2>
+          <h2>Diagnose this job</h2>
           <p>
-            Generate a deterministic report from a sealed job snapshot.
-            Suggested actions are advice; they never execute changes.
+            Analyze a saved snapshot of the job’s status, events, and other
+            available details. The report suggests actions but does not change
+            the job.
           </p>
           <label className="checkbox-label">
             <input
@@ -154,17 +155,19 @@ function ReportBrowser({ job, run }: { job: JobRef; run?: Wire.JobRun }) {
                 )
               }
             />
-            Include redacted log tails (up to 64 KiB per stream)
+            Include recent logs with redaction rules applied (up to 64 KiB per
+            log)
           </label>
           <p>
-            Metadata is included by default. Log tails require your current log
-            access and an operator-configured redaction policy. No model
-            provider is invoked.
+            Job details are included automatically. Including logs requires
+            permission to view them and administrator-configured rules for
+            removing sensitive text. Reports use fixed analysis rules, without
+            sending data to an AI service.
           </p>
           <label className="report-run">
-            Actual run UUID (optional)
+            Run ID (optional)
             <input
-              aria-label="Report run UUID"
+              aria-label="Report run ID"
               value={run?.id ?? runId}
               readOnly={!!run}
               disabled={working}
@@ -197,7 +200,8 @@ function ReportBrowser({ job, run }: { job: JobRef; run?: Wire.JobRun }) {
             <h2>Report history</h2>
             <p>
               Reports available to your account for this job, across all runs.
-              Each report retains its original run references.
+              Each report keeps the run information captured when it was
+              created.
             </p>
           </div>
           <button className="button secondary" onClick={restart}>
@@ -216,8 +220,8 @@ function ReportBrowser({ job, run }: { job: JobRef; run?: Wire.JobRun }) {
                       <div>
                         <strong>
                           {report.profile === "include_log_tail"
-                            ? "Metadata and log tails"
-                            : "Metadata report"}
+                            ? "Job details and recent logs"
+                            : "Job details report"}
                         </strong>
                         <span className="secondary-line">
                           {timestamp(
@@ -258,7 +262,7 @@ function ReportBrowser({ job, run }: { job: JobRef; run?: Wire.JobRun }) {
               )}
               <div className="pagination">
                 <span>
-                  Fetched{" "}
+                  Updated{" "}
                   {timestamp(page.fetchedAt, bootstrap.preferences.timezone)}
                 </span>
                 <div>
@@ -375,18 +379,21 @@ function ReportView({
           </div>
           {report.outdated && (
             <p className="notice warning">
-              The source evidence has changed. This report describes its
-              original sealed snapshot.
+              The job information has changed. This report describes its
+              original saved snapshot.
             </p>
           )}
           <dl className="facts compact">
-            <Fact label="Task" value={report.taskId} />
-            <Fact label="Original report" value={report.reportId} />
-            <Fact label="Original evidence" value={report.evidenceId} />
-            <Fact label="Analysis evidence" value={report.analysisEvidenceId} />
-            <Fact label="Source revision" value={report.sourceRevision} />
+            <Fact label="Report request ID" value={report.taskId} />
+            <Fact label="Report ID" value={report.reportId} />
+            <Fact label="Saved evidence ID" value={report.evidenceId} />
+            <Fact
+              label="Analysis evidence ID"
+              value={report.analysisEvidenceId}
+            />
+            <Fact label="Source record version" value={report.sourceRevision} />
             <Fact label="Selected run" value={report.runId || "Recent runs"} />
-            <Fact label="Profile" value={title(report.profile)} />
+            <Fact label="Included data" value={title(report.profile)} />
             <Fact
               label="Expires"
               value={timestamp(
@@ -405,7 +412,7 @@ function ReportView({
             <p role="status">
               {["queued", "collecting", "analyzing"].includes(report.state)
                 ? "The report is in progress. Status updates every five seconds while this view is visible, including in manual refresh mode."
-                : "Sealed findings are not available for this task."}
+                : "Saved findings are not available for this report."}
             </p>
           )}
           {report.detail && (
@@ -434,7 +441,8 @@ function Confidence({ confidence }: { confidence: Wire.ReportConfidence }) {
   return (
     <p className="muted">
       Confidence: {confidence.score}/100 · {title(confidence.band)}.{" "}
-      {confidence.basis} This score is not a calibrated probability.
+      {confidence.basis} This score describes the strength of the supporting
+      evidence; it is not a percentage chance that the finding is correct.
     </p>
   );
 }
@@ -577,10 +585,10 @@ function SealedReport({
         </ul>
       </section>
       <section className="finding">
-        <h3>Sealed evidence</h3>
+        <h3>Saved evidence</h3>
         <p>
-          Citations open the original sealed evidence for this report. They do
-          not reread current logs.
+          Evidence links show the saved job details or log excerpts used for
+          this report. They do not load the current logs.
         </p>
         <ul>
           {detail.citations.map((citation) => (
@@ -608,21 +616,21 @@ function SealedReport({
         )}
       </section>
       <details className="finding">
-        <summary>Provenance and disclosure</summary>
+        <summary>Report sources and data use</summary>
         <dl className="facts compact">
           <Fact label="Control instance" value={detail.controlInstanceId} />
           <Fact label="Control version" value={detail.controlVersion} />
           <Fact label="Contract" value={detail.contractVersion} />
           <Fact label="Platform" value={detail.platform} />
-          <Fact label="Observed phase" value={title(detail.phase)} />
-          <Fact label="Observed outcome" value={title(detail.outcome)} />
+          <Fact label="Recorded job status" value={title(detail.phase)} />
+          <Fact label="Recorded final result" value={title(detail.outcome)} />
           <Fact label="Mode" value={title(detail.mode)} />
           {Object.entries(detail.versions).map(([name, value]) => (
             <Fact key={name} label={title(name)} value={String(value)} />
           ))}
         </dl>
         <p>
-          Actual runs:{" "}
+          Runs included:{" "}
           {detail.runs.length
             ? detail.runs
                 .map(
@@ -639,9 +647,9 @@ function SealedReport({
             .join("; ") || "None recorded"}
         </p>
         <p>
-          Provider invoked: {d.providerInvoked ? "Yes" : "No"}. Generated
-          content used: {d.generatedContentUsed ? "Yes" : "No"}. Locality:{" "}
-          {d.locality}.
+          AI service used: {d.providerInvoked ? "Yes" : "No"}. AI-generated
+          content used: {d.generatedContentUsed ? "Yes" : "No"}. Processing
+          location: {d.locality}.
         </p>
         {detail.generators.map((generator, i) => (
           <p key={i}>
@@ -732,17 +740,17 @@ function CitationView({
   }, [result.error, onReadError]);
   if (result.error)
     return <ErrorNotice error={result.error} retry={result.refresh} />;
-  if (!result.data) return <Spinner label="Validating sealed citation" />;
+  if (!result.data) return <Spinner label="Checking saved evidence" />;
   const { citation: c, preview } = result.data;
   return (
-    <div className="citation" aria-label="Sealed citation">
+    <div className="citation" aria-label="Saved evidence excerpt">
       <h4>{c.label}</h4>
       <p>{preview.note}</p>
-      <pre>{preview.text || "(Empty sealed content)"}</pre>
+      <pre>{preview.text || "(Saved excerpt is empty)"}</pre>
       <dl className="facts compact">
         <Fact label="Range basis" value={c.rangeBasis} />
         <Fact
-          label="Sanitized byte range"
+          label="Range after sensitive text removal"
           value={
             c.startOffset !== undefined && c.endOffset !== undefined
               ? `[${c.startOffset}, ${c.endOffset})`
@@ -759,8 +767,8 @@ function CitationView({
               : "No exact original byte mapping for this selection"
           }
         />
-        <Fact label="Source entity" value={c.sourceEntityId} />
-        <Fact label="Source revision" value={c.sourceRevision} />
+        <Fact label="Source record ID" value={c.sourceEntityId} />
+        <Fact label="Source record version" value={c.sourceRevision} />
         <Fact label="Run" value={c.runId} />
         <Fact label="Run number" value={c.runNumber} />
         <Fact label="Execution" value={c.executionId} />

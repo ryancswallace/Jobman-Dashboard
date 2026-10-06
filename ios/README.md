@@ -210,8 +210,26 @@ Packaging requires explicit numeric marketing version and build values. The arch
 
 Job detail separates the current job snapshot from facts captured when a recorded run is selected. Target name, partition, workload digest and confidence-update time are shown when supplied; older responses remain readable with unavailable fields. Selected-run metadata timestamps are not presented as execution lifecycle times.
 
-The submitted execution specification uses the generated API model. Its dedicated scrollable screen shows the executable and every ordered argument, including empty arguments and multiline shell-wrapper scripts. Values are selectable literal text; control/direction characters use visible Unicode escapes. No argument bytes are discarded. The explicit **Copy argument vector as JSON** action preserves original strings and uses a local-only clipboard entry that expires after 60 seconds. It does not construct a shell-quoted command or execute anything. The submitted working directory is a portable logical path, not an inferred runtime directory. Environment values are excluded, and unavailable specifications show the source's reason.
+The submitted execution specification uses the generated API model. Its dedicated scrollable screen shows the executable and every ordered argument, including empty arguments and multiline shell-wrapper scripts. Values are selectable literal text; control/direction characters use visible Unicode escapes. No argument bytes are discarded. The explicit **Copy command and arguments (JSON)** action preserves original strings and uses a local-only clipboard entry that expires after 60 seconds. It does not construct a shell-quoted command or execute anything. The submitted working directory is a portable logical path, not an inferred runtime directory. Environment values are excluded, and unavailable specifications show the source's reason.
 
 The DEBUG-only `--dashboard-inspection-fixtures` option supplies synthetic command/metadata and unavailable-source cases. Core tests cover backward-compatible decoding, exact JSON argument-vector round trips, empty arguments, multiline scripts, Unicode/control text and a 65,536-byte argument. Simulator workflows inspect the full script tail and selected-run/source distinctions; these fixtures do not constitute live Control or physical-device acceptance.
 
 Validation on 2026-10-06: 86 core tests passed and the final unsigned simulator build succeeded with Xcode 27.0. The two new inspection workflows passed on iPhone 18 Pro / iOS 27.0 after correcting combined accessibility-label selectors; the existing recorded-run log/artifact/diagnosis workflow also passed. Five captured fixture screenshots were inspected. The full simulator suite and physical-device checks were not repeated for this change.
+
+## User-facing wording
+
+The iPhone interface follows [the Dashboard language guide](../docs/UI_LANGUAGE.md).
+It distinguishes job status from final result, current job details from a selected
+run, status confidence from diagnosis confidence, and phone permission from
+notification registration and delivery. Known job statuses use descriptive labels
+such as Submitted and Finished; unknown values remain visible. Deployment and
+namespace keep their technical meanings with short explanations. Job groups,
+output-file details, redaction rules, saved reports and unavailable-service errors
+use the same terms as the web interface. Commands, identifiers and source-provided
+report text remain unchanged.
+
+This copy pass preserves route, query, permission, refresh and mutation behavior.
+Core checks cover contextual labels, unknown values, unavailable command reasons,
+and the distinction between missing data, an outage and denied access. Existing
+simulator workflows use the new visible labels and continue asserting exact
+identities, pagination, permission clearing and explicit notification actions.

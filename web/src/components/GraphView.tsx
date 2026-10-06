@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { GraphNode } from "../lib/models";
-import { count, title } from "../lib/format";
+import { count, title, jobStatus } from "../lib/format";
 export function GraphView({
   nodes,
   selected,
@@ -54,10 +54,10 @@ export function GraphView({
     <section className="panel">
       <div className="panel-heading">
         <div>
-          <h2>Graph neighborhood</h2>
+          <h2>Connected jobs diagram</h2>
           <p>
-            Selected node and its bounded neighborhood. Use the paginated node
-            and dependency lists for complete navigation.
+            The selected job and nearby dependencies. Use the job and dependency
+            lists to browse the rest of the graph.
           </p>
         </div>
       </div>
@@ -108,7 +108,7 @@ export function GraphView({
                   role="button"
                   aria-current={selected === node.id ? "true" : undefined}
                   tabIndex={0}
-                  aria-label={`${node.name ?? node.id}, ${node.job.phase}, ${node.readiness ?? "readiness unavailable"}`}
+                  aria-label={`${node.name ?? node.id}, ${jobStatus(node.job.phase)}, ${node.readiness ?? "readiness unavailable"}`}
                   onClick={() => onSelect(node.id)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
@@ -131,20 +131,23 @@ export function GraphView({
                     {(node.name ?? node.id).slice(0, 23)}
                   </text>
                   <text x="12" y="47" className="graph-node-status">
-                    {title(node.disposition || node.job.phase)}
+                    {node.disposition
+                      ? title(node.disposition)
+                      : jobStatus(node.job.phase)}
                   </text>
                 </g>
               );
             })}
           </svg>
         ) : (
-          <p className="panel-body">Laying out this node page…</p>
+          <p className="panel-body">Drawing connected jobs…</p>
         )}
       </div>
       {(omittedNodes || omittedEdges) && (
         <p className="panel-note">
-          Not shown in this neighborhood: {count(omittedNodes)} nodes,{" "}
-          {count(omittedEdges)} edges. Continue through the paginated node list.
+          Not shown in this diagram: {count(omittedNodes)} nodes,{" "}
+          {count(omittedEdges)} dependency links. Browse the job list to see
+          more.
         </p>
       )}
     </section>

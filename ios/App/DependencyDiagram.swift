@@ -12,10 +12,10 @@ struct DependencyDiagram: View {
     private var inputs: [GraphLayout.Input] { children.map { node in .init(id: node.id, upstream: neighborhood.edges.filter { $0.toJobId == node.id }.map(\.fromJobId)) } }
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Showing \(children.count) nodes and \(neighborhood.edges.count) edges from the selected neighborhood (limits: 200 nodes, 500 edges).").font(.caption).accessibilityIdentifier("graphDiagramBounds")
+            Text("Showing \(children.count) jobs and \(neighborhood.edges.count) dependencies in this area (limits: 200 jobs, 500 dependencies).").font(.caption).accessibilityIdentifier("graphDiagramBounds")
             if let layout {
                 if layout.containsCycle { Label("Unexpected cycle in displayed dependencies", systemImage: "exclamationmark.triangle").font(.caption) }
-                Text("\(layout.omittedNodes) loaded nodes and \(layout.omittedEdges) dependencies outside this diagram").font(.caption)
+                Text("\(layout.omittedNodes) loaded jobs and \(layout.omittedEdges) dependencies outside this diagram").font(.caption)
                 ScrollView([.horizontal, .vertical]) {
                     ZStack(alignment: .topLeading) {
                         Canvas { context, _ in
@@ -39,12 +39,12 @@ struct DependencyDiagram: View {
                                 Button { select(child.id) } label: {
                                     VStack(alignment: .leading) {
                                         Text(child.id).font(.caption.bold()).lineLimit(2)
-                                        Text(child.readiness ?? child.job.phase).font(.caption2)
+                                        Text(child.readiness ?? InterfaceText.jobStatus(child.job.phase)).font(.caption2)
                                     }.padding(8).frame(width: width, height: height, alignment: .leading)
                                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
                                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(.secondary.opacity(0.5)))
                                 }.buttonStyle(.plain).position(point(vertex))
-                                    .accessibilityLabel("Node \(child.id), \(child.readiness ?? child.job.phase). Center graph on this node.")
+                                    .accessibilityLabel("Job \(child.id), \(child.readiness ?? InterfaceText.jobStatus(child.job.phase)). Center the diagram on this job.")
                                     .accessibilityAddTraits(child.id == neighborhood.centerId ? .isSelected : [])
                                     .accessibilityIdentifier("diagram-node-\(child.id)")
                             }

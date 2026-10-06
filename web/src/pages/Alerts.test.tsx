@@ -130,10 +130,10 @@ it("creates all namespace jobs with explicit multi-source selections and all-ter
   );
   await user.click(screen.getByLabelText("East / Research"));
   await user.click(screen.getByLabelText("West / Research"));
-  await user.click(screen.getByRole("button", { name: "All terminal" }));
+  await user.click(screen.getByRole("button", { name: "All final results" }));
   await user.click(screen.getByRole("button", { name: "Save rule" }));
   await screen.findByText(
-    "Rule saved. Check its namespace activation states below.",
+    "Rule saved. Check below to see which namespaces are being monitored.",
   );
   const create = calls.find((call) => call.method === "POST")!;
   expect(create.body).toEqual({
@@ -211,7 +211,9 @@ it("revalidates only after an explicit click, with no invented hidden reference 
   show();
   await screen.findByText("Team failures");
   expect(calls.every((call) => call.method === "GET")).toBe(true);
-  await user.click(screen.getByRole("button", { name: "Revalidate access" }));
+  await user.click(
+    screen.getByRole("button", { name: "Check access and resume" }),
+  );
   await waitFor(() =>
     expect(calls.some((call) => call.path.endsWith("/revalidate"))).toBe(true),
   );
@@ -260,9 +262,7 @@ it("rejects a multibyte name exceeding120 bytes before mutation", async () => {
     target: { value: "界".repeat(41) },
   });
   await user.click(screen.getByRole("button", { name: "Save rule" }));
-  expect(
-    await screen.findByText(/Use a rule name of 1–120 UTF-8 bytes/),
-  ).toBeVisible();
+  expect(await screen.findByText(/Enter a short rule name/)).toBeVisible();
   expect(calls.every((call) => call.method === "GET")).toBe(true);
 });
 it("does not repeat an uncertain create and requires checking the list", async () => {
@@ -318,7 +318,7 @@ it("keeps an in-flight create open until the server result can be checked", asyn
     complete(json(saved, 201));
   });
   await screen.findByText(
-    "Rule saved. Check its namespace activation states below.",
+    "Rule saved. Check below to see which namespaces are being monitored.",
   );
   expect(calls.filter((call) => call.method === "POST")).toHaveLength(1);
   expect(

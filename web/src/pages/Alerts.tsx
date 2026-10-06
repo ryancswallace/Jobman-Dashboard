@@ -107,7 +107,7 @@ function AlertWorkspace() {
       if (mode !== "delete" && decodeRule(value).id !== rule.id)
         throw new APIError(
           "invalid_response",
-          "The updated rule identity did not match the selected rule.",
+          "Dashboard returned a different rule than the one selected. Refresh the rule list before trying again.",
         );
       if (!active.signal.aborted) {
         setNotice(
@@ -115,9 +115,9 @@ function AlertWorkspace() {
             ? "Rule deleted."
             : mode === "enabled"
               ? rule.enabled
-                ? "Rule stopped. Pending matches for this rule are no longer eligible for delivery."
-                : "Rule enabled. Check each namespace’s activation state below."
-              : "Revalidation completed. Check each namespace’s current activation state below.",
+                ? "Rule stopped. Notifications waiting to be sent for this rule will not be delivered."
+                : "Rule enabled. Check below to see which namespaces are being monitored."
+              : "Access checked. Check below to see which namespaces have resumed monitoring.",
         );
         refresh();
       }
@@ -162,7 +162,7 @@ function AlertWorkspace() {
     <>
       <PageHeader
         title="Alert rules"
-        description="Choose which job results to follow. Each rule has explicit namespace selections and its own activation state."
+        description="Choose which job results should notify you and which jobs or namespaces to watch."
         actions={
           <button
             className="button"
@@ -185,9 +185,9 @@ function AlertWorkspace() {
         </p>
       )}
       <p className="notice subtle">
-        Rules are personal and do not grant access. Monitoring begins when a
-        namespace’s activation is active; pending or unavailable sources may
-        delay it. iPhone delivery is configured separately.
+        Your rules apply only to you. Monitoring starts separately for each
+        namespace when its status becomes Active. An unavailable server may
+        delay activation. Set up iPhone notifications in Settings.
       </p>
       {edit && !rules.error && !privateFailure && editStillVisible && (
         <RuleEditor
@@ -197,7 +197,7 @@ function AlertWorkspace() {
           onClose={closeEditor}
           onSaved={() => {
             setNotice(
-              "Rule saved. Check its namespace activation states below.",
+              "Rule saved. Check below to see which namespaces are being monitored.",
             );
             closeEditor();
           }}
@@ -245,7 +245,7 @@ function AlertWorkspace() {
                           : title(rule.scope)}{" "}
                     ·{" "}
                     {rule.outcomeMode === "all_terminal"
-                      ? "All terminal outcomes, including future outcomes"
+                      ? "All final results, including any added in future versions"
                       : rule.outcomes.map(title).join(", ") ||
                         title(rule.outcomeMode)}
                   </p>
@@ -287,8 +287,8 @@ function AlertWorkspace() {
                       {rule.unavailableScopes === 1 ? "" : "s"}.{" "}
                     </span>
                   )}
-                  References are hidden until current access can be verified.
-                  Stopping the rule remains available.
+                  Details are hidden until your access can be checked. You can
+                  still stop the rule.
                 </p>
               )}
               <ul className="rule-activation-list">
@@ -333,8 +333,8 @@ function AlertWorkspace() {
               )}
               {!editableRule(rule) && !hiddenReferences(rule) && (
                 <p className="muted small">
-                  This rule contains values this client cannot edit. You can
-                  still stop or delete it.
+                  This rule uses options this version of Dashboard cannot edit.
+                  You can still stop or delete it.
                 </p>
               )}
               <div className="rule-actions">
@@ -361,7 +361,7 @@ function AlertWorkspace() {
                   disabled={!!busy || !rule.enabled}
                   onClick={() => void action(rule, "revalidate")}
                 >
-                  Revalidate access
+                  Check access and resume
                 </button>
                 <button
                   className="text-button"
@@ -377,9 +377,9 @@ function AlertWorkspace() {
                     (scope) => scope.status === "inaccessible",
                   )) && (
                   <p className="panel-note">
-                    Revalidate access explicitly resumes eligible scopes from a
-                    new source checkpoint. Restored group membership alone does
-                    not resume revoked monitoring.
+                    After your access is restored, choose Check access and
+                    resume to start monitoring new events again. Restoring group
+                    membership alone does not restart this rule.
                   </p>
                 )}
               {deleteID === rule.id && (
@@ -389,8 +389,8 @@ function AlertWorkspace() {
                   aria-label={`Delete ${rule.name}`}
                 >
                   <p>
-                    Delete this personal rule? Future matches from it will stop.
-                    Existing inbox history is retained.
+                    Delete this personal rule? It will no longer create
+                    notifications. Existing inbox history is retained.
                   </p>
                   <div>
                     <button

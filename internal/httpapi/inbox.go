@@ -25,7 +25,7 @@ func (s *Server) registerInboxRoutes(mux *http.ServeMux) {
 }
 func writeInboxError(w http.ResponseWriter, r *http.Request, err error) {
 	if errors.Is(err, notifications.ErrInvalid) {
-		err = &api.Error{Code: "invalid_request", Message: "Supply a valid bounded inbox selection or a read boolean."}
+		err = &api.Error{Code: "invalid_request", Message: "The notification request is invalid. Refresh your inbox and try again."}
 	}
 	writeError(w, r, err)
 }

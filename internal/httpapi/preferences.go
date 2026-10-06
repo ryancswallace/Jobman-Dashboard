@@ -19,11 +19,11 @@ type PreferenceStore interface {
 
 func (s *Server) updatePreferences(w http.ResponseWriter, r *http.Request) {
 	if s.Preferences == nil {
-		writeError(w, r, &api.Error{Code: "source_unavailable", Message: "Personal settings storage is unavailable."})
+		writeError(w, r, &api.Error{Code: "source_unavailable", Message: "Settings are unavailable on this server. Ask your administrator to check its configuration."})
 		return
 	}
 	invalid := func() {
-		writeError(w, r, &api.Error{Code: "invalid_request", Message: "Send valid settings and their current revision."})
+		writeError(w, r, &api.Error{Code: "invalid_request", Message: "These settings could not be saved. Reload settings, check your choices, and try again."})
 	}
 	typeName, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil || typeName != "application/json" || r.URL.RawQuery != "" || len(r.Header.Values("If-Match")) != 1 {

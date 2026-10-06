@@ -41,7 +41,7 @@ struct JobmanDashboardApp: App {
                 Task { await store.refreshDeviceRegistration() }
             }
             .onReceive(NotificationCenter.default.publisher(for: .dashboardPushRegistrationFailed)) { _ in
-                store.devices.registrationFailed("Apple notification registration failed. Check network access and the app’s signing configuration, then try again.")
+                store.devices.registrationFailed("This iPhone could not register for Apple notifications. Check your connection and try again. If it continues, contact your administrator.")
             }
             .onChange(of: scenePhase) { _, phase in store.setActive(phase == .active) }
         }
@@ -56,7 +56,7 @@ private struct ConnectionView: View {
             Form {
                 Section {
                     DashboardBrand().font(.title.bold())
-                    Text("Monitor jobs and investigate results on your organization's private network.").foregroundStyle(.secondary)
+                    Text("View job progress, read logs and investigate results on your organization's private network.").foregroundStyle(.secondary)
                 }
                 Section("Connect to your organization") {
                     TextField("https://dashboard.example.internal", text: $store.address)
@@ -65,11 +65,11 @@ private struct ConnectionView: View {
                     Text("Connect to your private network or VPN first. Use the address supplied by your administrator.").font(.footnote)
                     Button { Task { await store.signIn() } } label: {
                         if store.busy { ProgressView("Opening organization sign-in…") }
-                        else { Label("Sign in with AD FS", systemImage: "person.crop.circle.badge.checkmark") }
+                        else { Label("Sign in with your organization", systemImage: "person.crop.circle.badge.checkmark") }
                     }.disabled(store.busy || store.address.isEmpty)
                 }
                 if let error = store.error { Section { ErrorMessage(error: error) } }
-                if store.pendingRoute != nil { Section { Text("An update is waiting. Sign in and reconnect to open its current authorized details.") } }
+                if store.pendingRoute != nil { Section { Text("An update is waiting. Sign in and connect to your private network to view it.") } }
             }.navigationTitle("Connect")
         }
     }
@@ -88,7 +88,7 @@ private struct DashboardTabs: View {
                     }
                 }
             }.tabItem { Label("Jobs", systemImage: "list.bullet.rectangle") }.tag(1)
-            NavigationStack { WorkloadsView() }.tabItem { Label("Workloads", systemImage: "point.3.connected.trianglepath.dotted") }.tag(2)
+            NavigationStack { WorkloadsView() }.tabItem { Label("Job groups", systemImage: "point.3.connected.trianglepath.dotted") }.tag(2)
             NavigationStack(path: Binding(get: { store.inboxPath }, set: { store.inboxPath = $0 })) {
                 InboxView().navigationDestination(for: DashboardRoute.self) { route in
                     switch route {
@@ -108,7 +108,7 @@ struct ScopeMenu: View {
     @State private var choosing = false
     var body: some View {
         Menu {
-            Button("All authorized namespaces") { store.selectScope(.all) }
+            Button("All namespaces you can access") { store.selectScope(.all) }
             ForEach(store.bootstrap?.deployments ?? []) { deployment in
                 Section(deployment.name) {
                     Button("All in \(deployment.name)") { store.selectScope(.deployments([deployment.id])) }
@@ -119,7 +119,7 @@ struct ScopeMenu: View {
             }
             Button("Choose deployments…") { choosing = true }
         } label: { Label(store.scopeLabel, systemImage: "line.3.horizontal.decrease.circle").lineLimit(2) }
-        .accessibilityHint("Select one namespace or an aggregate across deployments")
+        .accessibilityHint("Choose a namespace, or combine jobs from several deployments. A namespace groups jobs with their own access permissions.")
         .sheet(isPresented: $choosing) { DeploymentPicker() }
     }
 }
@@ -154,11 +154,11 @@ struct SourceSummary: View {
     let fetchedAt: String
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            if completeness != "complete" { Label("Partial results — unavailable contributions are excluded", systemImage: "exclamationmark.triangle").font(.callout.bold()) }
+            if completeness != "complete" { Label("Partial results — some deployments or namespaces could not be included", systemImage: "exclamationmark.triangle").font(.callout.bold()) }
             ForEach(sources.filter { $0.status != "available" }) { source in
                 Text("\(source.deploymentId) / \(source.namespaceId): \(source.status.replacingOccurrences(of: "_", with: " "))").font(.caption)
             }
-            TimestampRow(label: "Last fetched", value: fetchedAt)
+            TimestampRow(label: "Last refreshed", value: fetchedAt)
         }.foregroundStyle(.secondary)
     }
 }
@@ -174,7 +174,7 @@ struct TimestampRow: View {
                 Text(format(date))
                     .accessibilityLabel("\(label), \(value)")
                 Text("UTC: \(value)").font(.caption2).foregroundStyle(.secondary).textSelection(.enabled)
-            } else { Text("Unavailable").foregroundStyle(.secondary) }
+            } else { Text("Not available").foregroundStyle(.secondary) }
         }
     }
     private func format(_ date: Date) -> String {
@@ -190,7 +190,7 @@ struct StatusBadge: View {
     let title: String
     let value: String?
     var body: some View {
-        Text("\(title): \(value?.replacingOccurrences(of: "_", with: " ") ?? "Unavailable")")
+        Text("\(title): \(value?.replacingOccurrences(of: "_", with: " ") ?? "Not available")")
             .font(.caption.weight(.medium)).padding(.horizontal, 8).padding(.vertical, 5)
             .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
     }

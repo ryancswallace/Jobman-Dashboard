@@ -6,7 +6,7 @@ import UIKit
 struct InspectionText: View {
     let label: String
     let value: String
-    var empty = "Empty string"
+    var empty = "Empty value"
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(verbatim: label).font(.caption).foregroundStyle(.secondary)
@@ -23,20 +23,20 @@ struct JobCommandView: View {
     var body: some View {
         List {
             Section {
-                Text("The executable and each ordered argument are separate literal values. This is not a shell-quoted command. Scripts passed to a shell remain literal arguments.").font(.footnote)
-                Text("No text is truncated. Nonprinting and direction controls are displayed as Unicode escapes; JSON copy preserves the original values.").font(.footnote).foregroundStyle(.secondary)
-                Button("Copy argument vector as JSON") {
+                Text("The executable is the program to run. Arguments are the values passed to it, in order; a shell script can be one argument.").font(.footnote)
+                Text("All text is included. Invisible control characters are shown as Unicode codes. Copy saves the original program and arguments as a JSON list, not a ready-to-run terminal command.").font(.footnote).foregroundStyle(.secondary)
+                Button("Copy command and arguments (JSON)") {
                     do {
                         let value = try JobInspectionText.argumentVectorJSON(execution.command)
                         UIPasteboard.general.setItems([["public.utf8-plain-text": value]], options: [.localOnly: true, .expirationDate: Date().addingTimeInterval(60)])
                         copyStatus = "Copied to this device for 60 seconds."
-                    } catch { copyStatus = "Could not encode the argument vector." }
+                    } catch { copyStatus = "The command could not be copied. Try again." }
                 }.accessibilityIdentifier("copyArgumentVector")
                 if let copyStatus { Text(copyStatus).font(.caption).accessibilityIdentifier("argumentCopyStatus") }
             }
-            Section("Submitted specification") {
-                InspectionText(label: "Submitted working directory", value: execution.workingDirectory, empty: "Empty (no directory specified)")
-                Text("The submitted directory is a portable logical path; no runtime path expansion is inferred.").font(.caption).foregroundStyle(.secondary)
+            Section("As submitted") {
+                InspectionText(label: "Submitted working directory", value: execution.workingDirectory, empty: "No directory specified")
+                Text("This is the submitted directory reference. The actual directory used during execution may differ.").font(.caption).foregroundStyle(.secondary)
                 InspectionText(label: "Executable · argv[0]", value: execution.command.executable).accessibilityIdentifier("submittedExecutable")
             }
             Section("\(execution.command.args.count) ordered arguments") {
@@ -55,24 +55,24 @@ struct SelectedRunFacts: View {
     let run: DashboardAPI.JobRun
     let currentRunID: String?
     var body: some View {
-        Section("Selected run facts") {
-            Text(currentRunID == run.id ? "The selected run matches the current job's run reference." : "These are the selected recorded run's facts. Current job facts above remain separate.")
+        Section("Selected run details") {
+            Text(currentRunID == run.id ? "The selected run matches the current job's run reference." : "These details describe the run you selected. The current job details above are unchanged.")
                 .font(.footnote).foregroundStyle(.secondary)
-            Text("Recorded when the run was selected. Choose the run again to refresh these facts.").font(.caption).foregroundStyle(.secondary)
+            Text("Loaded when you selected this run. Select it again to refresh these details.").font(.caption).foregroundStyle(.secondary)
             LabeledContent("Selected run number", value: run.number)
             InspectionText(label: "Selected run ID", value: run.id)
-            LabeledContent("Run phase", value: run.phase)
-            LabeledContent("Run desired state", value: run.desiredState)
-            LabeledContent("Run outcome", value: run.outcome ?? "Unavailable")
-            TimestampRow(label: "Run metadata created", value: run.createdAt)
-            TimestampRow(label: "Run metadata updated", value: run.updatedAt)
-            Text("Run metadata dates are not execution start or completion times.").font(.caption).foregroundStyle(.secondary)
+            LabeledContent("Run status", value: InterfaceText.jobStatus(run.phase))
+            LabeledContent("Run requested state", value: run.desiredState)
+            LabeledContent("Run final result", value: run.outcome.map(InterfaceText.finalResult) ?? "Not available")
+            TimestampRow(label: "Run record created", value: run.createdAt)
+            TimestampRow(label: "Run record updated", value: run.updatedAt)
+            Text("These are record dates, not execution start or completion times.").font(.caption).foregroundStyle(.secondary)
             InspectionText(label: "Selected execution ID", value: run.executionId ?? "No execution recorded")
-            LabeledContent("Execution phase", value: run.executionPhase ?? "Unavailable")
-            InspectionText(label: "Run target ID", value: run.targetId ?? "Unavailable")
-            InspectionText(label: "Run target generation ID", value: run.targetGenerationId ?? "Unavailable")
-            LabeledContent("Run backend", value: run.backend ?? "Unavailable")
-            LabeledContent("Run confidence", value: run.confidence ?? "Unavailable")
+            LabeledContent("Execution status", value: run.executionPhase ?? "Not available")
+            InspectionText(label: "Run target ID", value: run.targetId ?? "Not available")
+            InspectionText(label: "Run target configuration version ID", value: run.targetGenerationId ?? "Not available")
+            LabeledContent("Run execution system", value: run.backend ?? "Not available")
+            LabeledContent("Run status confidence", value: run.confidence.map(InterfaceText.statusConfidence) ?? "Not available")
         }
     }
 }

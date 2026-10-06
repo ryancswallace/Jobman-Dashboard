@@ -9,7 +9,7 @@ export const validRunId = (value: string) =>
 const invalid = () =>
   new APIError(
     "invalid_response",
-    "Run references could not be verified for this job. Refresh the run list.",
+    "The run details could not be verified for this job. Refresh the run list.",
   );
 const date = (value: unknown) =>
   typeof value === "string" && Number.isFinite(Date.parse(value));

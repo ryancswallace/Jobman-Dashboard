@@ -125,10 +125,10 @@ public enum DeviceInputError: Error, LocalizedError {
     case label, secureStorage, unavailableToken, recheckRequired
     public var errorDescription: String? {
         switch self {
-        case .label: "Enter a device label using at most 120 UTF-8 bytes, without control characters."
-        case .secureStorage: "Secure device storage is unavailable. Unlock this phone and try again. No new binding was assumed."
-        case .unavailableToken: "A current Apple notification token is not available. Check notification permission and registration, then try again."
-        case .recheckRequired: "Device state changed or could not be confirmed. Reload and review it before another change."
+        case .label: "Enter a device name up to 120 bytes, without control characters. Some characters use more than one byte."
+        case .secureStorage: "Secure storage is not available. Unlock this phone and try again. A new account connection has not been confirmed."
+        case .unavailableToken: "This iPhone is not currently registered for Apple notifications. Check notification permission and your connection, then try again."
+        case .recheckRequired: "Device state changed or could not be confirmed. Refresh and review it before another change."
         }
     }
 }

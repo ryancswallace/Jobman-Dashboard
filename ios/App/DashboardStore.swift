@@ -68,7 +68,7 @@ final class DashboardStore {
     var signedIn: Bool { bootstrap != nil }
     var scopeLabel: String {
         switch scope {
-        case .all: "All authorized namespaces"
+        case .all: "All namespaces you can access"
         case .deployments(let ids): bootstrap?.deployments.filter { ids.contains($0.id) }.map(\.name).joined(separator: ", ") ?? "Selected deployments"
         case .namespace(let ref): bootstrap?.deployments.first { $0.id == ref.deploymentId }?.namespaces.first { $0.id == ref.namespaceId }?.name ?? "Namespace"
         }
@@ -140,7 +140,7 @@ final class DashboardStore {
                 if revoked || grantsChanged { try activate(boot); purgeContent(); path = []; inboxPath = [] }
                 scheduleExpiry()
                 if resumeReadPending { resumeReadPending = false; foregroundGeneration = UUID() }
-                if boot.namespaces.isEmpty { error = "No namespaces are currently authorized for this account."; return }
+                if boot.namespaces.isEmpty { error = "Your account does not currently have access to any namespaces."; return }
                 guard let ticket = boundary.ticket() else { return }
                 let query = try scope.queryItems(authorized: boot.namespaces)
                 async let summary: Overview = request(path: "/api/v1/overview", query: query + [overviewWindow.query])
@@ -386,11 +386,11 @@ final class DashboardStore {
         bootstrap = nil; path = []; inboxPath = []; pendingRoute = nil; error = nil
         purgeContent()
         if queuedUnbind {
-            error = "Signed out on this phone. Device alert unbinding will finish when the private service is reachable."
+            error = "Signed out on this phone. The saved request to stop its notifications will finish when Dashboard is reachable."
             Task { await DeviceRevocations.flush() }
         }
-        if unconfirmedBinding { error = "Signed out locally. Server unbinding is unconfirmed for an older device binding; reconnect, sign in, and remove this installation. No login credential was retained." }
-        if unbindQueueFailed { error = "Signed out locally. Device alert unbinding could not be queued; reconnect to finish removing this phone's server binding." }
+        if unconfirmedBinding { error = "Signed out on this phone. We could not confirm that notifications have stopped for its older connection. Reconnect, sign in and remove this device. Your sign-in credentials were cleared." }
+        if unbindQueueFailed { error = "Signed out on this phone. The request to stop notifications could not be saved. Reconnect, sign in and remove this device to finish." }
         devices.clear()
     }
 

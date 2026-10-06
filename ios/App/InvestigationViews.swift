@@ -18,26 +18,26 @@ struct LogView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let run { Text("Selected run \(run.number) · \(run.id)").font(.caption) }
-            Picker("Stream", selection: $stream) { Text("stdout").tag("stdout"); Text("stderr").tag("stderr") }.pickerStyle(.segmented).disabled(loading)
+            Picker("Log", selection: $stream) { Text("Output (stdout)").tag("stdout"); Text("Errors (stderr)").tag("stderr") }.pickerStyle(.segmented).disabled(loading)
             HStack {
-                Toggle("Follow", isOn: $following).toggleStyle(.switch).disabled(read.requiresRefresh || (read.cursor == nil && read.state == "complete"))
-                Button { Task { await load() } } label: { Label("Read next", systemImage: "arrow.clockwise") }.disabled(loading || read.requiresRefresh || (read.cursor == nil && read.state == "complete"))
+                Toggle("Follow new output", isOn: $following).toggleStyle(.switch).disabled(read.requiresRefresh || (read.cursor == nil && read.state == "complete"))
+                Button { Task { await load() } } label: { Label("Load next part", systemImage: "arrow.clockwise") }.disabled(loading || read.requiresRefresh || (read.cursor == nil && read.state == "complete"))
             }
             Button("Refresh log") { Task { await refresh() } }.disabled(loading).accessibilityIdentifier("refreshLog")
-            if read.requiresRefresh { Text("Refresh starts a new verified stream and clears the previously loaded bytes.").font(.footnote) }
+            if read.requiresRefresh { Text("Refresh checks access again and starts a new log view, replacing the output currently shown.").font(.footnote) }
             TextField("Search loaded text", text: $search).textFieldStyle(.roundedBorder).autocorrectionDisabled()
             if !search.isEmpty { Text("\(read.buffer.text.components(separatedBy: search).count - 1) matches in loaded text only").font(.caption) }
             Text("Bytes \(read.buffer.startOffset)–\(read.buffer.nextOffset) • \(read.state.isEmpty ? "not yet loaded" : read.state)").font(.caption).accessibilityLabel("Loaded byte range \(read.buffer.startOffset) through \(read.buffer.nextOffset), \(read.state)")
-            if read.buffer.evicted { Text("Earlier loaded output was removed to keep the 2 MiB display limit.").font(.caption) }
-            if read.truncated { Text("Source output is truncated.").font(.caption) }
+            if read.buffer.evicted { Text("Earlier output was removed from this view to stay within the 2 MiB display limit.").font(.caption) }
+            if read.truncated { Text("Some log output was omitted by the source.").font(.caption) }
             if let error { ErrorMessage(error: error) }
-            TimestampRow(label: "Last successful fetch", value: fetchedAt)
-            TimestampRow(label: "Source capture", value: capturedAt)
-            if loading && read.buffer.byteCount == 0 { ProgressView("Reading verified log bytes…") }
+            TimestampRow(label: "Last refreshed", value: fetchedAt)
+            TimestampRow(label: "Output recorded at", value: capturedAt)
+            if loading && read.buffer.byteCount == 0 { ProgressView("Loading log output…") }
             ScrollView([.vertical, .horizontal]) {
-                Text(read.buffer.text.isEmpty ? (read.state == "complete" ? "Empty complete stream" : "No captured output in this range") : read.buffer.text)
+                Text(read.buffer.text.isEmpty ? (read.state == "complete" ? "This log is complete and contains no output." : "No log text is currently loaded.") : read.buffer.text)
                     .font(.system(.body, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityLabel(read.buffer.text.isEmpty ? "No output in loaded range" : read.buffer.text)
+                    .accessibilityLabel(read.buffer.text.isEmpty ? "No output in the loaded part of the log" : read.buffer.text)
             }
             .simultaneousGesture(DragGesture().onChanged { _ in following = false })
         }.padding().navigationTitle("Logs").navigationBarTitleDisplayMode(.inline)
@@ -81,22 +81,22 @@ struct ArtifactsView: View {
     var run: DashboardAPI.JobRun? = nil
     var body: some View {
         List {
-            Section { Text("Published metadata only. File downloads are outside this release.").font(.footnote).foregroundStyle(.secondary) }
+            Section { Text("Files published by the job. Only file details are shown; files cannot be opened or downloaded here.").font(.footnote).foregroundStyle(.secondary) }
             PagedRows<Artifact, ArtifactRow>(path: APIPath.job(ref) + "/artifacts", extraQuery: run?.logQuery ?? [], scoped: false, validate: { try run?.validate(artifacts: $0.items) }) { ArtifactRow(artifact: $0) }
-        }.navigationTitle("Artifacts")
+        }.navigationTitle("Output file details")
     }
 }
 private struct ArtifactRow: View {
     let artifact: Artifact
     var body: some View {
         DisclosureGroup(artifact.name) {
-            LabeledContent("Recorded bytes", value: artifact.sizeBytes)
+            LabeledContent("Recorded size (bytes)", value: artifact.sizeBytes)
             LabeledContent("Run number", value: artifact.runNumber).accessibilityIdentifier("artifactRunNumber")
             LabeledContent("Run ID", value: artifact.runId)
             LabeledContent("Execution ID", value: artifact.executionId).accessibilityIdentifier("artifactExecutionID")
-            LabeledContent("Target generation", value: artifact.targetGenerationId)
+            LabeledContent("Target configuration version", value: artifact.targetGenerationId)
             LabeledContent("Availability", value: artifact.availability).accessibilityIdentifier("artifactAvailability")
-            Text("File bytes have not been verified. Size and checksum are published metadata.").font(.footnote)
+            Text("The size and checksum were reported by the job. Dashboard has not checked the file contents.").font(.footnote)
             Text("Recorded checksum: \(artifact.checksum)").font(.caption.monospaced()).textSelection(.enabled)
             TimestampRow(label: "Published", value: artifact.publishedAt)
         }

@@ -23,7 +23,7 @@ import {
   Status,
 } from "../components/States";
 const configurationNotice =
-  "Configured state and advertised capabilities describe policy. They do not establish agent connectivity or health. Utilization and capacity monitoring come later.";
+  "These settings describe where jobs may run. They do not confirm that a target is connected or healthy. CPU, GPU, memory, and capacity information is not available in this release.";
 export function TargetsPage() {
   const { bootstrap, scope, identity } = useSession(),
     [search, setSearch] = useSearchParams();
@@ -45,7 +45,7 @@ export function TargetsPage() {
     <>
       <PageHeader
         title="Targets"
-        description="Configured execution destinations and generation metadata."
+        description="Targets are the computers or clusters configured to run your jobs."
         actions={
           <button className="button secondary" onClick={refresh}>
             ↻ Refresh
@@ -62,7 +62,7 @@ export function TargetsPage() {
         <span>
           {result.data
             ? `${count(result.data.data.total)} targets ${result.data.meta.completeness === "partial" ? "in available sources (subtotal)" : ""}`
-            : "Source totals unavailable"}
+            : "Target totals unavailable"}
         </span>
       </div>
       {result.error && <ErrorNotice error={result.error} retry={refresh} />}
@@ -76,10 +76,10 @@ export function TargetsPage() {
               <thead>
                 <tr>
                   <th>Target</th>
-                  <th>Source / namespace</th>
+                  <th>Deployment / namespace</th>
                   <th>Configured state</th>
                   <th>Backend / provider</th>
-                  <th>Generation</th>
+                  <th>Configuration version</th>
                   <th>Partitions</th>
                 </tr>
               </thead>
@@ -117,8 +117,8 @@ export function TargetsPage() {
           </div>
           <div className="pagination">
             <span>
-              Grouped by source; newest targets first within each source.
-              Bounded pages.
+              Grouped by deployment and namespace, with newest targets first in
+              each group.
             </span>
             {result.data.meta.nextCursor && (
               <button
@@ -132,7 +132,7 @@ export function TargetsPage() {
             )}
           </div>
           <details>
-            <summary>Source totals and observation times</summary>
+            <summary>Totals and last reported times by namespace</summary>
             <ul>
               {result.data.data.totals.map((t) => (
                 <li key={`${t.deploymentId}:${t.namespaceId}`}>
@@ -150,7 +150,7 @@ export function TargetsPage() {
       ) : (
         !result.error && (
           <Empty title="No targets available">
-            No configured targets were returned for this scope.
+            No targets are configured in the selected namespaces.
           </Empty>
         )
       )}
@@ -206,14 +206,14 @@ export function TargetDetailPage() {
               <dd>
                 {t.kind} / {t.state}
               </dd>
-              <dt>Revision</dt>
+              <dt>Record version</dt>
               <dd>{t.revision}</dd>
-              <dt>Generation</dt>
+              <dt>Configuration version</dt>
               <dd>
                 {t.generation.number} ·{" "}
                 <span className="mono">{t.generation.id}</span>
               </dd>
-              <dt>Backend / transport</dt>
+              <dt>Execution system / connection method</dt>
               <dd>
                 {t.generation.executionBackend} / {t.generation.transport}
               </dd>
@@ -230,26 +230,24 @@ export function TargetDetailPage() {
                 />
               </dd>
               <dt>Runtimes</dt>
-              <dd>{t.generation.runtimes.join(", ") || "None advertised"}</dd>
+              <dd>{t.generation.runtimes.join(", ") || "None reported"}</dd>
               <dt>Operating systems</dt>
               <dd>
-                {t.generation.operatingSystems.join(", ") || "None advertised"}
+                {t.generation.operatingSystems.join(", ") || "None reported"}
               </dd>
               <dt>Architectures</dt>
               <dd>
-                {t.generation.architectures.join(", ") || "None advertised"}
+                {t.generation.architectures.join(", ") || "None reported"}
               </dd>
-              <dt>Capabilities</dt>
-              <dd>
-                {t.generation.capabilities.join(", ") || "None advertised"}
-              </dd>
+              <dt>Supported features</dt>
+              <dd>{t.generation.capabilities.join(", ") || "None reported"}</dd>
               <dt>Log store</dt>
               <dd>
                 {t.generation.logStore
                   ? `${t.generation.logStore.name} · version ${t.generation.logStore.version}`
                   : "None configured"}
               </dd>
-              <dt>Artifact stores</dt>
+              <dt>Output file storage</dt>
               <dd>
                 {t.generation.artifactStores
                   .map((s) => `${s.name} · version ${s.version}`)
@@ -259,17 +257,23 @@ export function TargetDetailPage() {
               <dd>
                 {timestamp(t.createdAt)} / {timestamp(t.updatedAt)}
               </dd>
-              <dt>Source observed</dt>
+              <dt>Last reported by Control</dt>
               <dd>{timestamp(t.asOf)}</dd>
             </dl>
           </section>
           <section className="panel">
             <h2>Partition preview</h2>
             <p>
+              For Slurm, a partition is a named group of cluster resources used
+              to schedule jobs.
+            </p>
+            <p>
               {t.generation.partitions.length} of{" "}
               {count(t.generation.partitionCount)} configured partitions
-              {t.generation.partitionsTruncated ? " · preview truncated" : ""}.
-              The complete catalog is paged below.
+              {t.generation.partitionsTruncated
+                ? " · more partitions available"
+                : ""}
+              . Browse all partitions below.
             </p>
             <details>
               <summary>Show partition preview</summary>
@@ -324,8 +328,8 @@ function PartitionBrowser({
     <section className="panel">
       <h2>All partitions</h2>
       <p>
-        Generation {target.generation.number}; each page rechecks current access
-        and generation.
+        Configuration version {target.generation.number}. Refresh the target if
+        its configuration changes while you browse.
       </p>
       {result.error && (
         <ErrorNotice
@@ -392,7 +396,7 @@ export function BoundedTargetText({ value }: { value: string }) {
       {truncated ? value.slice(0, 512) + "…" : value}
       {truncated && (
         <span className="secondary-line">
-          Display truncated after 512 characters; the source value is preserved.
+          Showing the first 512 characters of this value.
         </span>
       )}
     </span>

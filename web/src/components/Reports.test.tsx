@@ -208,7 +208,7 @@ it("uses the strict profile/run contract and retries an uncertain request with t
   await screen.findByText("No reports on this page");
   await userEvent.click(screen.getByRole("checkbox"));
   await userEvent.type(
-    screen.getByLabelText("Report run UUID"),
+    screen.getByLabelText("Report run ID"),
     "79000000-0000-4000-8000-000000000001",
   );
   await userEvent.click(
@@ -285,8 +285,8 @@ it("polls a pending task into its original sealed findings and renders advice wi
   expect(screen.getByText("Recorded nonzero exit")).toBeVisible();
   expect(screen.getByText("original-report")).toBeVisible();
   expect(screen.getAllByText(/9007199254740993/).length).toBeGreaterThan(0);
-  expect(screen.getAllByText(/not a calibrated probability/).length).toBe(2);
-  expect(screen.getByText(/source evidence has changed/)).toBeVisible();
+  expect(screen.getAllByText(/not a percentage chance/).length).toBe(2);
+  expect(screen.getByText(/job information has changed/)).toBeVisible();
   expect(screen.getByText(/No scheduler observation/)).toBeVisible();
   expect(
     screen.queryByRole("button", { name: /retry job|cancel job|run command/i }),

@@ -1,3 +1,4 @@
+import { jobStatus } from "../lib/format";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useSession } from "../lib/session";
 import { apiQuery, resourcePath } from "../lib/transport";
@@ -39,8 +40,8 @@ export function WorkloadsPage() {
   return (
     <>
       <PageHeader
-        title="Workloads"
-        description="Explore collections, Slurm arrays, and source-owned dependency graphs."
+        title="Job groups"
+        description="Browse related jobs in collections, Slurm arrays, and dependency graphs."
         actions={
           <button
             className="button secondary"
@@ -56,7 +57,7 @@ export function WorkloadsPage() {
           </button>
         }
       />
-      <nav className="tabs" aria-label="Workload type">
+      <nav className="tabs" aria-label="Job group type">
         {[
           ["collection", "Collections"],
           ["array", "Slurm arrays"],
@@ -77,6 +78,13 @@ export function WorkloadsPage() {
           </button>
         ))}
       </nav>
+      <p className="panel-note">
+        {kind === "graph"
+          ? "A dependency graph connects jobs with conditions that must be met before dependent jobs can run."
+          : kind === "array"
+            ? "A Slurm array groups related tasks. Open an array to inspect each task and its job details."
+            : "A collection groups related jobs. Open a collection to see its jobs, results, and execution limits."}
+      </p>
       <div className="page-meta">
         <Freshness
           fetchedAt={result.fetchedAt}
@@ -85,8 +93,8 @@ export function WorkloadsPage() {
         />
         <span>
           {result.data
-            ? `${count(result.data.data.total)} ${result.data.meta.completeness === "partial" ? "workloads in available sources (subtotal)" : "workloads"}`
-            : "Source summaries · bounded child pages"}
+            ? `Job groups: ${count(result.data.data.total)}${result.data.meta.completeness === "partial" ? " in available deployments (partial count)" : ""}`
+            : "Group totals and individual jobs"}
         </span>
       </div>
       {result.error && (
@@ -94,17 +102,17 @@ export function WorkloadsPage() {
       )}
       <Completeness meta={result.data?.meta} />
       {!result.data && result.loading ? (
-        <Spinner label="Loading workloads" />
+        <Spinner label="Loading job groups" />
       ) : result.data?.data.items.length ? (
         <section className="panel">
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Workload</th>
-                  <th>Source / namespace</th>
-                  <th>Children</th>
-                  <th>Source-reported results</th>
+                  <th>Job group</th>
+                  <th>Deployment / namespace</th>
+                  <th>Jobs</th>
+                  <th>Job counts</th>
                   <th>Policy</th>
                 </tr>
               </thead>
@@ -129,7 +137,7 @@ export function WorkloadsPage() {
                       <div className="count-chips">
                         {Object.entries(w.counts).map(([key, value]) => (
                           <span className="count-chip" key={key}>
-                            {title(key)} {count(value)}
+                            {jobStatus(key)} {count(value)}
                           </span>
                         ))}
                       </div>
@@ -143,7 +151,7 @@ export function WorkloadsPage() {
             </table>
           </div>
           <div className="pagination">
-            <span>Wrappers are not counted as additional jobs.</span>
+            <span>Group records are not counted as additional jobs.</span>
             {result.data.meta.nextCursor && (
               <button
                 className="button secondary"
@@ -161,10 +169,9 @@ export function WorkloadsPage() {
       ) : (
         !result.error && (
           <Empty
-            title={`No ${kind === "array" ? "Slurm arrays" : kind === "graph" ? "dependency graphs" : "collections"} in this scope`}
+            title={`No ${kind === "array" ? "Slurm arrays" : kind === "graph" ? "dependency graphs" : "collections"} in the selected namespaces`}
           >
-            Workloads become available when reported by the selected Control
-            deployments.
+            Job groups appear when reported by the selected Control deployments.
           </Empty>
         )
       )}
@@ -206,7 +213,7 @@ export function WorkloadDetailPage() {
         className="back-link"
         to={`/workloads?kind=${encodeURIComponent(kind)}`}
       >
-        ← Back to workloads
+        ← Back to job groups
       </Link>
       <PageHeader
         eyebrow={sourceLabel(bootstrap.sources, deploymentId, namespaceId)}
@@ -232,30 +239,30 @@ export function WorkloadDetailPage() {
       )}
       <Completeness meta={result.data?.meta} />
       {!detail && result.loading ? (
-        <Spinner label="Loading workload" />
+        <Spinner label="Loading job group" />
       ) : (
         detail &&
         w && (
           <>
             <div className="metric-grid workload-metrics">
               <div className="metric-card purple">
-                <span>Total child jobs</span>
+                <span>Total jobs in group</span>
                 <strong>{count(w.totalChildren)}</strong>
                 <small>
-                  Source summary as of{" "}
+                  Reported by Control at{" "}
                   {timestamp(w.asOf, bootstrap.preferences.timezone)}
                 </small>
               </div>
               {Object.entries(w.counts).map(([key, value]) => (
                 <div className="metric-card" key={key}>
-                  <span>{title(key)}</span>
+                  <span>{jobStatus(key)}</span>
                   <strong>{count(value)}</strong>
                 </div>
               ))}
             </div>
             <p className="panel-note">
-              Group counts follow Control's summary semantics: active excludes
-              accepted and terminal child jobs.
+              In these group totals, Active excludes jobs that are only
+              submitted and jobs that have finished.
             </p>
             <section className="panel">
               <dl className="facts compact">
@@ -281,12 +288,12 @@ export function WorkloadDetailPage() {
                 )}
                 {w.unsatisfiedPolicy && (
                   <div>
-                    <dt>Unsatisfied dependency policy</dt>
+                    <dt>When dependencies cannot be met</dt>
                     <dd>{w.unsatisfiedPolicy}</dd>
                   </div>
                 )}
                 <div>
-                  <dt>Source revision</dt>
+                  <dt>Record version</dt>
                   <dd>{w.revision}</dd>
                 </div>
                 {kind === "array" && (
@@ -314,12 +321,12 @@ export function WorkloadDetailPage() {
                       ? "Graph nodes"
                       : kind === "array"
                         ? "Array tasks"
-                        : "Child jobs"}
+                        : "Jobs in this collection"}
                   </h2>
                   <p>
                     {kind === "graph"
-                      ? "Accessible source-reported node list. Readiness is evaluated by Control."
-                      : "Each row keeps its original Jobman job identity."}
+                      ? "Each node is a job. Control reports whether its dependencies allow it to run."
+                      : "Open a job to view its details and logs."}
                   </p>
                 </div>
               </div>
@@ -327,12 +334,10 @@ export function WorkloadDetailPage() {
                 <table>
                   <thead>
                     <tr>
-                      <th>
-                        {kind === "array" ? "Task index" : "Node / child"}
-                      </th>
+                      <th>{kind === "array" ? "Task index" : "Node / job"}</th>
                       <th>Job</th>
-                      <th>Phase / outcome</th>
-                      <th>Readiness / disposition</th>
+                      <th>Status / result</th>
+                      <th>Ready to run / dependency decision</th>
                       {kind === "graph" && <th>Dependencies</th>}
                     </tr>
                   </thead>
@@ -365,7 +370,10 @@ export function WorkloadDetailPage() {
                           </Link>
                         </td>
                         <td>
-                          <Status value={node.job.phase} />
+                          <Status
+                            value={node.job.phase}
+                            label={jobStatus(node.job.phase)}
+                          />
                           {node.job.outcome && (
                             <span className="secondary-line">
                               {title(node.job.outcome)}

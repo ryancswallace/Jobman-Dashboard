@@ -1,3 +1,4 @@
+import { jobStatus } from "../lib/format";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { NamespaceRef } from "../lib/models";
@@ -70,7 +71,7 @@ function Inspector({
           )}
           <Completeness meta={neighborhood.data?.meta} />
           {neighborhood.loading && !neighborhood.data && (
-            <Spinner label="Loading graph neighborhood" />
+            <Spinner label="Loading connected jobs" />
           )}
           {neighborhood.data && (
             <>
@@ -81,16 +82,17 @@ function Inspector({
                 omittedNodes={neighborhood.data.data.omittedNodes}
                 omittedEdges={neighborhood.data.data.omittedEdges}
               />
-              <section className="panel" aria-label="Neighborhood node list">
+              <section className="panel" aria-label="Connected job list">
                 <div className="panel-heading">
                   <div>
-                    <h2>Neighborhood nodes</h2>
+                    <h2>Connected jobs</h2>
                     <p>
                       Returned {neighborhood.data.data.nodes.length} of{" "}
                       {count(neighborhood.data.data.totalNodes)} nodes and{" "}
                       {neighborhood.data.data.edges.length} of{" "}
-                      {count(neighborhood.data.data.totalEdges)} edges. This is
-                      a local neighborhood, not the entire graph.
+                      {count(neighborhood.data.data.totalEdges)} dependency
+                      links. This shows the selected job and nearby jobs, not
+                      the entire graph.
                     </p>
                   </div>
                 </div>
@@ -100,7 +102,7 @@ function Inspector({
                       <tr>
                         <th>Node</th>
                         <th>Job</th>
-                        <th>Source phase</th>
+                        <th>Job status</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -123,7 +125,10 @@ function Inspector({
                             </Link>
                           </td>
                           <td>
-                            <Status value={node.job.phase} />
+                            <Status
+                              value={node.job.phase}
+                              label={jobStatus(node.job.phase)}
+                            />
                           </td>
                         </tr>
                       ))}
@@ -131,12 +136,13 @@ function Inspector({
                   </table>
                 </div>
                 <p className="panel-note">
-                  Source observation:{" "}
+                  Last reported by Control:{" "}
                   {timestamp(
                     neighborhood.data.meta.contributions[0]?.observedAt,
                     bootstrap.preferences.timezone,
                   )}
-                  . Readiness and predicates are reported by Control.
+                  . Control reports whether each dependency condition has been
+                  met.
                 </p>
               </section>
             </>
@@ -144,8 +150,8 @@ function Inspector({
         </>
       ) : (
         <p className="notice info">
-          Select a graph node to inspect its bounded neighborhood. The
-          dependency list below includes the whole graph through pagination.
+          Select a node (job) to see its nearby dependencies. Use the list below
+          to browse dependencies across the entire graph.
         </p>
       )}
       <details className="dependency-disclosure" open={!!selected}>
@@ -161,8 +167,8 @@ function Inspector({
                 {selected ? "Selected node dependencies" : "Graph dependencies"}
               </h2>
               <p>
-                {selected ? selected : "All graph nodes"} · Source-reported
-                predicates and states
+                {selected ? selected : "All graph nodes"} · Dependency
+                conditions and their current status
               </p>
             </div>
             <button
@@ -190,8 +196,8 @@ function Inspector({
                     setCursor(undefined);
                   }}
                 >
-                  <option value="incoming">Incoming prerequisites</option>
-                  <option value="outgoing">Outgoing dependents</option>
+                  <option value="incoming">Jobs this job depends on</option>
+                  <option value="outgoing">Jobs that depend on this job</option>
                   <option value="">Both directions</option>
                 </select>
               </label>
@@ -221,9 +227,9 @@ function Inspector({
                         <tr>
                           <th>Upstream node</th>
                           <th>Downstream node</th>
-                          <th>Predicate</th>
-                          <th>Upstream phase / outcome</th>
-                          <th>Predicate state</th>
+                          <th>Required condition</th>
+                          <th>Upstream status / result</th>
+                          <th>Condition status</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -261,7 +267,7 @@ function Inspector({
                               </Link>
                             </td>
                             <td>
-                              {edge.predicate}
+                              {title(edge.predicate)}
                               {edge.outcomes.length > 0 && (
                                 <span className="secondary-line">
                                   Outcomes: {edge.outcomes.join(", ")}
@@ -269,7 +275,7 @@ function Inspector({
                               )}
                             </td>
                             <td>
-                              {title(edge.upstreamPhase)}
+                              {jobStatus(edge.upstreamPhase)}
                               {edge.upstreamOutcome && (
                                 <span className="secondary-line">
                                   {title(edge.upstreamOutcome)}
@@ -284,7 +290,7 @@ function Inspector({
                   </div>
                 ) : (
                   <Empty title="No dependencies match this view">
-                    Control reported no dependency edges for this selection.
+                    Control reported no dependency links for this selection.
                   </Empty>
                 )}
                 <div className="pagination">

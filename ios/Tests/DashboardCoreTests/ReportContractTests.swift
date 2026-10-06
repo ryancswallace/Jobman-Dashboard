@@ -76,7 +76,7 @@ private func reportFixture() throws -> DiagnosisReport {
 @Test func reportSourceChangesAndMissingRedactionHaveActionableErrors() {
     #expect(DashboardError.from(code: "snapshot_changed", status: 409) == .snapshotChanged)
     #expect(DashboardError.from(code: "redaction_unavailable", status: 503) == .redactionUnavailable)
-    #expect(DashboardError.redactionUnavailable.localizedDescription.contains("metadata report"))
+    #expect(DashboardError.redactionUnavailable.localizedDescription.contains("report with job details only"))
 }
 
 @Test func reportRetryKeysDistinguishUncertainTransportFromDefinitiveRejection() {

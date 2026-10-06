@@ -83,7 +83,7 @@ func (e *Engine) discover(ctx context.Context, a Actor) map[string]discoveryResu
 			var d Discovery
 			err := e.call(ctx, id, func(c context.Context) error { var err error; d, err = src.Discover(c, a); return err })
 			if err == nil && (d.Deployment.ID != id || d.InstanceID == "" || d.RecoveryEpoch == "" || d.ServiceTime.IsZero()) {
-				err = failure("unsupported_contract", "The source is missing required identity or clock metadata.")
+				err = failure("unsupported_contract", "Jobman Control returned incomplete server information. Ask your administrator to check the connection and server version.")
 			}
 			mu.Lock()
 			result[id] = discoveryResult{d, err}
@@ -244,13 +244,13 @@ func (e *Engine) fill(ctx context.Context, a Actor, q Query, b *sourceBuffer) er
 		return err
 	}
 	if len(page.Items) > q.Limit || page.AsOf.IsZero() || (len(page.Items) == 0 && page.NextCursor != "") || (page.NextCursor != "" && page.NextCursor == b.Cursor) {
-		return failure("unsupported_contract", "The source returned an invalid bounded page.")
+		return failure("unsupported_contract", "Jobman Control returned an invalid list of jobs. Try again or contact your administrator.")
 	}
 	last := b.LastRead
 	for i := range page.Items {
 		j := &page.Items[i]
 		if j.Scope != b.Scope || j.ID == "" || j.CreatedAt.After(b.Cutoff) || (last != nil && compareJobs(*last, *j) >= 0) {
-			return failure("unsupported_contract", "The source returned invalid scope or ordering.")
+			return failure("unsupported_contract", "Jobman Control returned inconsistent job information. Try again or contact your administrator.")
 		}
 		last = j
 	}
@@ -278,7 +278,7 @@ func statusFor(s api.Scope, now time.Time, err error) api.SourceStatus {
 	if code == "unsupported_contract" {
 		status = "unsupported"
 	}
-	return api.SourceStatus{Scope: s, Status: status, FetchedAt: now, Message: "This source contribution is unavailable. Refresh to retry."}
+	return api.SourceStatus{Scope: s, Status: status, FetchedAt: now, Message: "Data from this deployment or namespace is unavailable. Refresh to try again."}
 }
 
 func (e *Engine) Jobs(ctx context.Context, a Actor, q Query, cursor string) (api.Page[api.Job], error) {
@@ -618,7 +618,7 @@ func (e *Engine) Overview(ctx context.Context, a Actor, q Query, w api.Window) (
 // Summary counts are JSON safe integers. Reject malformed or overflowing source
 // contributions as unavailable; they cannot corrupt otherwise useful totals.
 func addCounts(total, c Counts) (Counts, error) {
-	invalid := failure("unsupported_contract", "The source returned invalid summary counts.")
+	invalid := failure("unsupported_contract", "Jobman Control returned invalid job totals. Try again or contact your administrator.")
 	if c.AsOf.IsZero() || c.AwaitingExecution > c.Active || c.Running > c.Active || c.EvidenceAttention > c.Active {
 		return total, invalid
 	}

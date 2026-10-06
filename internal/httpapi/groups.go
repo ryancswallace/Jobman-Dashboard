@@ -33,7 +33,7 @@ func groupQuery(r *http.Request, names ...string) (url.Values, error) {
 	return q, nil
 }
 func invalidGroupQuery() error {
-	return &api.Error{Code: "invalid_request", Message: "The workload query or page bounds are invalid."}
+	return &api.Error{Code: "invalid_request", Message: "The job group request is invalid. Refresh the list and check your filters."}
 }
 func groupLimit(q url.Values, name string, fallback, max int) (int, error) {
 	if !q.Has(name) {

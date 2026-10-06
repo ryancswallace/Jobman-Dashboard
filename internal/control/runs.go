@@ -41,7 +41,7 @@ func (c *Client) Runs(ctx context.Context, a monitoring.Actor, q monitoring.RunQ
 		return out, err
 	}
 	if !slices.Contains(d.features, "bounded-run-catalog") {
-		return out, &api.Error{Code: "unsupported_contract", Message: "This source does not support bounded run monitoring."}
+		return out, &api.Error{Code: "unsupported_contract", Message: "This Jobman Control deployment does not support run history. Ask your administrator about upgrading it."}
 	}
 	params := url.Values{"limit": {strconv.Itoa(q.Limit)}}
 	if q.Cursor != "" {
@@ -86,7 +86,7 @@ func (c *Client) Run(ctx context.Context, a monitoring.Actor, scope api.Scope, j
 		return out, err
 	}
 	if !slices.Contains(d.features, "bounded-run-catalog") {
-		return out, &api.Error{Code: "unsupported_contract", Message: "This source does not support bounded run monitoring."}
+		return out, &api.Error{Code: "unsupported_contract", Message: "This Jobman Control deployment does not support run history. Ask your administrator about upgrading it."}
 	}
 	var v runResponse
 	if err = c.get(ctx, a, "jobs.read", ns.ID, "/v1/namespaces/"+ns.Name+"/jobs/"+jobID+"/runs/"+runID, nil, &v); err != nil {

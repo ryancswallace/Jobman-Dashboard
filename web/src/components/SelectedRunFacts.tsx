@@ -1,5 +1,5 @@
 import type * as Wire from "../../../contracts/typescript/dashboard.generated";
-import { timestamp, title } from "../lib/format";
+import { jobStatus, statusConfidence, timestamp, title } from "../lib/format";
 
 export function SelectedRunFacts({
   run,
@@ -11,25 +11,28 @@ export function SelectedRunFacts({
   return (
     <section className="panel wide" aria-labelledby="selected-run-heading">
       <div className="panel-heading">
-        <h2 id="selected-run-heading">Selected run facts · run {run.number}</h2>
+        <h2 id="selected-run-heading">
+          Selected run details · run {run.number}
+        </h2>
       </div>
       <p className="panel-note">
-        These facts describe the selected run. Current job status, timeline and
-        scheduler observations below remain separate. Run record timestamps are
-        not execution start or completion times.
+        These facts describe the selected run. The status, timeline, and
+        scheduler details below describe the current job, which may have moved
+        on to a later run. Record dates show when this run’s information was
+        saved, not when it started or finished.
       </p>
       <dl className="facts">
         {[
           ["Run ID", run.id],
-          ["Run phase", title(run.phase)],
-          ["Run outcome", title(run.outcome)],
-          ["Run desired state", title(run.desiredState)],
+          ["Run status", jobStatus(run.phase)],
+          ["Run final result", title(run.outcome)],
+          ["Run requested state", title(run.desiredState)],
           ["Execution ID", run.executionId],
           ["Execution phase", title(run.executionPhase)],
-          ["Observation confidence", title(run.confidence)],
+          ["Status confidence", statusConfidence(run.confidence)],
           ["Target ID", run.targetId],
-          ["Target generation ID", run.targetGenerationId],
-          ["Backend", run.backend],
+          ["Target configuration ID", run.targetGenerationId],
+          ["Execution system", run.backend],
           ["Run record created", timestamp(run.createdAt, timezone)],
           ["Run record updated", timestamp(run.updatedAt, timezone)],
         ].map(([label, value]) => (

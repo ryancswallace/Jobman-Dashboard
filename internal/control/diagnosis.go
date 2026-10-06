@@ -27,7 +27,7 @@ func (c *Client) DiagnosticSnapshot(ctx context.Context, a monitoring.Actor, sel
 		return out, err
 	}
 	if !slices.Contains(d.features, "shared-diagnostic-snapshots") {
-		return out, &api.Error{Code: "unsupported_contract", Message: "This source does not support shared diagnostic snapshots."}
+		return out, &api.Error{Code: "unsupported_contract", Message: "This Jobman Control deployment does not support diagnosis reports. Ask your administrator about upgrading it."}
 	}
 	params := url.Values{"deploymentId": {selection.DeploymentID}, "controlInstanceId": {selection.ControlInstanceID}, "namespaceId": {selection.NamespaceID}}
 	if selection.RunID != "" {

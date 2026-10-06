@@ -40,20 +40,20 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(app.buttons["selectRun-1"].waitForExistence(timeout: 10)); app.buttons["selectRun-1"].tap()
         let selected = app.staticTexts["Selected run number, 1"]; reveal(selected, app: app)
         XCTAssertTrue(app.staticTexts["93000000-0000-4000-8000-000000000001"].exists)
-        XCTAssertTrue(app.staticTexts["Run phase, terminal"].exists)
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Current job facts above remain separate")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts["Run status, Finished"].exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "The current job details above are unchanged")).firstMatch.exists)
         capture("Selected historical run facts remain separate", app: app)
         app.navigationBars.buttons.element(boundBy: 0).tap()
         let other = app.staticTexts["Synthetic index build"]; reveal(other, app: app); other.tap()
         let unavailable = app.staticTexts["executionUnavailableReason"]; reveal(unavailable, app: app)
-        XCTAssertEqual(unavailable.label, "unsupported_contract")
+        XCTAssertEqual(unavailable.label, "This deployment does not support showing the submitted command.")
         XCTAssertFalse(app.buttons["viewSubmittedCommand"].exists)
         capture("Unavailable submitted specification disclosed", app: app)
     }
 
     func testCurrentPageRefreshIncludesAdditionsAndRemovesMissingRows() {
         let app = fixtureApp(extra: ["--dashboard-refresh-fixtures", "--dashboard-manual-refresh-fixtures"])
-        app.tabBars.buttons["Workloads"].tap()
+        app.tabBars.buttons["Job groups"].tap()
         XCTAssertTrue(app.staticTexts["Refresh row A"].waitForExistence(timeout: 10))
         let refresh = app.buttons["Refresh current page"]
         reveal(refresh, app: app); refresh.tap()
@@ -88,8 +88,8 @@ final class DashboardUITests: XCTestCase {
         XCUIDevice.shared.press(.home); app.activate()
         XCTAssertTrue(app.staticTexts["Manual log read 2\n"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["Manual log read 1\n"].exists)
-        XCTAssertTrue(app.staticTexts["Last successful fetch"].exists)
-        XCTAssertTrue(app.staticTexts["Source capture"].exists)
+        XCTAssertTrue(app.staticTexts["Last refreshed"].exists)
+        XCTAssertTrue(app.staticTexts["Output recorded at"].exists)
         capture("Manual refresh foreground log recheck", app: app)
     }
 
@@ -102,7 +102,7 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(input.waitForExistence(timeout: 10))
         input.tap(); input.typeText("https://foreign.example/deployments/east/namespaces/research/jobs/job-042")
         app.buttons["Open Dashboard link"].tap()
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "without a query, fragment or sign-in token")).firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Remove anything starting with ? or #")).firstMatch.waitForExistence(timeout: 5))
         app.buttons["Clear link"].tap(); input.tap()
         input.typeText("https://dashboard-fixtures.example.test/deployments/east/namespaces/research/jobs/job-042")
         app.buttons["Open Dashboard link"].tap()
@@ -116,10 +116,10 @@ final class DashboardUITests: XCTestCase {
         let next = app.buttons["Next page"]; reveal(next, app: app); next.tap()
         app.tabBars.buttons["Overview"].tap()
         app.buttons["overviewWindow"].tap(); app.buttons["7 days"].tap()
-        XCTAssertTrue(app.staticTexts["Loading authorized activity…"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Loading activity…"].waitForExistence(timeout: 3))
         // The selected window is read after the in-flight page completes even
         // with background polling disabled; no extra user refresh is required.
-        XCTAssertTrue(app.staticTexts["Recorded job state"].waitForExistence(timeout: 40))
+        XCTAssertTrue(app.staticTexts["Recorded job status"].waitForExistence(timeout: 40))
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "Active jobs", "168")).firstMatch.exists)
         capture("Queued manual overview window refresh", app: app)
     }
@@ -130,7 +130,7 @@ final class DashboardUITests: XCTestCase {
         let next = app.buttons["Next page"]; reveal(next, app: app); next.tap()
         XCTAssertTrue(app.staticTexts["Loading jobs…"].waitForExistence(timeout: 10))
         app.tabBars.buttons["Overview"].tap(); app.buttons["Refresh"].tap()
-        XCTAssertTrue(app.staticTexts["Recorded job state"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Recorded job status"].waitForExistence(timeout: 10))
         app.tabBars.buttons["Jobs"].tap()
         let current = app.staticTexts["Authorized refreshed job"]; reveal(current, app: app)
         XCTAssertTrue(current.exists)
@@ -152,12 +152,12 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Selected run 9007199254740993")).firstMatch.exists)
         capture("Selected exact run log", app: app)
         app.navigationBars.buttons.element(boundBy: 0).tap()
-        let artifacts = app.buttons["Artifact metadata"]; reveal(artifacts, app: app); artifacts.tap()
+        let artifacts = app.buttons["Output files"]; reveal(artifacts, app: app); artifacts.tap()
         app.buttons["synthetic-summary.txt"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["artifactExecutionID"].label.contains("94000000-0000-4000-8000-000000000002"))
         app.navigationBars.buttons.element(boundBy: 0).tap()
         let diagnosis = app.buttons["Diagnosis"]; reveal(diagnosis, app: app); diagnosis.tap()
-        let field = app.textFields["Optional run UUID (blank = selected history)"]
+        let field = app.textFields["Run ID (optional)"]
         XCTAssertTrue(field.waitForExistence(timeout: 10))
         XCTAssertEqual(field.value as? String, "93000000-0000-4000-8000-000000000002")
         capture("Diagnosis selected run prefill", app: app)
@@ -168,32 +168,35 @@ final class DashboardUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.staticTexts["Connect to your organization"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["fixtureBanner"].exists)
-        XCTAssertTrue(app.buttons["Sign in with AD FS"].exists)
+        XCTAssertTrue(app.buttons["Sign in with your organization"].exists)
         capture("Connection", app: app)
     }
 
     func testNativeMonitoringTabsUseExplicitSyntheticFixtureMode() {
         let app = fixtureApp()
-        XCTAssertTrue(app.staticTexts["Recorded job state"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Recorded job status"].waitForExistence(timeout: 10))
         capture("Synthetic overview", app: app)
         app.tabBars.buttons["Inbox"].tap()
         XCTAssertTrue(app.staticTexts["Inbox"].firstMatch.waitForExistence(timeout: 5))
         app.tabBars.buttons["More"].tap()
         app.buttons["Settings"].tap()
         XCTAssertTrue(app.staticTexts["Synthetic researcher"].waitForExistence(timeout: 5))
+        let help = app.staticTexts["Manual only stops routine data refreshes. Access checks continue, and active log following or a report being prepared may still refresh."]
+        reveal(help, app: app); XCTAssertTrue(help.exists)
+        XCTAssertTrue(app.buttons["Save settings"].exists)
         capture("Synthetic settings", app: app)
     }
 
     func testGraphNeighborhoodSelectionAndDirectionalDependencyPages() {
         let app = fixtureApp()
         openWorkload("Graphs", name: "Synthetic graph", app: app)
-        let explore = app.buttons["Explore graph neighborhood"]
+        let explore = app.buttons["Explore connected jobs"]
         reveal(explore, app: app); explore.tap()
         XCTAssertTrue(app.staticTexts["graphCenter"].waitForExistence(timeout: 10))
         XCTAssertEqual(app.staticTexts["graphCenter"].label, "node-0")
         let diagram = app.switches["Show diagram"]
         reveal(diagram, app: app)
-        XCTAssertTrue(app.staticTexts["graphOmissions"].label.contains("2 nodes, 2 edges"))
+        XCTAssertTrue(app.staticTexts["graphOmissions"].label.contains("2 jobs, 2 dependencies"))
         capture("Bounded native graph", app: app)
         diagram.tap()
         let center = app.buttons["center-node-1"]
@@ -203,7 +206,7 @@ final class DashboardUITests: XCTestCase {
         let dependencies = app.buttons["Browse dependencies"]
         reveal(dependencies, app: app); dependencies.tap()
         XCTAssertTrue(app.staticTexts["edgePageTotal"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["edgePageTotal"].label.contains("2 matching edges"))
+        XCTAssertTrue(app.staticTexts["edgePageTotal"].label.contains("2 matching dependencies"))
         XCTAssertTrue(app.buttons["stage-0 → stage-1"].exists)
         app.buttons["Next dependency page"].tap()
         XCTAssertTrue(app.buttons["stage-2 → stage-1"].waitForExistence(timeout: 10))
@@ -214,11 +217,11 @@ final class DashboardUITests: XCTestCase {
         app.buttons["Next dependency page"].tap()
         XCTAssertTrue(app.buttons["stage-1 → stage-4"].waitForExistence(timeout: 10))
         app.buttons["stage-1 → stage-4"].tap()
-        XCTAssertTrue(app.staticTexts["Predicate, outcome_in"].exists)
+        XCTAssertTrue(app.staticTexts["Dependency condition, outcome_in"].exists)
         capture("Paged outgoing dependencies", app: app)
         app.buttons["Both"].tap()
         XCTAssertTrue(app.buttons["stage-0 → stage-1"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["edgePageTotal"].label.contains("4 matching edges"))
+        XCTAssertTrue(app.staticTexts["edgePageTotal"].label.contains("4 matching dependencies"))
     }
 
     func testArrayPolicyExactTaskIndexAndChildPaging() {
@@ -234,7 +237,7 @@ final class DashboardUITests: XCTestCase {
         reveal(index, app: app)
         XCTAssertTrue(index.label.contains("9007199254740993"))
         capture("Exact Slurm task index", app: app)
-        let next = app.buttons["Next child page"]
+        let next = app.buttons["Next jobs page"]
         reveal(next, app: app); next.tap()
         XCTAssertTrue(app.buttons["Task 6 · node-3"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["Task 9007199254740993 · node-1"].exists)
@@ -245,7 +248,7 @@ final class DashboardUITests: XCTestCase {
         app.tabBars.buttons["Jobs"].tap()
         let job = app.staticTexts["Synthetic alignment run"]
         XCTAssertTrue(job.waitForExistence(timeout: 10)); job.tap()
-        let artifacts = app.buttons["Artifact metadata"]
+        let artifacts = app.buttons["Output files"]
         reveal(artifacts, app: app); artifacts.tap()
         let artifact = app.buttons["synthetic-summary.txt"]
         XCTAssertTrue(artifact.waitForExistence(timeout: 10)); artifact.tap()
@@ -254,21 +257,21 @@ final class DashboardUITests: XCTestCase {
         let availability = app.descendants(matching: .any)["artifactAvailability"]
         reveal(availability, app: app)
         XCTAssertTrue(availability.label.contains("metadata_only"))
-        XCTAssertTrue(app.staticTexts["File bytes have not been verified. Size and checksum are published metadata."].exists)
+        XCTAssertTrue(app.staticTexts["The size and checksum were reported by the job. Dashboard has not checked the file contents."].exists)
         capture("Artifact run provenance", app: app)
         app.navigationBars.buttons.element(boundBy: 0).tap()
         let logs = app.buttons["Logs"]
         reveal(logs, app: app); logs.tap()
         let loadedText = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Synthetic stdout log fixture")).firstMatch
         XCTAssertTrue(loadedText.waitForExistence(timeout: 10))
-        app.buttons["Read next"].tap()
+        app.buttons["Load next part"].tap()
         let expired = app.staticTexts["This page has expired. Refresh to start a new list."]
         XCTAssertTrue(expired.waitForExistence(timeout: 10))
-        XCTAssertFalse(app.buttons["Read next"].isEnabled)
+        XCTAssertFalse(app.buttons["Load next part"].isEnabled)
         app.buttons["refreshLog"].tap()
         XCTAssertTrue(expired.waitForNonExistence(timeout: 10))
         XCTAssertTrue(loadedText.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["Read next"].isEnabled)
+        XCTAssertTrue(app.buttons["Load next part"].isEnabled)
         XCTAssertEqual(loadedText.label.components(separatedBy: "Synthetic stdout log fixture").count - 1, 1)
         capture("Log refresh after cursor expiry", app: app)
     }
@@ -296,7 +299,7 @@ final class DashboardUITests: XCTestCase {
         app.buttons["Next partition page"].tap()
         XCTAssertTrue(app.staticTexts["gpu"].waitForExistence(timeout: 10))
         app.buttons["Next partition page"].tap()
-        let changed = app.staticTexts["The target generation changed. Refresh the target before browsing partitions."]
+        let changed = app.staticTexts["The target configuration changed. Refresh the target before browsing its partitions."]
         XCTAssertTrue(changed.waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["Next partition page"].exists)
         capture("Target generation change requires refresh", app: app)
@@ -322,7 +325,7 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["reportState"].waitForExistence(timeout: 10))
         let outdated = app.staticTexts["reportOutdated"]
         reveal(outdated, app: app)
-        XCTAssertTrue(outdated.label.contains("recorded snapshot"))
+        XCTAssertTrue(outdated.label.contains("earlier recorded information"))
         XCUIDevice.shared.press(.home)
         app.activate()
         XCTAssertTrue(app.descendants(matching: .any)["reportState"].waitForExistence(timeout: 10))
@@ -359,18 +362,18 @@ final class DashboardUITests: XCTestCase {
         let name = app.textFields["ruleName"]
         XCTAssertTrue(name.waitForExistence(timeout: 10)); name.tap(); name.typeText("Every future outcome"); app.buttons["ruleKeyboardDone"].tap()
         XCTAssertFalse(app.buttons["saveRule"].isEnabled)
-        app.buttons["ruleScope"].tap(); app.buttons["Namespace jobs"].tap()
-        XCTAssertTrue(app.staticTexts["Follow every member’s eligible jobs in the selected namespaces."].exists)
+        app.buttons["ruleScope"].tap(); app.buttons["All jobs in selected namespaces"].tap()
+        XCTAssertTrue(app.staticTexts["Follow all eligible jobs in the selected namespaces, regardless of who submitted them."].exists)
         tapRuleSwitch(app.switches["ruleScope-10000000-0000-4000-8000-000000000001-20000000-0000-4000-8000-000000000001"], app: app)
-        let every = app.switches["Every terminal outcome"]
+        let every = app.switches["Every final result"]
         tapRuleSwitch(every, app: app)
-        XCTAssertTrue(app.staticTexts["Includes success, unsuccessful outcomes, cancellation, and future unknown terminal outcomes."].exists)
+        XCTAssertTrue(app.staticTexts["Includes success, failure, timeout, abort, lost execution, cancellation and any new final result types."].exists)
         capture("Native explicit alert rule editor", app: app)
         app.buttons["saveRule"].tap()
         let created = app.staticTexts["Every future outcome"]
         XCTAssertTrue(created.waitForExistence(timeout: 10)); created.tap()
         XCTAssertTrue(app.staticTexts["Status: pending"].waitForExistence(timeout: 10))
-        app.buttons["Revalidate selected scopes"].tap()
+        app.buttons["Check access and resume"].tap()
         XCTAssertTrue(app.staticTexts["Status: active"].waitForExistence(timeout: 10))
         capture("Native rule activation status", app: app)
         let delete = app.buttons["Delete alert rule"]
@@ -397,7 +400,7 @@ final class DashboardUITests: XCTestCase {
         reveal(app.buttons["editRule"], app: app); app.buttons["editRule"].tap()
         XCTAssertTrue(app.textFields["ruleName"].waitForExistence(timeout: 10))
         app.buttons["saveRule"].tap()
-        let reload = app.buttons["Discard edits and reload"]
+        let reload = app.buttons["Discard edits and refresh"]
         XCTAssertTrue(reload.waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["saveRule"].isEnabled)
         capture("Native rule revision conflict", app: app)
@@ -515,11 +518,11 @@ final class DashboardUITests: XCTestCase {
     func testDeviceAttachmentIsExplicitAndRemovalCannotAutoReattach() {
         let app = deviceFixtureApp()
         XCTAssertTrue(app.buttons["device-bind"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.staticTexts["Attached to the signed-in account."].exists)
+        XCTAssertFalse(app.staticTexts["Connected to this account for notifications."].exists)
         app.buttons["device-bind"].tap()
         XCTAssertEqual(app.switches["Enable background alerts"].value as? String, "0")
-        app.buttons["Continue"].tap(); app.buttons["Confirm attachment"].tap()
-        XCTAssertTrue(app.staticTexts["Offline sign-out protection confirmed"].waitForExistence(timeout: 10))
+        app.buttons["Continue"].tap(); app.buttons["Confirm connection"].tap()
+        XCTAssertTrue(app.staticTexts["Ready to stop notifications after offline sign-out"].waitForExistence(timeout: 10))
         capture("Explicit native device attachment", app: app)
         let current = app.buttons["device-row-90000000-0000-4000-8000-000000000001"]
         reveal(current, app: app); current.tap()
@@ -546,7 +549,7 @@ final class DashboardUITests: XCTestCase {
         capture("Explicit account switch required", app: app)
         app.buttons["device-switch"].tap(); app.buttons["Continue"].tap()
         XCTAssertTrue(app.buttons["Confirm switch"].waitForExistence(timeout: 5)); app.buttons["Confirm switch"].tap()
-        XCTAssertTrue(app.staticTexts["Offline sign-out protection confirmed"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Ready to stop notifications after offline sign-out"].waitForExistence(timeout: 10))
         let remote = app.buttons["device-row-90000000-0000-4000-8000-000000000002"]
         reveal(remote, app: app); remote.tap()
         XCTAssertEqual(app.switches["Enable background alerts"].value as? String, "0")
@@ -558,11 +561,11 @@ final class DashboardUITests: XCTestCase {
     func testExistingDeviceRefreshPreservesMutedDisabledPreferencesAndUpgradeIsExplicit() {
         let app = deviceFixtureApp(extra: ["--dashboard-device-existing"])
         XCTAssertTrue(app.buttons["Complete secure setup"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.staticTexts["Offline sign-out protection confirmed"].exists)
+        XCTAssertFalse(app.staticTexts["Ready to stop notifications after offline sign-out"].exists)
         app.buttons["Complete secure setup"].tap()
-        XCTAssertTrue(app.staticTexts["Offline sign-out protection confirmed"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Ready to stop notifications after offline sign-out"].waitForExistence(timeout: 10))
         app.buttons["devices-reload"].tap()
-        XCTAssertTrue(app.staticTexts["Offline sign-out protection confirmed"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Ready to stop notifications after offline sign-out"].waitForExistence(timeout: 10))
         let current = app.buttons["device-row-90000000-0000-4000-8000-000000000001"]
         reveal(current, app: app); current.tap()
         XCTAssertEqual(app.switches["Enable background alerts"].value as? String, "0")
@@ -572,29 +575,29 @@ final class DashboardUITests: XCTestCase {
     func testBackgroundDuringReservationCannotAdmitLateBinding() {
         let app = deviceFixtureApp(extra: ["--dashboard-device-delayed-reservation"])
         XCTAssertTrue(app.buttons["device-bind"].waitForExistence(timeout: 10))
-        app.buttons["device-bind"].tap(); app.buttons["Continue"].tap(); app.buttons["Confirm attachment"].tap()
+        app.buttons["device-bind"].tap(); app.buttons["Continue"].tap(); app.buttons["Confirm connection"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["device-saving"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["device-editor-close"].isEnabled)
         XCUIDevice.shared.press(.home)
         app.activate()
         XCTAssertTrue(app.staticTexts["fixtureBanner"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["device-bind"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.staticTexts["Attached to the signed-in account."].exists)
+        XCTAssertFalse(app.staticTexts["Connected to this account for notifications."].exists)
         capture("Canceled reservation cannot attach", app: app)
     }
 
     func testOfflineSignOutPurgesAccountAndReportsQueuedDeviceRevocation() {
         let app = deviceFixtureApp(extra: ["--dashboard-device-offline-revoke"])
         XCTAssertTrue(app.buttons["device-bind"].waitForExistence(timeout: 10))
-        app.buttons["device-bind"].tap(); app.buttons["Continue"].tap(); app.buttons["Confirm attachment"].tap()
-        XCTAssertTrue(app.staticTexts["Offline sign-out protection confirmed"].waitForExistence(timeout: 10))
+        app.buttons["device-bind"].tap(); app.buttons["Continue"].tap(); app.buttons["Confirm connection"].tap()
+        XCTAssertTrue(app.staticTexts["Ready to stop notifications after offline sign-out"].waitForExistence(timeout: 10))
         app.navigationBars.buttons.element(boundBy: 0).tap()
         let signOut = app.buttons["Sign out"]
         reveal(signOut, app: app); signOut.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.5)).tap()
         XCTAssertTrue(app.staticTexts["Connect to your organization"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["Synthetic researcher"].exists)
-        XCTAssertFalse(app.staticTexts["Attached to the signed-in account."].exists)
-        XCTAssertTrue(app.staticTexts["Signed out on this phone. Device alert unbinding will finish when the private service is reachable."].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Connected to this account for notifications."].exists)
+        XCTAssertTrue(app.staticTexts["Signed out on this phone. The saved request to stop its notifications will finish when Dashboard is reachable."].waitForExistence(timeout: 10))
         capture("Offline sign-out retains only queued revocation", app: app)
     }
 
@@ -604,14 +607,14 @@ final class DashboardUITests: XCTestCase {
         let label = app.textFields["device-label"]
         label.tap(); label.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 6) + "Uncertain attachment")
         app.buttons["device-keyboard-done"].tap()
-        app.buttons["Continue"].tap(); app.buttons["Confirm attachment"].tap()
-        XCTAssertTrue(app.staticTexts["Close this form, reload devices, and review the current state before another change."].waitForExistence(timeout: 10))
+        app.buttons["Continue"].tap(); app.buttons["Confirm connection"].tap()
+        XCTAssertTrue(app.staticTexts["Close this form, refresh devices, and review their current settings before another change."].waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["Continue"].isEnabled)
         capture("Uncertain attachment requires explicit review", app: app)
         app.buttons["device-editor-close"].tap()
         app.buttons["devices-reload"].tap()
         XCTAssertTrue(app.buttons["device-bind"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.staticTexts["Attached to the signed-in account."].exists)
+        XCTAssertFalse(app.staticTexts["Connected to this account for notifications."].exists)
     }
 
     func testInboxHistoryPagingOriginalMatchesReadAndExplicitEmptySelection() {
@@ -649,13 +652,13 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["No updates in this selection."].waitForExistence(timeout: 10))
         XCTAssertTrue(count.label.contains("0")); XCTAssertFalse(app.buttons["Next inbox page"].exists)
         capture("Explicitly empty native inbox scope", app: app)
-        app.buttons["inbox-scope"].coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5)).tap(); app.buttons["All currently authorized namespaces"].tap()
+        app.buttons["inbox-scope"].coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5)).tap(); app.buttons["All namespaces you can access"].tap()
         XCTAssertTrue(count.waitForExistence(timeout: 10)); XCTAssertTrue(count.label.contains("23"))
     }
 
     func testInboxSourceFailureClearsCountAndRequiresExplicitRetry() {
         let app = inboxFixtureApp(extra: ["--dashboard-inbox-unavailable-once"])
-        let unavailable = app.staticTexts["Current access cannot be verified. Try again when directory services recover."]
+        let unavailable = app.staticTexts["Dashboard cannot confirm your access right now. Try again shortly. If it continues, contact your administrator."]
         XCTAssertTrue(unavailable.waitForExistence(timeout: 10))
         let count = app.descendants(matching: .any)["inbox-unread-count"].firstMatch
         XCTAssertFalse(count.exists)
@@ -732,11 +735,11 @@ final class DashboardUITests: XCTestCase {
         return app
     }
     private func openWorkload(_ kind: String, name: String, app: XCUIApplication) {
-        app.tabBars.buttons["Workloads"].tap()
+        app.tabBars.buttons["Job groups"].tap()
         XCTAssertTrue(app.buttons[kind].waitForExistence(timeout: 5)); app.buttons[kind].tap()
         let workload = app.staticTexts[name]
         XCTAssertTrue(workload.waitForExistence(timeout: 10)); workload.tap()
-        XCTAssertTrue(app.staticTexts["Complete source summary"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Whole group summary"].waitForExistence(timeout: 10))
     }
     private func reveal(_ element: XCUIElement, app: XCUIApplication) {
         for _ in 0..<10 { if element.exists && element.isHittable { return }; app.swipeUp() }

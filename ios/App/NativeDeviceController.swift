@@ -154,7 +154,7 @@ struct NativeDeviceContext: Equatable, Sendable {
         defer {
             if !succeeded, let capability {
                 do { try DeviceRevocations.queue(capability); Task { await DeviceRevocations.flush() } }
-                catch { if generation == request { self.error = "Secure unbinding could not be queued. Sign out locally, reconnect, and remove this installation before relying on notification privacy." } }
+                catch { if generation == request { self.error = "The request to stop notifications could not be saved. Sign out on this phone, then reconnect and remove this device to confirm notifications have stopped." } }
             }
             if generation == request { busy = false }
         }

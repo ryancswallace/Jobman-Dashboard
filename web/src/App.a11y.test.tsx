@@ -188,7 +188,7 @@ afterEach(() => vi.unstubAllGlobals());
 it.each([
   ["/", "Overview"],
   ["/jobs", "Jobs"],
-  ["/workloads", "Workloads"],
+  ["/workloads", "Job groups"],
   ["/targets", "Targets"],
   ["/inbox", "Inbox"],
   ["/alerts", "Alert rules"],
@@ -219,12 +219,12 @@ it("audits the open scope picker and alert editor", async () => {
   history.replaceState(null, "", "/alerts");
   render(<App />);
   await screen.findByRole("button", { name: "+ New alert rule" });
-  await userEvent.click(screen.getByText("MONITORING SCOPE"));
+  await userEvent.click(screen.getByText("VIEWING"));
   expect(
-    screen.getByRole("heading", { name: "Choose your scope" }),
+    screen.getByRole("heading", { name: "Choose what to view" }),
   ).toBeVisible();
   await auditAccessibility();
-  await userEvent.click(screen.getByText("MONITORING SCOPE"));
+  await userEvent.click(screen.getByText("VIEWING"));
   await userEvent.click(
     screen.getByRole("button", { name: "+ New alert rule" }),
   );

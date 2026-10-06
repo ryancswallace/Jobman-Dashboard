@@ -166,7 +166,7 @@ func sameChunk(a, b Chunk) bool {
 func serviceError(w http.ResponseWriter, status int, code string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(api.Error{Code: code, Message: "The authorized log read could not be completed."})
+	_ = json.NewEncoder(w).Encode(api.Error{Code: code, Message: "The logs could not be loaded. Try again shortly."})
 }
 func serviceSourceError(w http.ResponseWriter, err error) {
 	var known *api.Error

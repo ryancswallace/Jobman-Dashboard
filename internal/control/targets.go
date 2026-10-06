@@ -87,7 +87,7 @@ func validPartitions(items []api.TargetPartition, last string) bool {
 func (c *Client) targetAuthorize(ctx context.Context, a monitoring.Actor, scope api.Scope) (discovery, api.Namespace, error) {
 	d, n, err := c.authorize(ctx, a, scope, "targets.read")
 	if err == nil && !slices.Contains(d.features, "target-catalogs") {
-		err = &api.Error{Code: "unsupported_contract", Message: "This source does not support bounded target monitoring."}
+		err = &api.Error{Code: "unsupported_contract", Message: "This Jobman Control deployment does not support target details. Ask your administrator about upgrading it."}
 	}
 	return d, n, err
 }

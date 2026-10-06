@@ -134,9 +134,9 @@ func LabWatchdogDenialContract(path string, status int, body []byte) bool {
 		return false
 	}
 	if isLog {
-		return status == http.StatusForbidden && problem.Code == "forbidden" && problem.Message == "This scope is not currently authorized."
+		return status == http.StatusForbidden && problem.Code == "forbidden" && problem.Message == "You do not currently have permission to view this information."
 	}
-	return (isReport || isInbox) && status == http.StatusNotFound && problem.Code == "not_found_or_inaccessible" && problem.Message == "The resource is absent or inaccessible."
+	return (isReport || isInbox) && status == http.StatusNotFound && problem.Code == "not_found_or_inaccessible" && problem.Message == "This item could not be found, or you do not have access to it."
 }
 
 // Only bounded, sanitized HTTP503 can be retried during read recovery. No
@@ -414,7 +414,7 @@ func TestLabWatchdogReadRecovery(t *testing.T) {
 		status, body := 200, `{"ok":true}`
 		if calls == 1 {
 			status = 503
-			body = `{"code":"source_unavailable","message":"The source is unavailable. Retry when private connectivity is restored.","requestId":"11111111111111111111111111111111"}`
+			body = `{"code":"source_unavailable","message":"Monitoring data is unavailable. Check your private network or VPN connection. If the problem continues, contact your administrator.","requestId":"11111111111111111111111111111111"}`
 		}
 		return &http.Response{StatusCode: status, Header: http.Header{"Cache-Control": {"no-store"}}, Body: io.NopCloser(strings.NewReader(body))}, nil
 	})}
@@ -433,7 +433,7 @@ func TestLabWatchdogReadRejectsUnsafeFailure(t *testing.T) {
 	}{
 		{401, `{"code":"unauthenticated","message":"Sign in to continue.","requestId":"11111111111111111111111111111111"}`},
 		{503, `{"code":"source_unavailable","message":"private DSN secret","requestId":"11111111111111111111111111111111"}`},
-		{503, `{"code":"source_unavailable","code":"authorization_unavailable","message":"Current source authorization could not be verified.","requestId":"11111111111111111111111111111111"}`},
+		{503, `{"code":"source_unavailable","code":"authorization_unavailable","message":"Your access could not be checked with Jobman Control. Try again shortly.","requestId":"11111111111111111111111111111111"}`},
 	} {
 		calls := 0
 		client := &http.Client{Transport: labMixedRoundTripper(func(*http.Request) (*http.Response, error) {
@@ -449,7 +449,7 @@ func TestLabWatchdogReadRejectsUnsafeFailure(t *testing.T) {
 
 func TestLabWatchdogOwnerDenial(t *testing.T) {
 	client := &http.Client{Transport: labMixedRoundTripper(func(*http.Request) (*http.Response, error) {
-		return &http.Response{StatusCode: 404, Header: http.Header{"Cache-Control": {"no-store"}}, Body: io.NopCloser(strings.NewReader(`{"code":"not_found_or_inaccessible","message":"The resource is absent or inaccessible.","requestId":"11111111111111111111111111111111"}`))}, nil
+		return &http.Response{StatusCode: 404, Header: http.Header{"Cache-Control": {"no-store"}}, Body: io.NopCloser(strings.NewReader(`{"code":"not_found_or_inaccessible","message":"This item could not be found, or you do not have access to it.","requestId":"11111111111111111111111111111111"}`))}, nil
 	})}
 	if labWatchdogRead(t.Context(), client, "bob", "/api/v1/inbox/11111111-1111-4111-8111-111111111111", 404, nil, false) != nil {
 		t.Fatal("expected current-owner denial rejected")

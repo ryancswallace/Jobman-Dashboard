@@ -52,13 +52,13 @@ it("enforces UTF-8 byte, canonical UUID, job and source bounds", () => {
   ).toHaveLength(40);
   expect(() =>
     validateRule({ ...newRule(ref), name: "界".repeat(41) }),
-  ).toThrow("UTF-8 bytes");
+  ).toThrow("120 bytes");
   expect(() =>
     validateRule({ ...newRule(ref), name: "watch\u0085job" }),
   ).toThrow("control");
   expect(() =>
     validateRule({ ...newRule(ref), jobs: [{ ...ref, jobId: "bad-id" }] }),
-  ).toThrow("canonical");
+  ).toThrow("full IDs");
   expect(() =>
     validateRule({ ...newRule(ref), jobs: Array(101).fill(ref) }),
   ).toThrow("100");
@@ -79,7 +79,7 @@ it("does not turn redacted views into writable partial rules", () => {
   const hidden = { ...rule, scopes: [], jobs: [], unavailableScopes: 1 };
   expect(decodeRule(hidden)).toEqual(hidden);
   expect(editableRule(hidden)).toBe(false);
-  expect(() => ruleDraft(hidden)).toThrow("hidden");
+  expect(() => ruleDraft(hidden)).toThrow("Check access and resume");
   expect(() => decodeRule({ ...hidden, jobs: [ref] })).toThrow("invalid");
 });
 it("preserves wide revisions and future values while rejecting invalid pages", () => {

@@ -9,24 +9,24 @@ final class GraphCeilingUITests: XCTestCase {
         app.launchArguments = ["--dashboard-ui-fixtures", "--dashboard-graph-ceiling-fixtures", "--dashboard-manual-refresh-fixtures"]
         app.launch()
         XCTAssertTrue(app.staticTexts["fixtureBanner"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Workloads"].tap(); app.buttons["Graphs"].tap()
+        app.tabBars.buttons["Job groups"].tap(); app.buttons["Graphs"].tap()
         let graph = app.staticTexts["Synthetic ceiling graph"]
         XCTAssertTrue(graph.waitForExistence(timeout: 10)); graph.tap()
-        XCTAssertTrue(app.staticTexts["Complete source summary"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Whole group summary"].waitForExistence(timeout: 10))
         return app
     }
     func testLargeGraphChildPagesReplaceAndKeepExactTotal() {
         let app = app(), total = app.staticTexts["childPageTotal"]
         reveal(total, app: app)
-        XCTAssertEqual(total.label, "50 children on this page; 10000 at source")
+        XCTAssertEqual(total.label, "50 jobs on this page; 10000 in the group")
         reveal(app.buttons["node-00000"], app: app)
         capture("Native ceiling first child page", app)
-        let next = app.buttons["Next child page"]
+        let next = app.buttons["Next jobs page"]
         reveal(next, app: app, up: false); next.tap()
         XCTAssertTrue(app.buttons["node-00050"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["node-00000"].exists)
-        XCTAssertEqual(total.label, "50 children on this page; 10000 at source")
-        app.buttons["Previous child page"].tap()
+        XCTAssertEqual(total.label, "50 jobs on this page; 10000 in the group")
+        app.buttons["Previous jobs page"].tap()
         XCTAssertTrue(app.buttons["node-00000"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["node-00050"].exists)
     }
@@ -35,8 +35,8 @@ final class GraphCeilingUITests: XCTestCase {
         openNeighborhood(app)
         let bounds = app.staticTexts["graphDiagramBounds"]
         reveal(bounds, app: app)
-        XCTAssertTrue(bounds.label.contains("200 nodes and 500 edges"))
-        XCTAssertEqual(app.staticTexts["graphOmissions"].label, "Not shown in this neighborhood: 9800 nodes, 99500 edges")
+        XCTAssertTrue(bounds.label.contains("200 jobs and 500 dependencies"))
+        XCTAssertEqual(app.staticTexts["graphOmissions"].label, "Not shown here: 9800 jobs, 99500 dependencies")
         capture("Native 200 node 500 edge diagram", app)
         let selected = app.buttons["diagram-node-" + node(0)]
         XCTAssertTrue(selected.exists && selected.isSelected)
@@ -50,32 +50,32 @@ final class GraphCeilingUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["graphCenter"].label, node(1))
         let total = app.staticTexts["graphNeighborhoodTotal"]
         reveal(total, app: app)
-        XCTAssertEqual(total.label, "Neighborhood totals: 12 nodes, 66 edges")
-        XCTAssertEqual(app.staticTexts["graphOmissions"].label, "Not shown in this neighborhood: 0 nodes, 0 edges")
+        XCTAssertEqual(total.label, "Connected area: 12 jobs, 66 dependencies")
+        XCTAssertEqual(app.staticTexts["graphOmissions"].label, "Not shown here: 0 jobs, 0 dependencies")
         capture("Native selected node and exact source counts", app)
     }
     func testLargeGraphDependencyPageDirectionAndPredicate() {
         let app = app(); openNeighborhood(app)
         app.buttons["Browse dependencies"].tap()
         let total = app.staticTexts["edgePageTotal"]
-        XCTAssertTrue(total.waitForExistence(timeout: 10)); XCTAssertTrue(total.label.contains("0 matching edges"))
+        XCTAssertTrue(total.waitForExistence(timeout: 10)); XCTAssertTrue(total.label.contains("0 matching dependencies"))
         app.buttons["Outgoing"].tap()
         XCTAssertTrue(app.buttons["node-00000 → node-00001"].waitForExistence(timeout: 10))
-        XCTAssertEqual(total.label, "100 edges on this page; 9999 matching edges at source")
+        XCTAssertEqual(total.label, "100 dependencies on this page; 9999 matching dependencies in total")
         app.buttons["Next dependency page"].tap()
         XCTAssertTrue(app.buttons["node-00000 → node-00101"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["node-00000 → node-00001"].exists)
         app.buttons["Previous dependency page"].tap()
         let edge = app.buttons["node-00000 → node-00001"]
         XCTAssertTrue(edge.waitForExistence(timeout: 10)); edge.tap()
-        XCTAssertTrue(app.staticTexts["Predicate, success"].exists)
+        XCTAssertTrue(app.staticTexts["Dependency condition, success"].exists)
         XCTAssertTrue(app.staticTexts["Dependency state, waiting"].exists)
         capture("Native ceiling exact dependency predicate", app)
         app.buttons["Incoming"].tap()
-        XCTAssertTrue(total.label.contains("0 matching edges")); XCTAssertFalse(app.buttons["Next dependency page"].exists)
+        XCTAssertTrue(total.label.contains("0 matching dependencies")); XCTAssertFalse(app.buttons["Next dependency page"].exists)
         app.buttons["Both"].tap()
         XCTAssertTrue(app.buttons["node-00000 → node-00001"].waitForExistence(timeout: 10))
-        XCTAssertEqual(total.label, "100 edges on this page; 9999 matching edges at source")
+        XCTAssertEqual(total.label, "100 dependencies on this page; 9999 matching dependencies in total")
     }
     func testLargeGraphAccessibleTextAndMotionSettings() throws {
         // The opt-in runner captures/restores real simulator settings, even on failure.
@@ -104,7 +104,7 @@ final class GraphCeilingUITests: XCTestCase {
         XCTAssertTrue(NSPredicate(format: "value == %@", "0").evaluate(with: toggle), "Diagram toggle must actually turn off before list scrolling")
     }
     private func openNeighborhood(_ app: XCUIApplication) {
-        let explore = app.buttons["Explore graph neighborhood"]
+        let explore = app.buttons["Explore connected jobs"]
         reveal(explore, app: app); explore.tap()
         XCTAssertTrue(app.staticTexts["graphCenter"].waitForExistence(timeout: 10))
         XCTAssertEqual(app.staticTexts["graphCenter"].label, node(0))

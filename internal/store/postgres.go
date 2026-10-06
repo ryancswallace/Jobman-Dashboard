@@ -272,7 +272,7 @@ func (s *Store) UpdatePreferences(ctx context.Context, accountID, revision strin
 	}
 	err = tx.QueryRow(ctx, `UPDATE dashboard_preferences SET revision=revision+1,timezone=$3,appearance=$4,refresh_seconds=$5,updated_at=clock_timestamp() WHERE account_id=$1 AND revision::text=$2 RETURNING revision::text`, accountID, revision, p.Timezone, p.Appearance, p.RefreshSeconds).Scan(&p.Revision)
 	if err == pgx.ErrNoRows {
-		return p, &api.Error{Code: "revision_conflict", Message: "Preferences changed in another client. Reload and try again."}
+		return p, &api.Error{Code: "revision_conflict", Message: "Your settings changed in another browser or device. Reload settings and try again."}
 	}
 	if err != nil {
 		return p, err

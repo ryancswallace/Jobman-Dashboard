@@ -45,12 +45,12 @@ type CursorIdentity struct {
 func DecodeCursorIdentity(data []byte) (CursorIdentity, error) {
 	var id CursorIdentity
 	if len(data) > 4<<20 || json.Unmarshal(data, &id) != nil || id.AccountID == "" || id.QueryHash == "" {
-		return id, failure("invalid_request", "Invalid bounded browse state.")
+		return id, failure("invalid_request", "This list could not be loaded. Refresh the list and try again.")
 	}
 	return id, nil
 }
 
-var ErrCursorQuota = failure("rate_limited", "The active browse-state limit was reached. Close old searches or retry after they expire.")
+var ErrCursorQuota = failure("rate_limited", "Too many lists are open. Wait for earlier browsing sessions to expire, then try again.")
 
 func NewMemoryCursors() *MemoryCursors {
 	return &MemoryCursors{records: make(map[string]memoryRecord), Now: time.Now, Max: 1000}
@@ -160,7 +160,7 @@ func (s *MemoryCursors) withinBudget(account, except string, newBytes int) bool 
 func encodeState(v any) ([]byte, error) {
 	b, err := json.Marshal(v)
 	if err == nil && len(b) > 4<<20 {
-		return nil, failure("rate_limited", "Browse state exceeds the configured bound.")
+		return nil, failure("rate_limited", "This list is too large to load. Narrow your selection and try again.")
 	}
 	return b, err
 }

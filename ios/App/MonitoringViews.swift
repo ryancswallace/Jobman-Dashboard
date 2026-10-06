@@ -8,29 +8,29 @@ struct OverviewView: View {
         List {
             Section {
                 ScopeMenu()
-                Picker("Terminal result window", selection: Binding(get: { store.overviewWindow }, set: { store.selectOverviewWindow($0) })) {
+                Picker("Final results from", selection: Binding(get: { store.overviewWindow }, set: { store.selectOverviewWindow($0) })) {
                     ForEach(OverviewWindow.allCases, id: \.self) { Text($0.title).tag($0) }
                 }.accessibilityIdentifier("overviewWindow")
             }
             if let error = store.error { Section { ErrorMessage(error: error) } }
             if let summary = store.overview {
-                Section("Recorded job state") {
+                Section("Recorded job status") {
                     count("Active jobs", summary.active, phase: "active")
-                    count("Awaiting reported execution", summary.awaitingExecution, phase: "awaiting")
+                    count("Waiting for execution", summary.awaitingExecution, phase: "awaiting")
                     count("Running", summary.running, phase: "running")
-                    Button { store.drilldown(phase: "active", attention: true) } label: { LabeledContent("Evidence needs attention", value: summary.evidenceAttention.map(String.init) ?? "Unavailable") }.buttonStyle(.plain)
-                    Text("Evidence attention can overlap active jobs. It does not mean the jobs have failed.").font(.footnote).foregroundStyle(.secondary)
+                    Button { store.drilldown(phase: "active", attention: true) } label: { LabeledContent("Status needs attention", value: summary.evidenceAttention.map(String.init) ?? "Not available") }.buttonStyle(.plain)
+                    Text("Jobs needing attention may still be active. Their reported status needs checking; this does not mean they failed.").font(.footnote).foregroundStyle(.secondary)
                 }
-                Section("Terminal outcomes") {
+                Section("Final results") {
                     ForEach(summary.terminal.keys.sorted(), id: \.self) { outcome in
-                        count(outcome.replacingOccurrences(of: "_", with: " ").capitalized, summary.terminal[outcome] ?? nil, phase: "terminal", outcome: outcome, window: summary.window)
+                        count(InterfaceText.finalResult(outcome), summary.terminal[outcome] ?? nil, phase: "terminal", outcome: outcome, window: summary.window)
                     }
-                    LabeledContent("Missing completion time", value: summary.missingCompletionTime.map(String.init) ?? "Unavailable")
-                    TimestampRow(label: "Window from", value: summary.window.from)
-                    TimestampRow(label: "Window until (exclusive)", value: summary.window.to)
+                    LabeledContent("Completion time not recorded", value: summary.missingCompletionTime.map(String.init) ?? "Not available")
+                    TimestampRow(label: "From", value: summary.window.from)
+                    TimestampRow(label: "Before", value: summary.window.to)
                 }
                 Section { SourceSummary(completeness: summary.completeness, sources: summary.sources, fetchedAt: summary.fetchedAt) }
-            } else if store.error == nil { ProgressView("Loading authorized activity…") }
+            } else if store.error == nil { ProgressView("Loading activity…") }
         }.navigationTitle("Overview").refreshable { store.refresh() }
             .toolbar {
                 if colorScheme == .dark {
@@ -45,7 +45,7 @@ struct OverviewView: View {
     private func count(_ title: String, _ value: Int?, phase: String, outcome: String = "", window: Overview.Window? = nil) -> some View {
         Button {
             store.drilldown(phase: phase, outcome: outcome, window: window)
-        } label: { LabeledContent(title, value: value.map(String.init) ?? "Unavailable") }.buttonStyle(.plain)
+        } label: { LabeledContent(title, value: value.map(String.init) ?? "Not available") }.buttonStyle(.plain)
     }
 }
 
@@ -57,42 +57,42 @@ struct JobsView: View {
         List {
             Section { ScopeMenu() }
             Section("Filters") {
-                Picker("Phase", selection: $store.phase) {
-                    Text("All phases").tag("")
-                    ForEach(["active", "awaiting", "accepted", "assigning", "accepted_execution", "running", "terminal"], id: \.self) { Text($0.replacingOccurrences(of: "_", with: " ")).tag($0) }
+                Picker("Job status", selection: $store.phase) {
+                    Text("All statuses").tag("")
+                    ForEach(["active", "awaiting", "accepted", "assigning", "accepted_execution", "running", "terminal"], id: \.self) { Text(InterfaceText.jobStatus($0)).tag($0) }
                 }.onChange(of: store.phase) { _, _ in store.resetJobs() }
-                Picker("Outcome", selection: $store.outcome) {
-                    Text("All outcomes").tag("")
-                    ForEach(["success", "failure", "timed_out", "aborted", "lost", "cancelled"], id: \.self) { Text($0.replacingOccurrences(of: "_", with: " ")).tag($0) }
+                Picker("Final result", selection: $store.outcome) {
+                    Text("All final results").tag("")
+                    ForEach(["success", "failure", "timed_out", "aborted", "lost", "cancelled"], id: \.self) { Text(InterfaceText.finalResult($0)).tag($0) }
                 }.onChange(of: store.outcome) { _, _ in store.resetJobs() }
                 Toggle("Submitted by me", isOn: $store.ownerOnly).onChange(of: store.ownerOnly) { _, _ in store.resetJobs() }
-                Toggle("Evidence needs attention", isOn: $store.attentionOnly).onChange(of: store.attentionOnly) { _, _ in store.resetJobs() }
-                Toggle("Filter completion window", isOn: Binding(get: { store.completedFrom != nil }, set: { enabled in
+                Toggle("Status needs attention", isOn: $store.attentionOnly).onChange(of: store.attentionOnly) { _, _ in store.resetJobs() }
+                Toggle("Filter by completion time", isOn: Binding(get: { store.completedFrom != nil }, set: { enabled in
                     store.completedFrom = enabled ? Date().addingTimeInterval(-86400) : nil
                     store.completedTo = enabled ? Date() : nil
                     store.resetJobs()
                 }))
                 if store.completedFrom != nil {
-                    DatePicker("From (inclusive)", selection: Binding(get: { store.completedFrom ?? Date() }, set: { store.completedFrom = $0; store.resetJobs() }))
-                    DatePicker("Until (exclusive)", selection: Binding(get: { store.completedTo ?? Date() }, set: { store.completedTo = $0; store.resetJobs() }))
+                    DatePicker("Completed on or after", selection: Binding(get: { store.completedFrom ?? Date() }, set: { store.completedFrom = $0; store.resetJobs() }))
+                    DatePicker("Completed before", selection: Binding(get: { store.completedTo ?? Date() }, set: { store.completedTo = $0; store.resetJobs() }))
                 }
                 if case .namespace(let ref) = store.scope {
                     HStack {
                         TextField("Full job ID", text: $exactID).textInputAutocapitalization(.never).autocorrectionDisabled()
                         Button("Open") { store.open(.job(.init(deploymentId: ref.deploymentId, namespaceId: ref.namespaceId, jobId: exactID))) }.disabled(exactID.isEmpty)
                     }
-                } else { Text("Select a namespace to open an exact job ID.").font(.footnote).foregroundStyle(.secondary) }
+                } else { Text("Choose a namespace to open a job by its full ID.").font(.footnote).foregroundStyle(.secondary) }
             }
             if let error = store.error { ErrorMessage(error: error) }
             Section {
                 Button("Restart from first page") { store.resetJobs() }.accessibilityIdentifier("restartJobs")
-                if !store.jobsAreFirstPage { Text("Viewing a later page. Restart to include newly arrived first-page jobs.").font(.caption) }
+                if !store.jobsAreFirstPage { Text("You are viewing a later page. Return to the first page to see newly added jobs.").font(.caption) }
                 if store.canLoadPreviousJobs { Button("Previous page") { Task { await store.loadPreviousJobs() } }.disabled(store.loadingMore) }
             }
             if let page = store.jobs {
                 Section {
-                    if store.evictedJobRows > 0 { Text("\(store.evictedJobRows) earlier page cursors were discarded. Restart to return to the first page.").font(.caption) }
-                    if store.jobRows.isEmpty { ContentUnavailableView("No matching jobs", systemImage: "line.3.horizontal.decrease.circle", description: Text("Change the filters or refresh this scope.")) }
+                    if store.evictedJobRows > 0 { Text("\(store.evictedJobRows) older pages are no longer kept in memory. Restart to return to the first page.").font(.caption) }
+                    if store.jobRows.isEmpty { ContentUnavailableView("No matching jobs", systemImage: "line.3.horizontal.decrease.circle", description: Text("Change the filters or refresh this selection.")) }
                     ForEach(store.jobRows, id: \.ref) { job in NavigationLink(value: DashboardRoute.job(job.ref)) { JobRow(job: job) } }
                     if store.nextJobsCursor != nil { Button { Task { await store.loadMoreJobs() } } label: { if store.loadingMore { ProgressView() } else { Text("Next page") } }.disabled(store.loadingMore) }
                 }
@@ -109,10 +109,10 @@ struct JobRow: View {
             Text(job.title).font(.headline)
             Text("\(job.deploymentId) / \(job.namespaceId)").font(.caption).foregroundStyle(.secondary)
             ViewThatFits(in: .horizontal) {
-                HStack { StatusBadge(title: "Phase", value: job.phase); StatusBadge(title: "Outcome", value: job.outcome) }
-                VStack(alignment: .leading) { StatusBadge(title: "Phase", value: job.phase); StatusBadge(title: "Outcome", value: job.outcome) }
+                HStack { StatusBadge(title: "Job status", value: InterfaceText.jobStatus(job.phase)); StatusBadge(title: "Final result", value: job.outcome.map(InterfaceText.finalResult)) }
+                VStack(alignment: .leading) { StatusBadge(title: "Job status", value: InterfaceText.jobStatus(job.phase)); StatusBadge(title: "Final result", value: job.outcome.map(InterfaceText.finalResult)) }
             }
-            if let confidence = job.confidence { Text("Evidence: \(confidence)").font(.caption).foregroundStyle(.secondary) }
+            if let confidence = job.confidence { Text("Status confidence: \(InterfaceText.statusConfidence(confidence))").font(.caption).foregroundStyle(.secondary) }
             Text("Target: \(job.targetId)").font(.caption)
         }.padding(.vertical, 4).accessibilityElement(children: .combine)
     }
@@ -131,66 +131,67 @@ struct JobDetailView: View {
             if let error { ErrorMessage(error: error) }
             if let detail {
                 let job = detail.job
-                Section("Current job lifecycle") {
+                Section("Current job status and times") {
                     JobRow(job: job)
-                    Text("These facts describe the current job snapshot. Choosing a recorded run below does not change them.").font(.footnote).foregroundStyle(.secondary)
-                    TimestampRow(label: "Confidence updated", value: job.confidenceUpdatedAt)
-                    LabeledContent("Desired state", value: job.desiredState)
-                    LabeledContent("Graph disposition", value: job.disposition ?? "Unavailable")
-                    Text("A cancellation request is intent. Only the reported terminal outcome confirms cancellation.").font(.footnote).foregroundStyle(.secondary)
+                    Text("These are the latest loaded job details. Choosing a recorded run below does not change them.").font(.footnote).foregroundStyle(.secondary)
+                    TimestampRow(label: "Status confidence updated", value: job.confidenceUpdatedAt)
+                    Text("Status confidence describes how current or certain the reported status is. It does not predict success. Outdated means Control has not heard recently from the execution agent; it does not prove the job has stopped.").font(.footnote).foregroundStyle(.secondary)
+                    LabeledContent("Requested state", value: job.desiredState)
+                    LabeledContent("Dependency progress", value: job.disposition ?? "Not available")
+                    Text("Requested cancellation is not confirmed cancellation. Check the final result to see how the job ended.").font(.footnote).foregroundStyle(.secondary)
                     TimestampRow(label: "Created", value: job.createdAt)
                     TimestampRow(label: "Execution started", value: job.startedAt)
-                    TimestampRow(label: "Start recorded by Control", value: job.lifecycle?.startedRecordedAt)
-                    LabeledContent("Start evidence", value: job.lifecycle?.startedProvenance ?? "Unavailable")
+                    TimestampRow(label: "Start recorded by deployment", value: job.lifecycle?.startedRecordedAt)
+                    LabeledContent("Start time source", value: job.lifecycle?.startedProvenance ?? "Not available")
                     TimestampRow(label: "Completed", value: job.completedAt)
-                    TimestampRow(label: "Completion recorded by Control", value: job.lifecycle?.completedRecordedAt)
-                    LabeledContent("Completion evidence", value: job.lifecycle?.completedProvenance ?? "Unavailable")
-                    TimestampRow(label: "Metadata updated", value: job.updatedAt)
-                    TimestampRow(label: "Last fetched", value: detail.fetchedAt)
+                    TimestampRow(label: "Completion recorded by deployment", value: job.lifecycle?.completedRecordedAt)
+                    LabeledContent("Completion time source", value: job.lifecycle?.completedProvenance ?? "Not available")
+                    TimestampRow(label: "Job record updated", value: job.updatedAt)
+                    TimestampRow(label: "Last refreshed", value: detail.fetchedAt)
                 }
-                Section("Current job placement and ownership") {
-                    LabeledContent("Submitted by", value: job.owner?.displayName ?? job.owner?.id ?? "Unavailable")
-                    InspectionText(label: "Owner ID", value: job.owner?.id ?? "Unavailable")
-                    LabeledContent("Target name", value: job.targetName ?? "Unavailable")
+                Section("Where this job runs and who submitted it") {
+                    LabeledContent("Submitted by", value: job.owner?.displayName ?? job.owner?.id ?? "Not available")
+                    InspectionText(label: "Owner ID", value: job.owner?.id ?? "Not available")
+                    LabeledContent("Target name", value: job.targetName ?? "Not available")
                     LabeledContent("Target ID", value: job.targetId)
-                    LabeledContent("Partition", value: job.partition ?? "Unavailable")
-                    InspectionText(label: "Workload digest", value: job.workloadDigest ?? "Unavailable")
-                    LabeledContent("Target generation ID", value: job.targetGenerationId ?? "Unavailable")
-                    LabeledContent("Backend", value: job.backend ?? "Unavailable")
-                    LabeledContent("Revision", value: job.revision)
-                    LabeledContent("Scheduler backend", value: job.scheduler?.backend ?? "Unavailable")
-                    LabeledContent("Scheduler state", value: job.scheduler?.state ?? "Unavailable")
-                    LabeledContent("Scheduler job ID", value: job.scheduler?.jobId ?? "Unavailable")
-                    LabeledContent("Scheduler reason", value: job.scheduler?.reason ?? "Unavailable")
-                    LabeledContent("Cluster", value: job.scheduler?.cluster ?? "Unavailable")
+                    LabeledContent("Partition", value: job.partition ?? "Not available")
+                    InspectionText(label: "Submitted workload fingerprint", value: job.workloadDigest ?? "Not available")
+                    LabeledContent("Target configuration version ID", value: job.targetGenerationId ?? "Not available")
+                    LabeledContent("Execution system", value: job.backend ?? "Not available")
+                    LabeledContent("Record version", value: job.revision)
+                    LabeledContent("Scheduler system", value: job.scheduler?.backend ?? "Not available")
+                    LabeledContent("Scheduler status", value: job.scheduler?.state ?? "Not available")
+                    LabeledContent("Scheduler job ID", value: job.scheduler?.jobId ?? "Not available")
+                    LabeledContent("Scheduler reason", value: job.scheduler?.reason ?? "Not available")
+                    LabeledContent("Cluster", value: job.scheduler?.cluster ?? "Not available")
                     TimestampRow(label: "Scheduler observation", value: job.scheduler?.observedAt)
-                    LabeledContent("Imported history", value: job.imported.map { $0 ? "Yes" : "No" } ?? "Unavailable")
+                    LabeledContent("Imported job record", value: job.imported.map { $0 ? "Yes" : "No" } ?? "Not available")
                     ForEach(job.labels.keys.sorted(), id: \.self) { key in LabeledContent(key, value: job.labels[key] ?? "") }
                 }
-                Section("Current job run and workload references") {
-                    LabeledContent("Current run", value: job.currentRun?.number ?? "Unavailable")
-                    LabeledContent("Run ID", value: job.currentRun?.id ?? "Unavailable")
-                    LabeledContent("Execution ID", value: job.currentRun?.executionId ?? "Unavailable")
+                Section("Current run and job groups") {
+                    LabeledContent("Current run", value: job.currentRun?.number ?? "Not available")
+                    LabeledContent("Run ID", value: job.currentRun?.id ?? "Not available")
+                    LabeledContent("Execution ID", value: job.currentRun?.executionId ?? "Not available")
                     if let id = job.group?.collectionId {
                         NavigationLink("Collection \(id)") { WorkloadReferenceView(namespace: ref.namespace, kind: "collection", id: id) }
-                        if let index = job.group?.collectionIndex { LabeledContent("Collection index", value: String(index)) }
+                        if let index = job.group?.collectionIndex { LabeledContent("Position in collection", value: String(index)) }
                     }
                     if let id = job.group?.graphId {
                         NavigationLink("Graph \(id)") { WorkloadReferenceView(namespace: ref.namespace, kind: "graph", id: id) }
-                        if let index = job.group?.graphIndex { LabeledContent("Graph index", value: String(index)) }
+                        if let index = job.group?.graphIndex { LabeledContent("Position in graph", value: String(index)) }
                     }
                 }
                 Section("Submitted command") {
                     if let execution = detail.execution {
-                        Text("Immutable submitted specification. It does not describe shell expansion or prove that the command ran.").font(.footnote).foregroundStyle(.secondary)
-                        InspectionText(label: "Submitted working directory", value: execution.workingDirectory, empty: "Empty (no directory specified)")
+                        Text("The command as submitted. It may not have run; values changed by the program or shell during execution are not shown.").font(.footnote).foregroundStyle(.secondary)
+                        InspectionText(label: "Submitted working directory", value: execution.workingDirectory, empty: "No directory specified")
                         NavigationLink { JobCommandView(execution: execution) } label: {
                             Label("View full command and arguments", systemImage: "text.alignleft")
                         }.accessibilityIdentifier("viewSubmittedCommand")
                         Text("\(execution.command.args.count) ordered arguments; environment values are not included.").font(.caption)
                     } else {
                         Text("Submitted command unavailable")
-                        Text(verbatim: JobInspectionText.literal(detail.executionUnavailableReason ?? "The source did not provide a submitted execution specification."))
+                        Text(verbatim: InterfaceText.submittedCommandUnavailable(detail.executionUnavailableReason))
                             .font(.footnote).textSelection(.enabled).accessibilityIdentifier("executionUnavailableReason")
                     }
                 }
@@ -198,7 +199,7 @@ struct JobDetailView: View {
                     NavigationLink(selectedRun.map { "Selected run \($0.number)" } ?? "Choose a recorded run") { RunPickerView(ref: ref, selection: $selectedRun) }
                     if let run = selectedRun { Text("Run \(run.number) · \(run.id)").font(.caption).accessibilityIdentifier("selectedRun") }
                     NavigationLink { LogView(ref: ref, run: selectedRun).id(selectedRun?.id ?? "current") } label: { Label("Logs", systemImage: "text.alignleft") }
-                    NavigationLink { ArtifactsView(ref: ref, run: selectedRun).id(selectedRun?.id ?? "all") } label: { Label("Artifact metadata", systemImage: "doc") }
+                    NavigationLink { ArtifactsView(ref: ref, run: selectedRun).id(selectedRun?.id ?? "all") } label: { Label("Output files", systemImage: "doc") }
                     NavigationLink { ReportsView(ref: ref, selectedRunID: selectedRun?.id).id(selectedRun?.id ?? "current") } label: { Label("Diagnosis", systemImage: "stethoscope") }
                     Button { watching = true } label: { Label("Watch this job…", systemImage: "bell.badge") }
                 }
@@ -231,9 +232,9 @@ struct WorkloadsView: View {
     @State private var kind = "collection"
     var body: some View {
         List {
-            Section { ScopeMenu(); Picker("Kind", selection: $kind) { Text("Collections").tag("collection"); Text("Arrays").tag("array"); Text("Graphs").tag("graph") }.pickerStyle(.segmented) }
+            Section { ScopeMenu(); Text("Collections group jobs together. Arrays run related Slurm tasks. Graphs show jobs and the dependencies between them.").font(.footnote).foregroundStyle(.secondary); Picker("Group type", selection: $kind) { Text("Collections").tag("collection"); Text("Arrays").tag("array"); Text("Graphs").tag("graph") }.pickerStyle(.segmented) }
             PagedRows<Workload, WorkloadRow>(path: "/api/v1/workloads/\(kind)") { workload in WorkloadRow(workload: workload) }.id(kind)
-        }.navigationTitle("Workloads")
+        }.navigationTitle("Job groups")
     }
 }
 
@@ -244,7 +245,7 @@ struct WorkloadRow: View {
             VStack(alignment: .leading) {
                 Text(workload.name ?? workload.resourceId).font(.headline)
                 Text("\(workload.deploymentId) / \(workload.namespaceId)").font(.caption).foregroundStyle(.secondary)
-                Text("\(workload.totalChildren) children • \(workload.kind)").font(.callout)
+                Text("\(workload.totalChildren) jobs • \(workload.kind)").font(.callout)
             }
         }
     }
@@ -265,35 +266,35 @@ struct WorkloadDetailView: View {
     private var summary: Workload { detail?.workload ?? workload }
     var body: some View {
         List {
-            Section("Complete source summary") {
+            Section("Whole group summary") {
                 Text("\(workload.deploymentId) / \(workload.namespaceId)")
-                LabeledContent("Children", value: summary.totalChildren)
-                LabeledContent("Revision", value: summary.revision)
+                LabeledContent("Jobs in group", value: summary.totalChildren)
+                LabeledContent("Record version", value: summary.revision)
                 TimestampRow(label: "Source observation", value: summary.asOf)
-                if let phase = summary.phase { LabeledContent("Phase", value: phase) }
-                if let outcome = summary.outcome { LabeledContent("Outcome", value: outcome) }
-                ForEach(summary.counts.keys.sorted(), id: \.self) { LabeledContent($0, value: summary.counts[$0] ?? "Unavailable") }
-                LabeledContent("Concurrency", value: summary.concurrency ?? "Unavailable")
-                LabeledContent("Failure policy", value: summary.failurePolicy ?? "Unavailable")
-                if let policy = summary.unsatisfiedPolicy { LabeledContent("Unsatisfied dependency policy", value: policy) }
+                if let phase = summary.phase { LabeledContent("Job status", value: InterfaceText.jobStatus(phase)) }
+                if let outcome = summary.outcome { LabeledContent("Final result", value: InterfaceText.finalResult(outcome)) }
+                ForEach(summary.counts.keys.sorted(), id: \.self) { LabeledContent(InterfaceText.finalResult(InterfaceText.jobStatus($0)), value: summary.counts[$0] ?? "Not available") }
+                LabeledContent("Maximum jobs running at once", value: summary.concurrency ?? "Not available")
+                LabeledContent("What happens after a failure", value: summary.failurePolicy ?? "Not available")
+                if let policy = summary.unsatisfiedPolicy { LabeledContent("When a dependency is not met", value: policy) }
                 if workload.kind == "array" {
-                    LabeledContent("Array policy", value: summary.arrayPolicy ?? "Unavailable").accessibilityIdentifier("arrayPolicy")
-                    LabeledContent("Array mode", value: summary.arrayMode ?? "Unavailable").accessibilityIdentifier("arrayMode")
-                    LabeledContent("Slurm array", value: summary.arrayId ?? "Unavailable")
-                    Text("Task indices are the exact Slurm indices; child position is shown separately.").font(.footnote)
+                    LabeledContent("Array policy", value: summary.arrayPolicy ?? "Not available").accessibilityIdentifier("arrayPolicy")
+                    LabeledContent("Array mode", value: summary.arrayMode ?? "Not available").accessibilityIdentifier("arrayMode")
+                    LabeledContent("Slurm array", value: summary.arrayId ?? "Not available")
+                    Text("Slurm task numbers are shown exactly as recorded. A job’s position in this group is shown separately.").font(.footnote)
                 }
             }
-            if let error { Section { ErrorMessage(error: error); Button("Refresh workload") { Task { await restart() } } } }
+            if let error { Section { ErrorMessage(error: error); Button("Refresh job group") { Task { await restart() } } } }
             if workload.kind == "graph", let first = children.first {
                 Section("Graph exploration") {
-                    NavigationLink("Explore graph neighborhood") { GraphExplorer(workload: workload, initialCenter: first.id) }
-                    Text("Choose a node below to explore its bounded diagram, complete dependency counts, and paged incoming or outgoing edges.").font(.footnote)
+                    NavigationLink("Explore connected jobs") { GraphExplorer(workload: workload, initialCenter: first.id) }
+                    Text("Choose a job below to see its connected jobs and dependencies. Large diagrams show a limited area; use the dependency pages for the full list.").font(.footnote)
                 }
             }
-            Section(workload.kind == "graph" ? "Nodes" : "Children") {
-                if !pageHistory.isEmpty { Button("Previous child page") { Task { await previous() } }.disabled(loading) }
-                if let cursor { Button("Next child page") { Task { await next(cursor) } }.disabled(loading) }
-                if let total = page?.total ?? detail?.total { Text("\(children.count) children on this page; \(total) at source").font(.caption).accessibilityIdentifier("childPageTotal") }
+            Section("Jobs in group") {
+                if !pageHistory.isEmpty { Button("Previous jobs page") { Task { await previous() } }.disabled(loading) }
+                if let cursor { Button("Next jobs page") { Task { await next(cursor) } }.disabled(loading) }
+                if let total = page?.total ?? detail?.total { Text("\(children.count) jobs on this page; \(total) in the group").font(.caption).accessibilityIdentifier("childPageTotal") }
                 ForEach(children) { child in
                     DisclosureGroup {
                         WorkloadChildFacts(child: child)
@@ -342,13 +343,13 @@ struct WorkloadDetailView: View {
 struct WorkloadChildFacts: View {
     let child: WorkloadChild
     var body: some View {
-        LabeledContent("Child position", value: child.index)
+        LabeledContent("Position in group", value: child.index)
         if let index = child.taskIndex { LabeledContent("Slurm task index", value: index).accessibilityIdentifier("slurmTaskIndex") }
-        if let readiness = child.readiness { LabeledContent("Source readiness", value: readiness) }
-        if let disposition = child.disposition { LabeledContent("Disposition", value: disposition) }
+        if let readiness = child.readiness { LabeledContent("Reported readiness", value: readiness) }
+        if let disposition = child.disposition { LabeledContent("Dependency progress", value: disposition) }
         if let counts = child.dependencyCounts {
-            Text("Complete incoming dependency counts").font(.caption.bold())
-            ForEach(counts.keys.sorted(), id: \.self) { LabeledContent($0, value: counts[$0] ?? "Unavailable") }
+            Text("All dependencies this job requires").font(.caption.bold())
+            ForEach(counts.keys.sorted(), id: \.self) { LabeledContent($0, value: counts[$0] ?? "Not available") }
         }
     }
 }
@@ -367,7 +368,7 @@ struct WorkloadReferenceView: View {
         Group {
             if let workload { WorkloadDetailView(workload: workload) }
             else if let error { List { ErrorMessage(error: error); Button("Retry") { Task { await load() } } } }
-            else { ProgressView("Loading authorized workload…") }
+            else { ProgressView("Loading job group…") }
         }.task(id: store.foregroundGeneration) { await load() }
     }
     private func load() async {
@@ -392,12 +393,12 @@ struct PagedRows<Item: Decodable & Sendable & Identifiable, Row: View>: View whe
     @State private var error: String?
     var body: some View {
         Section {
-            if state.page == nil && error == nil { ProgressView("Loading authorized items…") }
+            if state.page == nil && error == nil { ProgressView("Loading items…") }
             ForEach(state.items, content: row)
-            if !state.isFirstPage { Text("Viewing a later page. Restart to include newly arrived first-page items.").font(.caption) }
-            if state.history.discardedPages > 0 { Text("Earlier back-page cursors were discarded to bound memory; restart remains available.").font(.caption) }
+            if !state.isFirstPage { Text("You are viewing a later page. Return to the first page to see newly added items.").font(.caption) }
+            if state.history.discardedPages > 0 { Text("Older pages are no longer kept in memory. Restart to return to the first page.").font(.caption) }
             if let page = state.page {
-                if let total = page.total { Text("Source total: \(total)").font(.caption) }
+                if let total = page.total { Text("Total reported: \(total)").font(.caption) }
                 if let totals = page.totals {
                     ForEach(Array(totals.enumerated()), id: \.offset) { _, total in
                         VStack(alignment: .leading) {

@@ -21,6 +21,15 @@ import {
   type DeviceSettingsInput,
 } from "../lib/devices";
 import "./Settings.css";
+const permissionNames = new Map([
+  ["namespace.read", "View namespace"],
+  ["jobs.read", "View jobs"],
+  ["groups.read", "View job groups"],
+  ["targets.read", "View targets"],
+  ["logs.read", "View logs"],
+  ["artifacts.read", "View output file details"],
+  ["evidence.read", "View diagnostic evidence"],
+]);
 export function SettingsPage() {
   const { identity } = useSession();
   return <SettingsWorkspace key={identity} />;
@@ -62,7 +71,7 @@ function SettingsWorkspace() {
           ? e
           : new APIError(
               "invalid_preferences",
-              "Enter a valid IANA timezone, such as America/New_York or UTC.",
+              "Enter a timezone name such as America/New_York or UTC.",
             ),
       );
     } finally {
@@ -99,7 +108,9 @@ function SettingsWorkspace() {
                 }}
                 placeholder="America/New_York"
               />
-              <small>Use an IANA timezone. UTC is always available.</small>
+              <small>
+                Use a timezone name such as America/New_York or UTC.
+              </small>
             </label>
             <label>
               Appearance
@@ -121,7 +132,7 @@ function SettingsWorkspace() {
               </select>
             </label>
             <label>
-              Foreground refresh
+              Automatic refresh
               <select
                 value={draft.refreshSeconds}
                 onChange={(e) => {
@@ -144,8 +155,8 @@ function SettingsWorkspace() {
                 ))}
               </select>
               <small>
-                Polling pauses in hidden tabs. Access is still revalidated while
-                signed in.
+                Updates pause when this tab is hidden. Dashboard continues
+                checking your access while you are signed in.
               </small>
             </label>
             <button className="button" disabled={busy || !dirty}>
@@ -173,12 +184,11 @@ function SettingsWorkspace() {
               </div>
             </div>
             <p>
-              Active Directory sign-in through AD FS. Namespace access comes
-              from current direct group membership.
+              Sign-in is managed by your organization. Your group memberships
+              determine which namespaces you can access.
             </p>
             <p className="muted">
-              Browser job and log content stays in memory. Sign-out clears this
-              view.
+              Job and log content is cleared from this view when you sign out.
             </p>
             <button className="button secondary" onClick={() => void logout()}>
               Sign out
@@ -190,8 +200,9 @@ function SettingsWorkspace() {
             <div>
               <h2>Connections and current access</h2>
               <p>
-                Capabilities are the exact union of all roles within each
-                deployment and namespace.
+                Your permissions combine all the roles you hold in each
+                deployment and namespace. A namespace groups jobs and their
+                access permissions.
               </p>
             </div>
           </div>
@@ -208,16 +219,16 @@ function SettingsWorkspace() {
                       <strong>{ns.name}</strong>
                       <span>{ns.roles.join(" + ")}</span>
                     </summary>
-                    <p className="muted small">Effective capabilities</p>
+                    <p className="muted small">Your combined permissions</p>
                     <div className="count-chips">
                       {ns.capabilities.map((cap) => (
-                        <span className="count-chip mono" key={cap}>
-                          {cap}
+                        <span className="count-chip" key={cap} title={cap}>
+                          {permissionNames.get(cap) ?? cap}
                         </span>
                       ))}
                     </div>
                     <p className="muted small">
-                      Authorization revision{" "}
+                      Access policy version{" "}
                       {ns.authorizationVersion ?? "Unavailable"}. Dashboard
                       remains monitoring only.
                     </p>
@@ -312,7 +323,7 @@ function NotificationDevices() {
       setNotice(
         input
           ? "Device preferences saved. Delivery also depends on iPhone permission and setup."
-          : "Device removed. Reattaching it requires an explicit action in the iPhone app.",
+          : "Device removed. Set it up again in the iPhone app to resume notifications.",
       );
       setEdit(undefined);
       setRemove(undefined);
@@ -348,7 +359,7 @@ function NotificationDevices() {
           <h2>iPhone notification delivery</h2>
           <p>
             Each device has its own delivery preferences. Alert rules and your
-            inbox stay active. Register phones through the native app.
+            inbox stay active. Add phones through the iPhone app.
           </p>
         </div>
         <button
@@ -398,7 +409,7 @@ function NotificationDevices() {
                   <dd>{title(device.permission)}</dd>
                 </div>
                 <div>
-                  <dt>Notification token</dt>
+                  <dt>Apple delivery registration</dt>
                   <dd>{title(device.tokenStatus)}</dd>
                 </div>
                 <div>
@@ -542,8 +553,8 @@ function NotificationDevices() {
                 <div className="device-removal">
                   <p>
                     Remove <strong>{device.label}</strong> from this account? It
-                    will stop receiving new deliveries. The iPhone must
-                    explicitly reattach before delivery resumes.
+                    will stop receiving new deliveries. Set up notifications
+                    again in the iPhone app to resume delivery.
                   </p>
                   <div className="device-actions">
                     <button
@@ -573,8 +584,8 @@ function NotificationDevices() {
         </div>
       ) : page && !page.items.length ? (
         <Empty title="No registered iPhones">
-          Sign in through the native iPhone app to register a device and choose
-          notification permission.
+          Sign in through the iPhone app and set up notifications to add a
+          device.
         </Empty>
       ) : null}
     </section>
