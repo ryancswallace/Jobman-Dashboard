@@ -274,10 +274,10 @@ private struct ReportCitationView: View {
                     if let bytes {
                         Text("Byte positions after redaction: \(citation.startOffset ?? "?")–\(citation.endOffset ?? "?")").font(.caption)
                         if citation.originalOffsetsExact { Text("Original log byte positions: \(citation.originalStartOffset ?? "?")–\(citation.originalEndOffset ?? "?")").font(.caption) }
-                        else { Text("Removing sensitive data changed the length. Exact positions in the original log are not available.").font(.caption) }
+                        else { Text("Exact positions in the original log are not available for this excerpt.").font(.caption) }
                         Text(String(decoding: bytes, as: UTF8.self)).font(.system(.body, design: .monospaced)).textSelection(.enabled).accessibilityIdentifier("citationBytes")
-                        if String(data: bytes, encoding: .utf8) == nil { Text("Some bytes could not be shown as text and use replacement characters. The original bytes are available below as Base64.").font(.caption) }
-                        DisclosureGroup("Original bytes (Base64 encoding)") { Text(citation.bytesBase64 ?? "").font(.caption.monospaced()).textSelection(.enabled) }
+                        if String(data: bytes, encoding: .utf8) == nil { Text("Some bytes could not be shown as text and use replacement characters. The exact saved bytes are available below as Base64.").font(.caption) }
+                        DisclosureGroup("Exact saved bytes (Base64 encoding)") { Text(citation.bytesBase64 ?? "").font(.caption.monospaced()).textSelection(.enabled) }
                         Text("Run \(citation.runNumber ?? "?") · \(citation.runId ?? "?")\nExecution \(citation.executionId ?? "?") · \(citation.stream ?? "?")").font(.caption)
                     }
                     if let entity = citation.sourceEntityId { Text("Source entity: \(entity)").font(.caption) }

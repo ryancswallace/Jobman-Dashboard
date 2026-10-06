@@ -4,7 +4,7 @@ import type { JobRef } from "../lib/models";
 import { APIError, dashboardClient, resourcePath } from "../lib/transport";
 import { useResource } from "../lib/useResource";
 import { useSession } from "../lib/session";
-import { count, timestamp, title } from "../lib/format";
+import { count, jobStatus, timestamp, title } from "../lib/format";
 import {
   citationForReport,
   citationPreview,
@@ -379,8 +379,8 @@ function ReportView({
           </div>
           {report.outdated && (
             <p className="notice warning">
-              The job information has changed. This report describes its
-              original saved snapshot.
+              The job source or analysis settings have changed. This report
+              describes its original saved snapshot.
             </p>
           )}
           <dl className="facts compact">
@@ -622,7 +622,7 @@ function SealedReport({
           <Fact label="Control version" value={detail.controlVersion} />
           <Fact label="Contract" value={detail.contractVersion} />
           <Fact label="Platform" value={detail.platform} />
-          <Fact label="Recorded job status" value={title(detail.phase)} />
+          <Fact label="Recorded job status" value={jobStatus(detail.phase)} />
           <Fact label="Recorded final result" value={title(detail.outcome)} />
           <Fact label="Mode" value={title(detail.mode)} />
           {Object.entries(detail.versions).map(([name, value]) => (

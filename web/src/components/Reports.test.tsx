@@ -286,7 +286,9 @@ it("polls a pending task into its original sealed findings and renders advice wi
   expect(screen.getByText("original-report")).toBeVisible();
   expect(screen.getAllByText(/9007199254740993/).length).toBeGreaterThan(0);
   expect(screen.getAllByText(/not a percentage chance/).length).toBe(2);
-  expect(screen.getByText(/job information has changed/)).toBeVisible();
+  expect(
+    screen.getByText(/job source or analysis settings have changed/),
+  ).toBeVisible();
   expect(screen.getByText(/No scheduler observation/)).toBeVisible();
   expect(
     screen.queryByRole("button", { name: /retry job|cancel job|run command/i }),

@@ -180,11 +180,13 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Inbox"].firstMatch.waitForExistence(timeout: 5))
         app.tabBars.buttons["More"].tap()
         app.buttons["Settings"].tap()
-        XCTAssertTrue(app.staticTexts["Synthetic researcher"].waitForExistence(timeout: 5))
         let help = app.staticTexts["Manual only stops routine data refreshes. Access checks continue, and active log following or a report being prepared may still refresh."]
         reveal(help, app: app); XCTAssertTrue(help.exists)
         XCTAssertTrue(app.buttons["Save settings"].exists)
-        capture("Synthetic settings", app: app)
+        capture("Synthetic settings refresh explanation", app: app)
+        let account = app.staticTexts["Synthetic researcher"]
+        reveal(account, app: app); XCTAssertTrue(account.exists)
+        capture("Synthetic settings account and access", app: app)
     }
 
     func testGraphNeighborhoodSelectionAndDirectionalDependencyPages() {
