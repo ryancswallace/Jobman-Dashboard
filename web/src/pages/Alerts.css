@@ -93,6 +93,6 @@
   margin-top: 20px;
 }
 
-.rule-card > .notice {
+.panel.rule-card > .notice {
   margin-inline: 0;
 }

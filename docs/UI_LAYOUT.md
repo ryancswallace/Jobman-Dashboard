@@ -32,7 +32,8 @@ within their containers. Appearance preferences and viewport overrides were
 restored after review.
 
 The production web build, formatting and existing web suite passed: 184 tests,
-with two existing skips. Independent source review found no blockers; its
+with two existing skips. Authenticated Lab preview and web-session smoke checks
+also passed, and all seven served HTTPS assets matched the build. Independent source review found no blockers; its
 alert-card double-inset observation was corrected. This is visual engineering
 verification in Chrome, not comprehensive assistive-technology, Safari or
 physical-device acceptance.
@@ -43,5 +44,5 @@ The preview updates static assets only. API, worker and log-broker executables
 remain RC10. Seven assets are deployed in an immutable directory, with a private
 configuration/override rollback receipt and API readiness verification. The
 final asset manifest SHA-256 is
-`add2c72396e410c4e5840c58746c059526880b2a50b1325ec77d3b9bb037206c`.
+`63e17e21abcb72575615733be1f954cf69ecda4c8c8094788608186481eee8e0`.
 No migrations or changes to monitored jobs were required.
