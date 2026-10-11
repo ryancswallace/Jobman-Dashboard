@@ -16,7 +16,7 @@ Reviewed 2026-10-11 using synthetic data in the private Dashboard Lab.
 - Run lists have row spacing, separated status badges and no empty pagination
   strip. Graph and output-file freshness text uses the surrounding card inset.
 - Dark-mode badges and inputs follow theme tokens. The light-mode white
-  wordmark has a dark rounded background for contrast; the connection screen
+  logo has a dark rounded background for contrast; the connection screen
   uses the same theme-specific logos as navigation.
 
 ## Verification
