@@ -45,23 +45,27 @@ export function RunSelector({
               : "Latest logs · output files from all runs · diagnosis of recent runs"}
           </p>
         </div>
-        <button
-          className="button secondary"
-          aria-expanded={open}
-          onClick={() => setOpen((v) => !v)}
-        >
-          {open ? "Close run list" : "Choose a run"}
-        </button>
-        {selected && (
-          <button className="button secondary" onClick={() => select()}>
-            Clear run selection
+        <div className="panel-actions">
+          <button
+            className="button secondary"
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+          >
+            {open ? "Close run list" : "Choose a run"}
           </button>
-        )}
+          {selected && (
+            <button className="button secondary" onClick={() => select()}>
+              Clear run selection
+            </button>
+          )}
+        </div>
       </div>
       {selected && (
         <div className="panel-body">
-          <Status value={selected.phase} label={jobStatus(selected.phase)} />
-          <Status value={selected.outcome} />
+          <div className="run-status">
+            <Status value={selected.phase} label={jobStatus(selected.phase)} />
+            <Status value={selected.outcome} />
+          </div>
           <p>
             Run details updated{" "}
             {timestamp(selected.updatedAt, bootstrap.preferences.timezone)}.
@@ -85,20 +89,22 @@ export function RunSelector({
             first. Selecting a run filters its logs, output file details, and
             new diagnosis reports.
           </p>
-          <Freshness
-            fetchedAt={result.fetchedAt}
-            loading={result.loading}
-            error={!!result.error}
-          />
-          <button
-            className="text-button"
-            onClick={() => {
-              if (pages.length) setPages([]);
-              else result.refresh();
-            }}
-          >
-            Refresh runs
-          </button>
+          <div className="panel-meta">
+            <Freshness
+              fetchedAt={result.fetchedAt}
+              loading={result.loading}
+              error={!!result.error}
+            />
+            <button
+              className="text-button"
+              onClick={() => {
+                if (pages.length) setPages([]);
+                else result.refresh();
+              }}
+            >
+              Refresh runs
+            </button>
+          </div>
           {result.error && (
             <ErrorNotice
               error={result.error}
@@ -138,28 +144,30 @@ export function RunSelector({
                     </li>
                   ))}
                 </ul>
-                <div className="pagination">
-                  {!!pages.length && (
-                    <button
-                      className="button secondary"
-                      disabled={result.loading}
-                      onClick={() => setPages((p) => p.slice(0, -1))}
-                    >
-                      Previous run page
-                    </button>
-                  )}
-                  {result.data.data.nextCursor && (
-                    <button
-                      className="button secondary"
-                      disabled={result.loading || pages.length >= 63}
-                      onClick={() =>
-                        setPages((p) => [...p, result.data!.data.nextCursor!])
-                      }
-                    >
-                      Next run page
-                    </button>
-                  )}
-                </div>
+                {(pages.length > 0 || result.data.data.nextCursor) && (
+                  <div className="pagination">
+                    {!!pages.length && (
+                      <button
+                        className="button secondary"
+                        disabled={result.loading}
+                        onClick={() => setPages((p) => p.slice(0, -1))}
+                      >
+                        Previous run page
+                      </button>
+                    )}
+                    {result.data.data.nextCursor && (
+                      <button
+                        className="button secondary"
+                        disabled={result.loading || pages.length >= 63}
+                        onClick={() =>
+                          setPages((p) => [...p, result.data!.data.nextCursor!])
+                        }
+                      >
+                        Next run page
+                      </button>
+                    )}
+                  </div>
+                )}
                 {pages.length >= 63 && (
                   <p>
                     Navigation history reached its 64-page limit. Refresh to

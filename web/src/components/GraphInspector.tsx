@@ -171,19 +171,21 @@ function Inspector({
                 conditions and their current status
               </p>
             </div>
-            <button
-              className="button secondary"
-              onClick={() =>
-                cursor ? setCursor(undefined) : dependencies.refresh()
-              }
-            >
-              Refresh dependencies
-            </button>
-            {selected && (
-              <button className="button secondary" onClick={onClear}>
-                All graph dependencies
+            <div className="panel-actions">
+              <button
+                className="button secondary"
+                onClick={() =>
+                  cursor ? setCursor(undefined) : dependencies.refresh()
+                }
+              >
+                Refresh dependencies
               </button>
-            )}
+              {selected && (
+                <button className="button secondary" onClick={onClear}>
+                  All graph dependencies
+                </button>
+              )}
+            </div>
           </div>
           {selected && (
             <div className="panel-body">
@@ -203,11 +205,13 @@ function Inspector({
               </label>
             </div>
           )}
-          <Freshness
-            fetchedAt={dependencies.fetchedAt}
-            loading={dependencies.loading}
-            error={!!dependencies.error}
-          />
+          <div className="panel-meta">
+            <Freshness
+              fetchedAt={dependencies.fetchedAt}
+              loading={dependencies.loading}
+              error={!!dependencies.error}
+            />
+          </div>
           {dependencies.error && (
             <ErrorNotice
               error={dependencies.error}

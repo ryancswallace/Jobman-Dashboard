@@ -127,7 +127,7 @@ export function JobsPage() {
             <option value="me">Me</option>
           </select>
         </label>
-        <label>
+        <label className="date-filter">
           Completed from (UTC)
           <input
             type="datetime-local"
@@ -142,7 +142,7 @@ export function JobsPage() {
             }
           />
         </label>
-        <label>
+        <label className="date-filter">
           Completed before (UTC)
           <input
             type="datetime-local"

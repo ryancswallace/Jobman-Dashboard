@@ -95,11 +95,13 @@ export function ArtifactList({
           />
         </label>
       </div>
-      <Freshness
-        fetchedAt={result.fetchedAt}
-        loading={result.loading}
-        error={!!result.error}
-      />
+      <div className="panel-meta">
+        <Freshness
+          fetchedAt={result.fetchedAt}
+          loading={result.loading}
+          error={!!result.error}
+        />
+      </div>
       <Completeness meta={result.data?.meta} />
       {result.error && <ErrorNotice error={result.error} retry={firstPage} />}
       {!result.data && result.loading ? (

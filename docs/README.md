@@ -15,6 +15,7 @@ old destructive scenarios. Use the [Lab catalog](LAB_RUN_CATALOG.md).
 
 ## Complete guide and evidence index
 
+- [Web layout review](UI_LAYOUT.md)
 - [Dashboard wording and terminology](UI_LANGUAGE.md)
 - [Client accessibility acceptance](ACCESSIBILITY.md)
 - [API and client contracts](API.md)

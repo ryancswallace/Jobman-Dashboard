@@ -71,7 +71,16 @@ export function ConnectionScreen({
 }) {
   return (
     <main className="connection">
-      <img src="/logo.svg" className="connection-logo" alt="Jobman Dashboard" />
+      <img
+        src="/logo.svg"
+        className="connection-logo brand-light"
+        alt="Jobman Dashboard"
+      />
+      <img
+        src="/logo-transparent-dashboard.svg"
+        className="connection-logo brand-dark"
+        alt="Jobman Dashboard"
+      />
       <div className="connection-card">
         <p className="eyebrow">YOUR PRIVATE MONITORING WORKSPACE</p>
         <h1>

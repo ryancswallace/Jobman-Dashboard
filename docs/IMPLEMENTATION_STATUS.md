@@ -10,6 +10,13 @@ The adopted [implementation prompt](IMPLEMENTATION_PROMPT.md),
 [requirements](REQUIREMENTS.md) and [design](DESIGN.md) govern this work.
 Later checkpoints supersede earlier merge, version and connectivity statements.
 
+## Web layout checkpoint — 2026-10-11
+
+The [web layout review](UI_LAYOUT.md) covers responsive spacing, alignment and
+theme refinements deployed as web-only assets over the RC10 Lab services. This
+is subsequent engineering preview evidence, not a replacement RC10 publication
+or completion of the external acceptance gates.
+
 ## Current RC10 checkpoint
 
 - [RC10](https://github.com/ryancswallace/Jobman-Dashboard/releases/tag/v0.1.0-rc.10)
