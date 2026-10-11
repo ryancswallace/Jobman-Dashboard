@@ -61,7 +61,10 @@ Settings offers a native timezone dropdown plus a city, region and timezone-name
 search (for example, New York, Europe or Eastern). UTC is included explicitly,
 and the device timezone can be selected with one button. Search does not alter
 the current selection or submit preferences; Save preferences remains explicit.
-Existing timezone identifiers and aliases are preserved.
+Existing timezone identifiers and aliases are preserved. Results show timezone
+names alongside cities; exact timezone-name matches rank first. Search supports
+standard/daylight names and abbreviations such as EST and EDT, with recognized abbreviations
+matched as words rather than fragments of unrelated names.
 
 The catalog uses the browser's `Intl.supportedValuesOf("timeZone")` and its
 timezone database for formatting. Older browsers use the bundled

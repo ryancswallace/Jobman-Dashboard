@@ -360,7 +360,9 @@ it("finds a timezone by city and saves the actual identifier with revision prote
     "new york",
   );
   expect(
-    within(zone).getByRole("option", { name: "New York — America" }),
+    within(zone).getByRole("option", {
+      name: "Eastern Time — New York — America",
+    }),
   ).toHaveValue("America/New_York");
   expect(zone).toHaveValue("UTC");
   await user.selectOptions(zone, "America/New_York");
@@ -417,14 +419,14 @@ it("filters unsupported fallback zones and preserves a saved timezone alias", as
     });
     expect(zone).toHaveValue("US/Eastern");
     expect(
-      within(zone).queryByRole("option", { name: "Coyhaique — America" }),
+      within(zone).queryByRole("option", { name: /Coyhaique/ }),
     ).not.toBeInTheDocument();
     await userEvent.type(
       screen.getByRole("searchbox", { name: "Find a timezone" }),
       "Kolkata",
     );
     expect(
-      within(zone).getByRole("option", { name: "Kolkata (Calcutta) — Asia" }),
+      within(zone).getByRole("option", { name: /Kolkata \(Calcutta\) — Asia/ }),
     ).toBeInTheDocument();
     await userEvent.clear(
       screen.getByRole("searchbox", { name: "Find a timezone" }),
@@ -437,4 +439,34 @@ it("filters unsupported fallback zones and preserves a saved timezone alias", as
   } finally {
     session.bootstrap.preferences.timezone = original;
   }
+});
+
+it("shows timezone names and ranks Eastern Time above other Eastern regions", async () => {
+  const user = userEvent.setup();
+  render(<SettingsPage />);
+  await screen.findByRole("article", { name: "Alice phone" });
+  const search = screen.getByRole("searchbox", { name: "Find a timezone" });
+  const zone = screen.getByRole("combobox", { name: "Timezone" });
+  for (const query of ["Eastern", "Eastern Standard Time", "EST", "EDT"]) {
+    await user.clear(search);
+    await user.type(search, query);
+    const group = within(zone).getByRole("group", {
+      name: "Matching timezones",
+    });
+    const options = within(group).getAllByRole("option");
+    expect(options[0].textContent).toMatch(/^Eastern (?:Standard )?Time —/);
+    expect(
+      within(group).getByRole("option", {
+        name: "Eastern Time — New York — America",
+      }),
+    ).toHaveValue("America/New_York");
+    if (query === "EST" || query === "EDT") {
+      expect(
+        options.every((option) =>
+          /^Eastern (?:Standard )?Time —/.test(option.textContent ?? ""),
+        ),
+      ).toBe(true);
+    }
+  }
+  expect(zone).toHaveValue("UTC");
 });
