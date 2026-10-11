@@ -54,3 +54,20 @@ edge and 36px of right text padding. This applies to Overview, Jobs, Settings,
 watched-job selection and graph dependency direction. The controls remain native
 selects for keyboard and screen-reader interaction. Forced-color mode restores
 the system indicator. Multi-selects and list boxes retain native presentation.
+
+## Timezone selection
+
+Settings offers a native timezone dropdown plus a city, region and timezone-name
+search (for example, New York, Europe or Eastern). UTC is included explicitly,
+and the device timezone can be selected with one button. Search does not alter
+the current selection or submit preferences; Save preferences remains explicit.
+Existing timezone identifiers and aliases are preserved. Results show timezone
+names alongside cities; exact timezone-name matches rank first. Search supports
+standard/daylight names and abbreviations such as EST and EDT, with recognized abbreviations
+matched as words rather than fragments of unrelated names.
+
+The catalog uses the browser's `Intl.supportedValuesOf("timeZone")` and its
+timezone database for formatting. Older browsers use the bundled
+`web/src/lib/timezones.json` fallback, generated from the pinned Node runtime's
+`Intl.supportedValuesOf("timeZone")` list. Refresh this fallback when updating the
+Node toolchain. The list describes timezones, not every city within each zone.
