@@ -46,3 +46,11 @@ configuration/override rollback receipt and API readiness verification. The
 final asset manifest SHA-256 is
 `63e17e21abcb72575615733be1f954cf69ecda4c8c8094788608186481eee8e0`.
 No migrations or changes to monitored jobs were required.
+
+## Dropdown arrow follow-up
+
+Single-value dropdowns share a centered arrow inset 12px from the right padding
+edge and 36px of right text padding. This applies to Overview, Jobs, Settings,
+watched-job selection and graph dependency direction. The controls remain native
+selects for keyboard and screen-reader interaction. Forced-color mode restores
+the system indicator. Multi-selects and list boxes retain native presentation.
