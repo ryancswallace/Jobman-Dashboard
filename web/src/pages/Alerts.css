@@ -83,3 +83,16 @@
     align-items: start;
   }
 }
+
+.rule-activation-list li > span:first-child,
+.rule-watched-jobs li > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.card-list + .pagination {
+  margin-top: 20px;
+}
+
+.rule-card > .notice {
+  margin-inline: 0;
+}

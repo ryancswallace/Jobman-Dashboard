@@ -1,19 +1,19 @@
 .target-details .panel > h2 {
   margin: 0;
-  padding: 20px 24px;
+  padding: 20px var(--panel-inset);
   border-bottom: 1px solid var(--line);
   font-size: 16px;
 }
 .target-details .panel > p,
 .target-details .panel > details {
-  padding: 16px 24px;
+  padding: 16px var(--panel-inset);
   margin: 0;
 }
 .target-details .facts-grid {
   display: grid;
   grid-template-columns: 180px minmax(0, 1fr);
-  gap: 16px 24px;
-  padding: 24px;
+  gap: 16px var(--panel-inset);
+  padding: var(--panel-inset);
   margin: 0;
   font-size: 13px;
 }
@@ -27,7 +27,7 @@
 .target-details .partition-list {
   max-height: 20rem;
   overflow: auto;
-  padding: 0 24px 12px 44px;
+  padding: 0 var(--panel-inset) 12px calc(var(--panel-inset) + 20px);
   font-size: 13px;
   line-height: 1.8;
 }
@@ -45,5 +45,5 @@
 }
 
 .target-catalog > details {
-  padding: 16px 24px;
+  padding: 16px var(--panel-inset);
 }

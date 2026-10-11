@@ -6,6 +6,10 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
+- Refine web layout across overview, jobs, groups, targets, inbox, alerts and
+  settings: consistent insets, aligned metrics and controls, responsive headers
+  and date filters, readable tables, and theme-aware badges and branding.
+
 - Verify Cloudsmith-normalized Alpine filenames by package name, version and
   architecture while still requiring the original APK checksum.
 
