@@ -20,6 +20,7 @@ import {
   type Device,
   type DeviceSettingsInput,
 } from "../lib/devices";
+import { TimezoneSelector } from "../components/TimezoneSelector";
 import "./Settings.css";
 const permissionNames = new Map([
   ["namespace.read", "View namespace"],
@@ -71,7 +72,7 @@ function SettingsWorkspace() {
           ? e
           : new APIError(
               "invalid_preferences",
-              "Enter a timezone name such as America/New_York or UTC.",
+              "Choose a timezone from the list.",
             ),
       );
     } finally {
@@ -98,20 +99,14 @@ function SettingsWorkspace() {
               void save();
             }}
           >
-            <label>
-              Timezone
-              <input
-                value={draft.timezone}
-                onChange={(e) => {
-                  setDraft({ ...draft, timezone: e.target.value });
-                  setDirty(true);
-                }}
-                placeholder="America/New_York"
-              />
-              <small>
-                Use a timezone name such as America/New_York or UTC.
-              </small>
-            </label>
+            <TimezoneSelector
+              value={draft.timezone}
+              onChange={(timezone) => {
+                setDraft({ ...draft, timezone });
+                setDirty(true);
+                setMessage("");
+              }}
+            />
             <label>
               Appearance
               <select

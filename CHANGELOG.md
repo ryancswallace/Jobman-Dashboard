@@ -6,6 +6,9 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
+- Replace free-text timezone entry with a searchable timezone list and a
+  device-timezone shortcut in web Settings.
+
 - Inset dropdown arrows consistently and reserve text clearance across all web
   selects, including Overview periods and Jobs filters.
 

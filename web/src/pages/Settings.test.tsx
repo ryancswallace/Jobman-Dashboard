@@ -349,3 +349,92 @@ it("keeps the new mutation abort fence after a revoked request settles late", as
   await act(async () => second(json({ ...base, enabled: false })));
   await screen.findByText("No registered iPhones");
 });
+it("finds a timezone by city and saves the actual identifier with revision protection", async () => {
+  const user = userEvent.setup();
+  render(<SettingsPage />);
+  await screen.findByRole("article", { name: "Alice phone" });
+  const zone = screen.getByRole("combobox", { name: "Timezone" });
+  expect(within(zone).getAllByRole("option").length).toBeGreaterThan(400);
+  await user.type(
+    screen.getByRole("searchbox", { name: "Find a timezone" }),
+    "new york",
+  );
+  expect(
+    within(zone).getByRole("option", { name: "New York — America" }),
+  ).toHaveValue("America/New_York");
+  expect(zone).toHaveValue("UTC");
+  await user.selectOptions(zone, "America/New_York");
+  await user.click(screen.getByRole("button", { name: "Save preferences" }));
+  await screen.findByText("Preferences saved.");
+  const save = calls.find(
+    (c) => c.path === "/api/v1/preferences" && c.method === "PUT",
+  )!;
+  expect(save.body).toMatchObject({
+    timezone: "America/New_York",
+    revision: "1",
+  });
+  expect(save.headers.get("If-Match")).toBe("1");
+  expect(save.headers.get("X-CSRF-Token")).toBe("csrf-current");
+});
+it("keeps the timezone when a search has no results and does not save on search Enter", async () => {
+  const user = userEvent.setup();
+  render(
+    <main>
+      <SettingsPage />
+    </main>,
+  );
+  await screen.findByRole("article", { name: "Alice phone" });
+  const zone = screen.getByRole("combobox", { name: "Timezone" });
+  await user.selectOptions(zone, "Europe/London");
+  await user.type(
+    screen.getByRole("searchbox", { name: "Find a timezone" }),
+    "no-such-place{Enter}",
+  );
+  expect(zone).toHaveValue("Europe/London");
+  expect(screen.getByText(/No matching timezones/)).toBeVisible();
+  expect(calls.some((c) => c.method === "PUT")).toBe(false);
+  await auditAccessibility();
+});
+it("filters unsupported fallback zones and preserves a saved timezone alias", async () => {
+  const formatter = Intl.DateTimeFormat;
+  vi.spyOn(Intl, "DateTimeFormat").mockImplementation(
+    function (locales, options) {
+      if (options?.timeZone === "America/Coyhaique")
+        throw new RangeError("Unsupported timezone");
+      return new formatter(locales, options);
+    },
+  );
+  const fallbackIntl = Object.create(Intl);
+  fallbackIntl.supportedValuesOf = undefined;
+  vi.stubGlobal("Intl", fallbackIntl);
+  const original = session.bootstrap.preferences.timezone;
+  session.bootstrap.preferences.timezone = "US/Eastern";
+  try {
+    render(<SettingsPage />);
+    await screen.findByRole("article", { name: "Alice phone" });
+    const zone = screen.getByRole("combobox", {
+      name: "Timezone",
+    });
+    expect(zone).toHaveValue("US/Eastern");
+    expect(
+      within(zone).queryByRole("option", { name: "Coyhaique — America" }),
+    ).not.toBeInTheDocument();
+    await userEvent.type(
+      screen.getByRole("searchbox", { name: "Find a timezone" }),
+      "Kolkata",
+    );
+    expect(
+      within(zone).getByRole("option", { name: "Kolkata (Calcutta) — Asia" }),
+    ).toBeInTheDocument();
+    await userEvent.clear(
+      screen.getByRole("searchbox", { name: "Find a timezone" }),
+    );
+    expect(within(zone).getAllByRole("option").length).toBeGreaterThan(400);
+    await userEvent.click(
+      screen.getByRole("button", { name: /Use this device’s timezone/ }),
+    );
+    expect(zone).toHaveValue(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  } finally {
+    session.bootstrap.preferences.timezone = original;
+  }
+});

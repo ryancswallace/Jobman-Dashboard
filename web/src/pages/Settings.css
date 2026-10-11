@@ -59,3 +59,23 @@
 .device-checkbox input {
   width: auto;
 }
+
+.timezone-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.timezone-selector small {
+  font-size: 11px;
+  color: var(--muted);
+}
+.timezone-selector label:not(:first-child) {
+  margin-top: 6px;
+}
+.timezone-selector .text-button {
+  align-self: flex-start;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
