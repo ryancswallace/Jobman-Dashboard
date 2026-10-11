@@ -6,6 +6,9 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
+- Inset dropdown arrows consistently and reserve text clearance across all web
+  selects, including Overview periods and Jobs filters.
+
 - Refine web layout across overview, jobs, groups, targets, inbox, alerts and
   settings: consistent insets, aligned metrics and controls, responsive headers
   and date filters, readable tables, and theme-aware badges and branding.
