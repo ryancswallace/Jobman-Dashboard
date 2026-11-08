@@ -90,14 +90,14 @@ def preflight(args):
     selection(args.version, args.revision, args.repository)
     need(os.environ.get("GITHUB_REF") == "refs/heads/main", "Publication must run from main")
     need(os.environ.get("GITHUB_SHA") == args.revision, "Workflow revision differs from selected source")
-    need(api(f"repos/{args.repository}/commits/main")["sha"] == args.revision, "Main advanced; select a newly tested RC")
+    need(api(f"repos/{args.repository}/commits/main")["sha"] == args.revision, "Main advanced; select a newly tested release")
     for gate in GATES:
         response = api(f"repos/{args.repository}/actions/workflows/{gate}/runs?head_sha={args.revision}&event=push&per_page=100")
         latest_gate(response["workflow_runs"], args.revision)
     # A list endpoint distinguishes an absent tag from authentication/network errors.
     refs = api(f"repos/{args.repository}/git/matching-refs/tags/{args.version}")
-    need(not any(r["ref"] == "refs/tags/" + args.version for r in refs), "Tag already exists; recovery requires a new RC, never overwrite")
-    need(release_for_tag(args.repository, args.version) is None, "Release already exists; use a new RC")
+    need(not any(r["ref"] == "refs/tags/" + args.version for r in refs), "Tag already exists; recovery requires a new version, never overwrite")
+    need(release_for_tag(args.repository, args.version) is None, "Release already exists; use a new version")
 
 
 def package_module():
@@ -267,7 +267,7 @@ def stage(args):
              "are scheduled after the first production release; their known limitations "
              "are accepted for that release. "
              "The native archive is unsigned and cannot be installed. "
-             "Containers and packages contain the canonical Linux candidate bytes. "
+             "Containers and packages contain the canonical Linux release bytes. "
              "See docs/FIRST_RELEASE_SCOPE.md for scope, and RELEASE.md and "
              "docs/FINAL_CANDIDATE.md for installation and publication checks.")
     prerelease = bool(RC.fullmatch(args.version))

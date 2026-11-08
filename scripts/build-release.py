@@ -293,7 +293,7 @@ def build(version, architectures, output):
             write_checksums(bundle)
             write_archive(bundle, output / (bundle.name + ".tar.gz"), epoch)
         write_checksums(output)
-    print(f"Built {len(architectures)} candidate bundle(s) from {revision}; no release published or service installed.")
+    print(f"Built {len(architectures)} release bundle(s) from {revision}; no release published or service installed.")
 
 
 def main():
