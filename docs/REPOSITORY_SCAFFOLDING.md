@@ -46,7 +46,8 @@ remain authoritative; scaffolding is not a new production-readiness claim.
   versioned GHCR images, SPDX inventories and GitHub attestations. A separate
   Cloudsmith workflow uses the shared `jobman/stable` repository and a personal API key.
   Automatic semantic version publication, stable/latest promotion, Homebrew and
-  Apple distribution remain gated. Failed partial releases retain their version;
+  Apple distribution are outside the current RC-only workflow. Managed Apple
+  delivery follows the approved post-release scope. Failed partial releases retain their version;
   repairs use a new candidate rather than replacing artifacts. See
   [release engineering](../RELEASE.md) and [distribution](DISTRIBUTION.md).
 - Documentation is organized around the existing `deploy/` and `scripts/` paths,

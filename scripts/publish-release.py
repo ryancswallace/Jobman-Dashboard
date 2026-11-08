@@ -259,12 +259,15 @@ def stage(args):
     # Creating the ref reserves the version. A partial failure intentionally
     # remains immutable and requires a new RC rather than destructive repair.
     api(f"repos/{args.repository}/git/refs", "--method", "POST", "-f", "ref=refs/tags/" + args.version, "-f", "sha=" + args.revision)
-    notes = ("Engineering release candidate; final release eligibility remains false. "
-             "Corporate AD FS/direct AD, real APNs, signing/internal distribution, "
-             "company-managed-device and pilot acceptance remain open. "
+    notes = ("Engineering release candidate. Product review is complete for the "
+             "approved first-production-release scope. Corporate identity validation, "
+             "real APNs, managed signing/distribution and additional acceptance work "
+             "are scheduled after the first production release; their known limitations "
+             "are accepted for that release. "
              "The native archive is unsigned and cannot be installed. "
              "Containers and packages contain the canonical Linux candidate bytes. "
-             "See RELEASE.md and docs/FINAL_CANDIDATE.md for installation and gates.")
+             "See docs/FIRST_RELEASE_SCOPE.md for scope, and RELEASE.md and "
+             "docs/FINAL_CANDIDATE.md for installation and publication checks.")
     run(["gh", "release", "create", args.version, "--repo", args.repository, "--verify-tag", "--draft", "--prerelease", "--latest=false", "--title", "Jobman Dashboard " + args.version + " (engineering RC)", "--notes", notes])
     run(["gh", "release", "upload", args.version, "--repo", args.repository, *[str(p) for p in sorted(args.input.iterdir())]], timeout=900)
 

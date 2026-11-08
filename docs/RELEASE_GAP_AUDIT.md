@@ -1,4 +1,10 @@
-# Remaining product work found in the release audit
+# Historical release audit and follow-up
+
+This is the historical October 4 audit. The [November 8 scope decision](FIRST_RELEASE_SCOPE.md)
+supersedes its first-release completion conditions: Ryan's review is complete,
+agent reliability is included, and every other unfinished item is scheduled for
+a later release. Preserve the findings as technical history, not a current
+first-release blocking checklist.
 
 The October 4 audit compares R01–R22 and WP01–WP15 with the authored design,
 current client code, and the evidence in `IMPLEMENTATION_STATUS.md`. This is a
@@ -15,22 +21,23 @@ remains tracked separately; this audit does not duplicate those operations.
 | R04, WP12 | Native overview always uses the default completion window; web offers 24 hours and seven days. | Add equivalent bounded window selection and exact-window drill-down tests. |
 | R18, WP01/WP12/WP15 | Native release preparation has no app-icon asset catalog, unsigned physical-device archive pipeline, or parameterized archive/export tooling. Existing CI builds a simulator app; version/build defaults are fixed. | Prepare reusable assets, validated version/build inputs, an unsigned Release device archive and inspectable manifest, and explicit signing/export instructions. Do not invent the organization’s bundle/team/channel or embed signing material. |
 
-These repairs are unblocked implementation work. Their automated evidence does
+These were the original implementation findings; completed repairs retain their evidence and unfinished work now follows the November 8 post-release scope. Their automated evidence does
 not replace actual AD FS acceptance, signed APNs delivery, supported-browser
 visual/assistive-technology checks, or installation/accessibility on company
 managed iPhones. The recorded browser policy block remains in force; no alternate
 driver or origin is an acceptance workaround. The Apple distribution decision,
-signing/APNs ownership and real device inputs remain external gates.
+signing/APNs ownership and real device inputs belong to the post-release roadmap.
 
 R01–R02/R07/R10–R17/R19–R20/R22 have corresponding implementation and focused
 tests; their remaining system evidence is recorded in the status document.
 This audit is not a claim that every production acceptance gate for those
 requirements has passed. Upstream protected reviews, released dependency pins,
-and a final clean candidate still govern release completion.
+and candidate provenance retain their recorded meaning without reinstating postponed first-release conditions.
 
 The [final candidate procedure](FINAL_CANDIDATE.md) carries this audit in the
-curated release documentation and keeps upstream, native and external acceptance
-gates explicit. Packaging this audit does not itself close any finding.
+curated release documentation. Its unfinished upstream, native and external
+validation items follow the post-release roadmap; packaging this audit does not
+claim that an unperformed check passed.
 
 ## Web recovery follow-up
 

@@ -1,5 +1,12 @@
 # Jobman Dashboard initial-release handoff
 
+The [November 8 first-release decision](FIRST_RELEASE_SCOPE.md) records Ryan's
+completed product review, includes agent reliability, and moves all other
+unfinished work to later releases. Earlier acceptance conditions in the historical
+handoffs below are superseded; their versioned evidence and artifact identities
+remain unchanged. Unverified integrations are accepted limitations, not
+outstanding first-release approvals.
+
 ## Current candidate — RC11
 
 [RC11](https://github.com/ryancswallace/Jobman-Dashboard/releases/tag/v0.1.0-rc.11)
@@ -39,9 +46,9 @@ both Linux manifests retain `finalReleaseEligible: false` and
 `controlCompatibilityVerified: false`.
 
 RC11 has no new Lab activation or external acceptance evidence. Corporate
-AD FS/direct AD, real APNs, signing/company-managed-device delivery, manual
-accessibility, pilot/operations and compatible stable Diagnose acceptance remain
-open. The native archive remains unsigned and non-installable. Historical RC10
+AD FS/direct AD, real APNs, managed signing/distribution, additional accessibility
+and pilot/operations work, and compatible stable Diagnose acceptance are
+scheduled for later releases under the approved scope. The native archive remains unsigned and non-installable. Historical RC10
 Lab and distribution evidence below applies only to its recorded artifacts; this
 post-publication receipt supplements the immutable RC11 build-time documentation.
 
@@ -268,7 +275,7 @@ approved environment. Simulator/Keycloak evidence does not establish actual
 AD FS, APNs, physical Keychain behavior, manual accessibility or company-managed
 phone acceptance.
 
-## Inputs needed to complete the release
+## Later-release integration inputs
 
 | Prerequisite | Concrete input / action | Owner |
 | --- | --- | --- |
@@ -282,5 +289,5 @@ phone acceptance.
 Production AD/AD FS/MDM/network changes, production deployment/migration, paid
 capacity/enrollment and company distribution require the concrete final approval
 specified in the adopted implementation prompt. Candidate GitHub delivery and
-synthetic Lab work are already authorized. Final release must retain its gates
-until the required external checks have actually succeeded.
+synthetic Lab work are already authorized. The November 8 scope decision postpones these integration checks; it does not
+record them as passed or reintroduce them as first-release conditions.

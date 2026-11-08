@@ -1,9 +1,12 @@
 # Initial release implementation status
 
-Updated: 2026-11-08. **Engineering prerelease v0.1.0-rc.11 is published with
-passing release and package distribution workflows. Final acceptance remains
-open.** Corporate identity, real APNs, signed managed-device, manual
-accessibility, pilot/operations and stable Diagnose provider gates remain.
+Updated: 2026-11-08. **Product review is complete for the approved first
+production release.** Agent reliability is included in this scope; all other
+unfinished work is scheduled for later releases, with limitations accepted by
+Ryan. [First-release scope and follow-up](FIRST_RELEASE_SCOPE.md) supersedes the
+earlier acceptance conditions in this chronological record. Engineering
+prerelease v0.1.0-rc.11 is published with passing release and package distribution
+workflows; its published identity and receipts are unchanged.
 Historical checkpoints below retain their original versions, failures and counts.
 RC10 Lab activation evidence has not been rerun against RC11.
 
@@ -26,11 +29,13 @@ Later checkpoints supersede earlier merge, version and connectivity statements.
   [sanitized receipt](evidence/rc11-distribution.json).
 - [Cloudsmith run 42505808404](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/42505808404)
   published and verified all six RC11 packages through the existing shared
-  `jobman/stable` channel. RC identity and all external acceptance gates remain.
+  `jobman/stable` channel. Its RC artifact identity remains unchanged; the later
+  product-scope decision is recorded separately above.
   No RC11 Lab activation, corporate identity, APNs, signed-device, manual
   accessibility or pilot acceptance was performed. Core `v1.9.0` and Diagnose
   `v0.7.0-rc.1` remain the embedded upstream versions; candidate manifests retain
-  final-release ineligibility and unverified Control compatibility.
+  their original engineering-candidate eligibility flag and unverified Control
+  compatibility. These recorded flags do not reinstate postponed product work.
 
 ## External deployment configuration checkpoint — 2026-11-08
 
@@ -54,7 +59,7 @@ APNs, managed-device, production deployment or accessibility acceptance.
 The [web layout review](UI_LAYOUT.md) covers responsive spacing, alignment and
 theme refinements deployed as web-only assets over the RC10 Lab services. This
 is subsequent engineering preview evidence, not a replacement RC10 publication
-or completion of the external acceptance gates.
+or additional evidence for the later organization-integration work.
 
 ## Historical RC10 checkpoint
 

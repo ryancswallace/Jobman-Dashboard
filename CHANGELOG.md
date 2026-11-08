@@ -11,6 +11,9 @@ Notable changes are recorded here. Historical engineering evidence remains in
   configuration validation and structural schema export. Expose only typed public
   presentation to clients, and stage isolated native identity/asset profiles
   without changing the generic source project or signing an app.
+- Record completed first-release product review, the accepted implemented baseline
+  plus agent reliability, and the explicit deferral of all other unfinished work
+  to later releases. Preserve known limitations and historical verification facts.
 
 - Update Go to 1.26.10 and refresh frontend dependencies, including the Vitest
   security fixes. Keep local, container and CI toolchains aligned.

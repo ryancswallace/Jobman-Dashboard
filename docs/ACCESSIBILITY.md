@@ -1,6 +1,8 @@
 # Client accessibility acceptance
 
-Accessibility is part of T06 and T10 release acceptance. Automated DOM checks,
+Accessibility is part of the T06 and T10 validation roadmap. Additional manual
+acceptance is scheduled after the first production release under the
+[approved scope](FIRST_RELEASE_SCOPE.md). Automated DOM checks,
 browser rendering and assistive-technology tests are separate evidence. Record
 the exact build, OS, browser/device, display settings and observed result for
 each manual check below; an unperformed check remains open.
