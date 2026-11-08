@@ -6,6 +6,9 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
+- Update Go to 1.26.10 and refresh frontend dependencies, including the Vitest
+  security fixes. Keep local, container and CI toolchains aligned.
+
 - Replace free-text timezone entry with a searchable timezone list and a
   device-timezone shortcut in web Settings.
 
