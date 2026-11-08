@@ -1,6 +1,6 @@
 # Authentication and private configuration
 
-Status: implemented authentication/monitoring slice under test; no production rollout or release acceptance. Real AD FS and directory integration are still required. The Lab identity provider and local signed-token fixtures establish application behavior only.
+Status: authentication and monitoring are implemented. Product review is complete under the [approved first-release scope](FIRST_RELEASE_SCOPE.md); corporate AD FS and directory integration validation are scheduled for later releases. The Lab identity provider and local signed-token fixtures establish application behavior only, and do not establish corporate integration or a production rollout.
 
 ## Configuration and commands
 
@@ -21,7 +21,7 @@ Encryption keys are exactly 32 raw bytes. Delegation signing keys are PKCS8 Ed25
 
 ## AD FS registration contract
 
-The installation needs three distinct identifiers: confidential web client, public native client, and Dashboard API audience. Register the exact web callback `https://<dashboard-host>/auth/callback` and native callback `jobman-dashboard-auth://callback`. Configure S256 PKCE, signed RS256 tokens, the approved immutable directory UUID claim, and the access-token client identity claim. `directoryIdClaim` and `clientIdClaim` are operator-selected claim names, not claims guessed from display names or email. Verify actual token shape with the identity owner before production acceptance.
+The installation needs three distinct identifiers: confidential web client, public native client, and Dashboard API audience. Register the exact web callback `https://<dashboard-host>/auth/callback` and native callback `jobman-dashboard-auth://callback`. Configure S256 PKCE, signed RS256 tokens, the approved immutable directory UUID claim, and the access-token client identity claim. `directoryIdClaim` and `clientIdClaim` are operator-selected claim names, not claims guessed from display names or email. Verify actual token shape with the identity owner when performing the later corporate integration work.
 
 Discovery, token exchange and signing-key requests use explicit private CA trust, bounded responses/timeouts, one allowed issuer origin and no redirects. Metadata advertising PKCE methods must include S256. An installation whose metadata omits that field still has to pass an actual PKCE exchange; there is no downgrade.
 
@@ -45,6 +45,6 @@ The database prevents reusing a deployment UUID for a replacement Control instan
 
 Automated signed-token TLS tests cover browser PKCE/nonce/state, replay, secure cookies, CSRF, sign-out, API audience/client/directory validation and clock policy. Mutual-TLS adapter tests cover source substitution, namespace mismatch, absent/stale authorization, redirects, body/page bounds, alias identity, revocation during reads and large revision fidelity. Real Lab PostgreSQL tests cover alias conflicts, session idle expiry/revocation, one-use login state, schema integrity, source registration and preference concurrency.
 
-Key rotation currently starts a new web-session security epoch: changing the authentication encryption key invalidates outstanding login attempts and session CSRF proofs. Plan a sign-in reset and keep the old configuration only within the approved rollback procedure. Per-Control trust rotation/disablement, directory reconciliation, authoritative deployment acceptance, remaining record-family retention and packaging remain tracked in `IMPLEMENTATION_STATUS.md` and the design; passing these local tests does not waive them.
+Key rotation currently starts a new web-session security epoch: changing the authentication encryption key invalidates outstanding login attempts and session CSRF proofs. Plan a sign-in reset and keep the old configuration only within the approved rollback procedure. Per-Control trust rotation/disablement, directory reconciliation, deployment validation, record-family retention and packaging evidence are tracked in `IMPLEMENTATION_STATUS.md` and the design. Any unfinished work in these areas is scheduled after the first production release; local tests do not establish external integration evidence.
 
 The opt-in synthetic Lab PKCE check runs with `JOBMAN_DASHBOARD_LAB_ROOT=/absolute/path/to/jobman-lab go test -tags=integration -race -run '^TestLabNativePKCEAndDashboardTokenValidation$' ./internal/auth`. It uses only the named synthetic account, verifies the Lab CA and issuer hostname without changing host DNS/trust, and keeps passwords/tokens out of output. A passing run proves native S256 code exchange, signed API/client/directory identity, ID-token nonce and rejection as an API credential, and authorization-code replay denial against Lab Keycloak. It does not prove AD FS, the deployed Dashboard session/database path, or a physical iPhone.

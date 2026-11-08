@@ -2,7 +2,7 @@
 
 The broker reads immutable Control log chunks from explicitly approved local or NFS roots. Dashboard assembles byte ranges through authenticated broker calls; the web and iPhone receive bytes, original offsets and stream state. They receive no storage roots, object keys, certificates or download URLs. Artifact metadata uses a separate bounded Control path.
 
-Implementation status: the file/process, delegation, cursor and broker transport paths have focused tests and independent security review. Actual Control manifests and newly produced cross-user NFS chunks pass [subprocess acceptance](LAB_EXECUTION.md); [split acceptance](LAB_SPLIT.md) verifies separate interactive/worker callers. The full failure/load matrix remains open. This document does not establish release acceptance.
+Implementation status: the file/process, delegation, cursor and broker transport paths have focused tests and independent security review. Actual Control manifests and newly produced cross-user NFS chunks pass [subprocess acceptance](LAB_EXECUTION.md); [split acceptance](LAB_SPLIT.md) verifies separate interactive/worker callers. Any additional failure/load validation is later-release work under the [approved scope](FIRST_RELEASE_SCOPE.md). This document records those specific checks without claiming unperformed validation.
 
 ## Placement and credentials
 

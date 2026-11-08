@@ -1,8 +1,10 @@
 # Candidate distribution
 
-Dashboard publishes engineering release candidates. A published candidate is not
-production acceptance: real AD FS/direct AD, APNs, signed managed-device delivery,
-manual accessibility and pilot/operations gates remain open. The unsigned iPhone
+Dashboard publishes engineering release candidates. Product review is complete
+for the [approved first-production-release scope](FIRST_RELEASE_SCOPE.md).
+Corporate AD FS/direct AD, APNs, signed managed-device delivery, manual
+accessibility and additional pilot/operations work are scheduled for later
+releases; publication does not establish evidence for those integrations. The unsigned iPhone
 archive is retained for provenance; it cannot be installed on a phone.
 
 ## Artifact contract
