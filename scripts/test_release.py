@@ -33,6 +33,10 @@ class ReleaseTests(unittest.TestCase):
         self.assertTrue(result["stableVersions"])
         self.assertFalse(result["controlCompatibilityVerified"])
         self.assertFalse(result["finalReleaseEligible"])
+        stable = release.upstream_release_pins({"dashboard": modules}, "v0.1.0")
+        self.assertTrue(stable["finalReleaseEligible"])
+        self.assertFalse(stable["controlCompatibilityVerified"])
+        self.assertEqual(stable["scopeDocument"], "docs/FIRST_RELEASE_SCOPE.md")
         for version in ("v1.2.4-0.20260101000000-abcdef012345", "v1.2.3-rc.1", "v1.2.3+incompatible", "v01.2.3"):
             changed = [dict(m) for m in modules]; changed[0]["Version"] = version
             self.assertFalse(release.upstream_release_pins({"dashboard": changed})["stableVersions"])

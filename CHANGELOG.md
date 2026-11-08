@@ -6,6 +6,12 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
+- Add immutable full-release publication with stable GitHub/latest identity,
+  channel-consistent packages, container checks, provenance and verified draft
+  promotion. Retain candidate support and accepted first-release limitations.
+- Embed released Core v1.10.1 and Diagnose v0.7.0-rc.3 and require reachable Go
+  and locked web vulnerability checks in ordinary candidate-qualifying CI.
+
 - Support external deployment presentation, new-account preferences, bounded
   operational tuning and future report/inbox retention. Add offline role-specific
   configuration validation and structural schema export. Expose only typed public

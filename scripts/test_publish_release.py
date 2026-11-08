@@ -30,8 +30,8 @@ class PublicationTests(unittest.TestCase):
     def args(self, **values):
         return argparse.Namespace(version=VERSION, revision=REVISION, repository=REPO, **values)
 
-    def test_stable_and_shell_versions_rejected_before_network(self):
-        for version in ('v0.1.0', 'v0.01.0-rc.1', 'v0.1.0-rc.0', 'v0.1.0-rc.1;id'):
+    def test_noncanonical_and_shell_versions_rejected_before_network(self):
+        for version in ('v0.01.0', 'v0.01.0-rc.1', 'v0.1.0-rc.0', 'v0.1.0-rc.1;id'):
             with self.subTest(version=version), patch.object(release, 'api') as api:
                 args = self.args(); args.version = version
                 with self.assertRaises(ValueError):
@@ -153,6 +153,24 @@ class PublicationTests(unittest.TestCase):
             release.publish(args)
             verify.assert_called_once_with(args)
             api.assert_called_once_with(f'repos/{REPO}/releases/405033021', '--method', 'PATCH', '-F', 'draft=false', '-F', 'prerelease=true', '-f', 'make_latest=false')
+
+    def test_full_release_is_published_as_latest_after_draft_verification(self):
+        args = self.args()
+        args.version = 'v0.1.0'
+        release.selection(args.version, REVISION, REPO)
+        published = {'id': 405033022, 'tag_name': args.version, 'draft': False, 'prerelease': False}
+        with patch.object(release, 'verify_draft', return_value=published['id']) as verify, patch.object(release, 'api', return_value=published) as api:
+            release.publish(args)
+            verify.assert_called_once_with(args)
+            api.assert_called_once_with(f'repos/{REPO}/releases/405033022', '--method', 'PATCH', '-F', 'draft=false', '-F', 'prerelease=false', '-f', 'make_latest=true')
+
+    def test_full_release_verification_failure_cannot_publish(self):
+        args = self.args()
+        args.version = 'v0.1.0'
+        with patch.object(release, 'verify_draft', side_effect=ValueError('wrong source')), patch.object(release, 'api') as api:
+            with self.assertRaises(ValueError):
+                release.publish(args)
+            api.assert_not_called()
 
     def test_image_absence_requires_explicit_registry_result(self):
         for stderr in ('ERROR: ghcr.io/owner/app:v0.1.0-rc.8: not found', 'manifest unknown'):

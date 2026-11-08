@@ -18,9 +18,9 @@ Neither document turns a pending acceptance into a passing one.
 ## Compatible upstream versions
 
 Candidate builds accept checksum-verified immutable released versions, prereleases
-and development pseudo-versions. The current source pins Core `v1.9.0` and
-Diagnose `v0.7.0-rc.1`; Control `v0.2.0` is verified deployed on both Dashboard Lab
-sources. Diagnose real-provider acceptance, compatible stable publication and
+and development pseudo-versions. The current source pins Core `v1.10.1` and
+Diagnose `v0.7.0-rc.3`; Control `v0.3.0` is selected for the evaluation baseline.
+Earlier Lab deployments retain their recorded versions. Diagnose real-provider acceptance, compatible stable publication and
 subsequent dependency updates are post-release work; see the exact tuple in
 [release handoff](RELEASE_HANDOFF.md). The approved first release may retain the
 recorded compatible candidate dependency. Applicable checks still verify the
@@ -44,10 +44,13 @@ multi-source behavior is claimed. Keep the original-event, cursor binding,
 current authorization and historical-run evidence associated with those exact
 versions. A module-only check does not establish separately deployed Control behavior.
 
-The current builder accepts only `vX.Y.Z-rc.N`. Adding final-version publication
-support is not implemented by this RC-only builder. Its version syntax and
-manifest fields describe the tooling, not additional acceptance conditions for
-the approved first-release scope. Do not rewrite already published candidates.
+The builder and protected publisher accept `vX.Y.Z` full releases and
+`vX.Y.Z-rc.N` candidates. Full releases are published as non-prerelease/latest;
+candidates retain their prerelease identity and are not marked latest. Both require exact-source
+CI, including current vulnerability checks, reproducible archives/packages,
+native archive verification and all file/container attestations. Never rewrite
+published versions. Full-release metadata binds the approved scope document and
+keeps unverified integration flags false.
 
 ## Controlled RC publication
 

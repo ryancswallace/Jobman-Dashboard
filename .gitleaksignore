@@ -1,0 +1,41 @@
+# Reviewed historical false positives only; no path-wide or test-wide exclusions.
+# Hashes, fixed filenames/identifiers and prose are not reusable credentials.
+# New fingerprints require review; run Gitleaks with --redact=100.
+0002cfd6f14f58e030c57a91e591a857aacea349:contracts/manifest.json:generic-api-key:4
+0002cfd6f14f58e030c57a91e591a857aacea349:contracts/swift/DashboardAPI.generated.swift:generic-api-key:2
+0002cfd6f14f58e030c57a91e591a857aacea349:contracts/typescript/dashboard.generated.ts:generic-api-key:2
+16d06abdc00c37516e247b1dd8c0fd5290035072:contracts/manifest.json:generic-api-key:4
+16d06abdc00c37516e247b1dd8c0fd5290035072:contracts/swift/DashboardAPI.generated.swift:generic-api-key:2
+16d06abdc00c37516e247b1dd8c0fd5290035072:contracts/typescript/dashboard.generated.ts:generic-api-key:2
+2787a30f7e6b61692f90662669e34999a9c68628:contracts/manifest.json:generic-api-key:4
+2787a30f7e6b61692f90662669e34999a9c68628:contracts/swift/DashboardAPI.generated.swift:generic-api-key:2
+2787a30f7e6b61692f90662669e34999a9c68628:contracts/typescript/dashboard.generated.ts:generic-api-key:2
+5e25534850aa1231ebb7ff05ff9386867bf12f22:contracts/manifest.json:generic-api-key:4
+5e25534850aa1231ebb7ff05ff9386867bf12f22:contracts/swift/DashboardAPI.generated.swift:generic-api-key:2
+5e25534850aa1231ebb7ff05ff9386867bf12f22:contracts/typescript/dashboard.generated.ts:generic-api-key:2
+6104d4a2df277098a1b2e746ebe8b66a53c65ae3:contracts/manifest.json:generic-api-key:4
+6104d4a2df277098a1b2e746ebe8b66a53c65ae3:contracts/swift/DashboardAPI.generated.swift:generic-api-key:2
+6104d4a2df277098a1b2e746ebe8b66a53c65ae3:contracts/typescript/dashboard.generated.ts:generic-api-key:2
+6aa32eb89989e79e9f5bb31a59a04801fdeca961:contracts/manifest.json:generic-api-key:4
+6aa32eb89989e79e9f5bb31a59a04801fdeca961:contracts/swift/DashboardAPI.generated.swift:generic-api-key:2
+6aa32eb89989e79e9f5bb31a59a04801fdeca961:contracts/typescript/dashboard.generated.ts:generic-api-key:2
+6aa32eb89989e79e9f5bb31a59a04801fdeca961:ios/App/DeviceRevocations.swift:generic-api-key:25
+6c10f8aa4e29f50b07df2d6461ff8c52cd80df01:contracts/manifest.json:generic-api-key:4
+6c10f8aa4e29f50b07df2d6461ff8c52cd80df01:contracts/swift/DashboardAPI.generated.swift:generic-api-key:2
+6c10f8aa4e29f50b07df2d6461ff8c52cd80df01:contracts/typescript/dashboard.generated.ts:generic-api-key:2
+9748e683df3b64b425c39ff18d30052b8140693a:contracts/manifest.json:generic-api-key:4
+9748e683df3b64b425c39ff18d30052b8140693a:contracts/swift/DashboardAPI.generated.swift:generic-api-key:2
+9748e683df3b64b425c39ff18d30052b8140693a:contracts/typescript/dashboard.generated.ts:generic-api-key:2
+97af8211ef7d67ed13110f260d1fca487e8173e9:contracts/manifest.json:generic-api-key:4
+97af8211ef7d67ed13110f260d1fca487e8173e9:contracts/swift/DashboardAPI.generated.swift:generic-api-key:2
+97af8211ef7d67ed13110f260d1fca487e8173e9:contracts/typescript/dashboard.generated.ts:generic-api-key:2
+d3b31b6a52cc99913231840f9826b4ca94a97e7b:contracts/manifest.json:generic-api-key:4
+d3b31b6a52cc99913231840f9826b4ca94a97e7b:contracts/swift/DashboardAPI.generated.swift:generic-api-key:2
+d3b31b6a52cc99913231840f9826b4ca94a97e7b:contracts/typescript/dashboard.generated.ts:generic-api-key:2
+d3b31b6a52cc99913231840f9826b4ca94a97e7b:internal/httpapi/reports_test.go:generic-api-key:54
+de383e5a593fa86e171bf7eeb561181924079c11:contracts/manifest.json:generic-api-key:4
+de383e5a593fa86e171bf7eeb561181924079c11:contracts/swift/DashboardAPI.generated.swift:generic-api-key:2
+de383e5a593fa86e171bf7eeb561181924079c11:contracts/typescript/dashboard.generated.ts:generic-api-key:2
+e60353d0187c30e9b6cc255cb2f366c537743fe1:contracts/manifest.json:generic-api-key:4
+e60353d0187c30e9b6cc255cb2f366c537743fe1:contracts/swift/DashboardAPI.generated.swift:generic-api-key:2
+e60353d0187c30e9b6cc255cb2f366c537743fe1:contracts/typescript/dashboard.generated.ts:generic-api-key:2

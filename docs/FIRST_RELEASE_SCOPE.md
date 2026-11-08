@@ -28,12 +28,14 @@ expired-credential recovery are addressed through the associated reliability
 change; its exact revisions and verification belong in the implementation
 record, not an inferred claim that every historical agent build is fixed.
 
-The latest published artifact is still
-[RC11](https://github.com/ryancswallace/Jobman-Dashboard/releases/tag/v0.1.0-rc.11).
-This scope decision does not rename that release, rewrite its immutable bytes,
-or claim a stable release has already been published. Candidate metadata such as
-`finalReleaseEligible: false` records the candidate builder's original semantics;
-it is not a renewed requirement for the postponed acceptance work.
+The first full release is selected as `v0.1.0`, with Core `v1.10.1` and Diagnose
+`v0.7.0-rc.3` embedded and Control `v0.3.0` selected separately. The
+[release page](https://github.com/ryancswallace/Jobman-Dashboard/releases)
+records publication status. Earlier RC12 and RC11 artifacts remain immutable.
+Full-release manifests record `releaseState: release`, the scope document digest
+and `finalReleaseEligible: true`. This is scoped product acceptance; compiled
+dependency stability and deployed Control interoperability are recorded
+separately and retain their actual values.
 
 Published tests and receipts retain their actual source, environment, results,
 and limitations. Ryan's completed review and acceptance of reduced scope are a
@@ -48,7 +50,7 @@ other untested integrations passed.
 | Apple push | APNs ownership, credentials, connectivity, and physical-device background-delivery acceptance. | Background push may be unavailable; implemented rule processing/inbox behavior does not prove Apple delivery. |
 | Managed iPhone delivery | Internal channel/MDM selection, signing/export, managed install/upgrade/removal and device acceptance. | The published native archive is unsigned and cannot be installed directly. A personal development build is separate from managed distribution. |
 | Diagnose | Live-provider acceptance, compatible stable publication and subsequent dependency updates. | The baseline uses the recorded compatible Diagnose candidate. Dashboard deterministic reports do not establish optional provider acceptance. |
-| Deployment configuration | Finish and deliver the unreleased configuration/schema, organization presentation, branding and native-profile work across the repositories. | Those local changes are outside the published baseline and are not silently included in release artifacts. |
+| Deployment configuration | Select and validate actual organization values using the delivered schemas, presentation and native-profile tooling. | Structural validation does not establish organization approval or connectivity. |
 | Accessibility and pilot | Additional manual browser/iPhone accessibility coverage, organization pilot and deployment-specific performance validation. | Existing automated and synthetic results apply only to their recorded scope. |
 | Operations | Additional private-hosting allocation, organization DNS/TLS/VPN/NFS and secrets setup, monitoring, backup/recovery exercises and operating ownership. | A deployment still needs the concrete configuration and credentials for each enabled service; absent integrations remain unavailable. |
 | Other unfinished work | Any implementation, validation, packaging expansion or integration not already in the baseline, except the agent reliability change. | No unimplemented or unverified behavior is implied by the first-production-release label. |

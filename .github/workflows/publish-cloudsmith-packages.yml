@@ -1,10 +1,10 @@
-name: Publish Dashboard RC Linux packages
+name: Publish Dashboard Linux packages
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: Published immutable engineering RC (vX.Y.Z-rc.N)
+        description: Published immutable release or candidate (vX.Y.Z or vX.Y.Z-rc.N)
         required: true
         type: string
 

@@ -17,7 +17,7 @@ assert len(selected) == 3
 versions = {r['version'] for r in selected}
 assert len(versions) == 1
 version = versions.pop()
-assert re.fullmatch(r'v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-rc\.([1-9][0-9]*)', version)
+assert re.fullmatch(r'v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-rc\.([1-9][0-9]*))?', version)
 name = 'jobman-dashboard-' + version[1:].replace('.', '-')
 assert {r['file'].rsplit('.', 1)[-1] for r in selected} == {'deb', 'rpm', 'apk'}
 for record in selected:

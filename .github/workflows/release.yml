@@ -1,10 +1,10 @@
-name: Publish Dashboard RC
+name: Publish Dashboard release
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: New immutable engineering candidate (vX.Y.Z-rc.N)
+        description: New immutable release (vX.Y.Z) or candidate (vX.Y.Z-rc.N)
         required: true
         type: string
       nativeBuild:

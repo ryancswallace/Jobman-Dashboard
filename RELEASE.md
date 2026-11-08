@@ -2,7 +2,8 @@
 
 The [approved first-production-release scope](docs/FIRST_RELEASE_SCOPE.md) records
 completed product review and the accepted post-release deferrals. Published
-artifacts currently retain their engineering-prerelease identity. Exact release
+full release is selected as `v0.1.0`. Earlier engineering prereleases retain
+their immutable identities. Exact release
 tuples and acceptance receipts are in
 [FINAL_CANDIDATE.md](docs/FINAL_CANDIDATE.md),
 [RELEASE_HANDOFF.md](docs/RELEASE_HANDOFF.md) and
@@ -12,18 +13,21 @@ tuples and acceptance receipts are in
 
 `scripts/build-release.py` builds clean committed-source Linux amd64/arm64 bundles
 with web assets, role-specific deployment examples, runbooks, license notices,
-checksums and provenance. It accepts only `vX.Y.Z-rc.N`, enforces pinned toolchains
-and immutable dependencies, and records `finalReleaseEligible: false`.
-Use `make candidate VERSION=vX.Y.Z-rc.N OUTPUT_DIR=/absolute/new/directory`.
+checksums and provenance. It accepts `vX.Y.Z` full releases and `vX.Y.Z-rc.N`
+candidates and enforces pinned toolchains and immutable dependencies. Stable
+builds record `releaseState: release`, scoped `finalReleaseEligible: true` and
+the scope document digest. Candidate eligibility remains false. Compiled
+dependency stability and deployed Control compatibility are separate facts.
+Use `make candidate VERSION=v0.1.0 OUTPUT_DIR=/absolute/new/directory`.
 Do not reuse an existing version/output or silently include untracked files.
 
 The existing `Dashboard CI` dispatch accepts candidate and explicit native version
 inputs, builds Linux bundles twice and compares checksums, and retains an unsigned
 native archive. That validation-only path does not publish or sign. The separate manual
-`release.yml` workflow builds, verifies, attests and publishes an engineering RC;
+`release.yml` workflow builds, verifies, attests and publishes the selected channel;
 see [distribution](docs/DISTRIBUTION.md). Follow the complete
 [candidate procedure](docs/FINAL_CANDIDATE.md) for review, artifact verification and
-separately authorized GitHub prerelease publication. Existing accepted evidence
+GitHub publication. Existing accepted evidence
 must remain bound to its exact bytes and source tuple.
 
 ## Additional local snapshot tooling
@@ -49,13 +53,13 @@ Corporate identity acceptance, real APNs, managed signing/distribution, pilot
 checks and stable Diagnose publication are post-release work under the approved
 scope. Their absence does not reopen product review or prevent the first
 production release. Preserve compatible dependency pins and report their actual
-versions; a release label does not establish untested interoperability. No semantic-release hook, `latest` update, Homebrew formula, Apple distribution
-or stable tag is automatically produced by this scaffold.
-The controlled RC publisher adds versioned GHCR images, canonical Linux packages,
-SPDX inventories and GitHub attestations. Optional Cloudsmith distribution uses a
-personal API key and the shared `jobman/stable` repository. Dashboard RC identity
-is retained there. Stable release publication, Homebrew and Apple
-distribution remain outside that RC-only workflow. [Repository parity](docs/REPOSITORY_SCAFFOLDING.md) records
+versions; a release label does not establish untested interoperability.
+The protected publisher creates a non-prerelease/latest full release for stable
+versions and a prerelease candidate without latest status for RC versions. Both channels use
+versioned GHCR images, canonical Linux packages, SPDX inventories and GitHub
+attestations, with remote draft verification before publication. Optional
+Cloudsmith distribution preserves the selected channel and exact package bytes.
+Homebrew and Apple distribution remain separate. [Repository parity](docs/REPOSITORY_SCAFFOLDING.md) records
 these intentional differences from the sibling CLI/service releases.
 
 Production deployment/migration, organizational identity/network changes, company

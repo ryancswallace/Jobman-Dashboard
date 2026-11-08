@@ -2,7 +2,7 @@
 """Build secret-free Linux candidate bundles from an exact committed Git tree.
 
 No tag, upload, installation, service change, or Git mutation is performed.
-Only vX.Y.Z-rc.N candidates are supported by this builder.
+Canonical vX.Y.Z releases and vX.Y.Z-rc.N candidates are supported.
 Approved product scope is recorded separately in docs/FIRST_RELEASE_SCOPE.md.
 """
 import argparse
@@ -21,7 +21,7 @@ import tarfile
 import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = re.compile(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-rc\.([1-9][0-9]*)\Z")
+VERSION = re.compile(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-rc\.([1-9][0-9]*))?\Z")
 ARCHITECTURES = ("amd64", "arm64")
 FIRST_PARTY = ("github.com/ryancswallace/jobman", "github.com/ryancswallace/jobman-diagnose")
 STABLE_VERSION = re.compile(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\Z")
@@ -202,7 +202,7 @@ def binary_dependencies(info):
     return sorted(result, key=lambda item: item["Path"])
 
 
-def upstream_release_pins(dependencies):
+def upstream_release_pins(dependencies, version=None):
     """Candidate provenance only; immutable pseudo-versions are not final tags."""
     found = {}
     for modules in dependencies.values():
@@ -216,12 +216,13 @@ def upstream_release_pins(dependencies):
     return {"dependencies": [found[name] for name in FIRST_PARTY],
             "stableVersions": all(STABLE_VERSION.fullmatch(found[name]["Version"]) is not None for name in FIRST_PARTY),
             "controlCompatibilityVerified": False,
-            "finalReleaseEligible": False}
+            "finalReleaseEligible": bool(version and STABLE_VERSION.fullmatch(version)),
+            "scopeDocument": "docs/FIRST_RELEASE_SCOPE.md"}
 
 
 def build(version, architectures, output):
     if not VERSION.fullmatch(version) or not architectures or len(set(architectures)) != len(architectures) or any(a not in ARCHITECTURES for a in architectures):
-        raise ValueError("use vX.Y.Z-rc.N and unique linux architectures amd64/arm64")
+        raise ValueError("use vX.Y.Z or vX.Y.Z-rc.N and unique linux architectures amd64/arm64")
     if not output.is_absolute() or output.exists() or output.is_symlink():
         raise ValueError("output directory must be a new absolute path")
     if capture(["git", "status", "--porcelain", "--untracked-files=normal"], ROOT):
@@ -287,7 +288,7 @@ def build(version, architectures, output):
                 shutil.copyfile(source / "docs" / name, bundle / "docs" / name)
             for name in ("README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "RELEASE.md", "SECURITY.md", "SUPPORT.md", "CHANGELOG.md", "CITATION.cff", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md"):
                 shutil.copyfile(source / name, bundle / name)
-            metadata = {"formatVersion": 1, "releaseState": "candidate", "version": version, "revision": revision, "sourceDateEpoch": epoch, "os": "linux", "architecture": architecture, "isa": "v1" if architecture == "amd64" else "v8.0", "toolchains": versions, "goModules": dependencies, "upstreamReleasePins": upstream_release_pins(dependencies), "webLockSHA256": digest(source / "web/package-lock.json")}
+            metadata = {"formatVersion": 1, "releaseState": "release" if STABLE_VERSION.fullmatch(version) else "candidate", "version": version, "revision": revision, "sourceDateEpoch": epoch, "os": "linux", "architecture": architecture, "isa": "v1" if architecture == "amd64" else "v8.0", "toolchains": versions, "goModules": dependencies, "upstreamReleasePins": upstream_release_pins(dependencies, version), "scopeSHA256": digest(source / "docs/FIRST_RELEASE_SCOPE.md"), "webLockSHA256": digest(source / "web/package-lock.json")}
             (bundle / "build.json").write_text(json.dumps(metadata, sort_keys=True, indent=2) + "\n")
             write_checksums(bundle)
             write_archive(bundle, output / (bundle.name + ".tar.gz"), epoch)

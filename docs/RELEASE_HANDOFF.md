@@ -1,5 +1,16 @@
 # Jobman Dashboard initial-release handoff
 
+## Selected full-release baseline
+
+The first full release is v0.1.0, embedding Core v1.10.1 and Diagnose v0.7.0-rc.3,
+with Control v0.3.0 selected separately. The protected publisher requires current
+vulnerability and exact-source quality checks, reproducible archives/packages,
+native verification and remote file/container attestations before publishing
+non-prerelease/latest. The source-bound scope digest records accepted limitations;
+the Diagnose candidate dependency and unverified organization integrations retain
+their actual status. Publication and verification receipts are recorded separately
+from the historical checkpoints below. See [release process](../RELEASE.md).
+
 The [November 8 first-release decision](FIRST_RELEASE_SCOPE.md) records Ryan's
 completed product review, includes agent reliability, and moves all other
 unfinished work to later releases. Earlier acceptance conditions in the historical

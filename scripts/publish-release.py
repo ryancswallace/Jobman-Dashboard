@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed, RC-only GitHub publication. Never replaces tags or assets."""
+"""Fail-closed release/candidate publication. Never replaces tags or assets."""
 import argparse
 import hashlib
 import importlib.util
@@ -14,6 +14,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
 RC = re.compile(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-rc\.([1-9][0-9]*)\Z")
+VERSION = re.compile(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-rc\.([1-9][0-9]*))?\Z")
 SHA = re.compile(r"[0-9a-f]{40}\Z")
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
 REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
@@ -47,7 +48,7 @@ def digest(path):
 
 
 def selection(version, revision, repository):
-    need(RC.fullmatch(version), "Only canonical vX.Y.Z-rc.N candidates may be published")
+    need(VERSION.fullmatch(version), "Only canonical vX.Y.Z or vX.Y.Z-rc.N versions may be published")
     need(SHA.fullmatch(revision), "Expected a full source revision")
     need(REPOSITORY.fullmatch(repository), "Invalid repository")
 
@@ -259,7 +260,8 @@ def stage(args):
     # Creating the ref reserves the version. A partial failure intentionally
     # remains immutable and requires a new RC rather than destructive repair.
     api(f"repos/{args.repository}/git/refs", "--method", "POST", "-f", "ref=refs/tags/" + args.version, "-f", "sha=" + args.revision)
-    notes = ("Engineering release candidate. Product review is complete for the "
+    notes = (("Engineering release candidate. " if RC.fullmatch(args.version) else "Full release. ") +
+             "Product review is complete for the "
              "approved first-production-release scope. Corporate identity validation, "
              "real APNs, managed signing/distribution and additional acceptance work "
              "are scheduled after the first production release; their known limitations "
@@ -268,7 +270,8 @@ def stage(args):
              "Containers and packages contain the canonical Linux candidate bytes. "
              "See docs/FIRST_RELEASE_SCOPE.md for scope, and RELEASE.md and "
              "docs/FINAL_CANDIDATE.md for installation and publication checks.")
-    run(["gh", "release", "create", args.version, "--repo", args.repository, "--verify-tag", "--draft", "--prerelease", "--latest=false", "--title", "Jobman Dashboard " + args.version + " (engineering RC)", "--notes", notes])
+    prerelease = bool(RC.fullmatch(args.version))
+    run(["gh", "release", "create", args.version, "--repo", args.repository, "--verify-tag", "--draft", "--prerelease=" + str(prerelease).lower(), "--latest=false", "--title", "Jobman Dashboard " + args.version + (" (engineering RC)" if prerelease else ""), "--notes", notes])
     run(["gh", "release", "upload", args.version, "--repo", args.repository, *[str(p) for p in sorted(args.input.iterdir())]], timeout=900)
 
 
@@ -279,7 +282,7 @@ def verify_draft(args):
     need(set(local) == expected_assets(args.version), "Release payload/SBOM set is incomplete or unexpected")
     release = release_for_tag(args.repository, args.version)
     need(release is not None, "Candidate release does not exist")
-    need(release["draft"] is True and release["prerelease"] is True, "Only a staged draft prerelease can be published")
+    need(release["draft"] is True and release["prerelease"] is bool(RC.fullmatch(args.version)), "Draft release channel differs from the selected version")
     need(api(f"repos/{args.repository}/git/ref/tags/{args.version}")["object"]["sha"] == args.revision, "Reserved release tag moved")
     need({a["name"] for a in release["assets"]} == set(local) | {"SHA256SUMS"} and len(release["assets"]) == len(local) + 1, "Remote asset inventory differs")
     with tempfile.TemporaryDirectory() as temp:
@@ -300,9 +303,10 @@ def verify_draft(args):
 def publish(args):
     release_id = verify_draft(args)
     # Address precisely the verified draft; never re-resolve it by tag or mark
-    # a candidate as latest, stable, or final-release eligible.
-    published = api(f"repos/{args.repository}/releases/{release_id}", "--method", "PATCH", "-F", "draft=false", "-F", "prerelease=true", "-f", "make_latest=false")
-    need(published.get("id") == release_id and published.get("tag_name") == args.version and published.get("draft") is False and published.get("prerelease") is True, "Published release identity or state differs")
+    # a candidate as latest or stable. Stable versions use the full-release channel.
+    prerelease = bool(RC.fullmatch(args.version))
+    published = api(f"repos/{args.repository}/releases/{release_id}", "--method", "PATCH", "-F", "draft=false", "-F", "prerelease=" + str(prerelease).lower(), "-f", "make_latest=" + str(not prerelease).lower())
+    need(published.get("id") == release_id and published.get("tag_name") == args.version and published.get("draft") is False and published.get("prerelease") is prerelease, "Published release identity or state differs")
 
 
 def main():
