@@ -14,6 +14,47 @@ The adopted [implementation prompt](IMPLEMENTATION_PROMPT.md),
 [requirements](REQUIREMENTS.md) and [design](DESIGN.md) govern this work.
 Later checkpoints supersede earlier merge, version and connectivity statements.
 
+## Agent reliability checkpoint — 2026-11-08
+
+- [Control PR46](https://github.com/ryancswallace/Jobman-Control/pull/46)
+  merged as `e6c4fd6196cc09aca2ec19ed5f549e0e86d165ef` after 32 passing CI
+  checks. Valid same-agent mTLS can renew an expired compatibility session;
+  expired certificates require fresh authorized enrollment-token recovery.
+  Replay, revocation, authorization, target-generation and lock-wait checks
+  preserve the enrolled identity and existing work references.
+- The Lab used Control source `bd99c1cd`, binary SHA-256
+  `f562f062f0a0822cd7dabdba4ae8a58a2393ee2e04f74fad5f9b7a1c80e07c53`,
+  and [Core PR62](https://github.com/ryancswallace/Jobman/pull/62) runtime source
+  `ac1e22812e36026f19d208e7528ae9b630fe4d6f`, agent SHA-256
+  `419fb75977a1a41181cf30d01b7289bea3a8385fc32c559e2bb85b9b9459e404`.
+  Subsequent Core CI changes at this checkpoint affected tests only.
+- Migration 22→23 followed a verified database backup. Row fingerprints for
+  existing jobs, agents, assignments, executions and source epochs were unchanged.
+  Both expired host and Slurm agents recovered their original IDs, target
+  generations and execution journals. Service stops preserve execution runners;
+  interrupted recovery retains its private token and operation for safe retry.
+- Host job `3a35ee5c-36a5-496f-b7b5-5b00ae1608eb` completed successfully after
+  its polling service restarted while the job was running. The Dashboard API
+  returned HTTP 200, current success and all 20 stdout lines (471 bytes).
+- Slurm job `bb5b247a-ce5d-4237-be8b-a2dde691d40e`, execution
+  `2f5b466e-f1ec-4e0c-81a6-b927ee2be5a6`, completed successfully as scheduler job
+  66 on `compute01.lab.test`. The Dashboard job/log APIs returned HTTP 200 and
+  both stdout lines (43 bytes), including `Slurm recovery verified`.
+- Original user job `8f91e30c-eaaf-4f51-a864-28845367086d` retained its successful
+  outcome and all 10 stdout lines (131 bytes). All three jobs were read through
+  the same Dashboard API used by the web and iPhone clients; this is API evidence,
+  not an additional rendered-client or corporate-device test.
+- Slurm completion initially waited on unavailable compute services following
+  VM resume and clock correction. Restarting Munge/Slurm cleared stale timers
+  while retaining the queued job. Future-dated directory verification proofs were
+  invalidated through the audited path and freshly verified. Agent recovery used
+  the renewed CA certificate with the same public key to refresh stale embedded
+  trust material; TLS verification remained enabled throughout.
+- [Lab PR13](https://github.com/ryancswallace/Jobman-Lab/pull/13), source
+  `7cbde35`, passed 14 recovery tests and CI. Configured agents are checked and
+  recovered during normal Lab startup. SQLite journal inspection runs as the
+  execution user so WAL/SHM sidecars retain the correct ownership.
+
 ## Current RC11 checkpoint — 2026-11-08
 
 - [RC11](https://github.com/ryancswallace/Jobman-Dashboard/releases/tag/v0.1.0-rc.11)
