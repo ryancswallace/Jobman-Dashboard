@@ -5,6 +5,7 @@ from pathlib import Path
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location("build_release", Path(__file__).with_name("build-release.py"))
 release = importlib.util.module_from_spec(spec)
@@ -132,12 +133,15 @@ class ReleaseTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 release.write_checksums(root)
 
-    def test_only_explicit_candidates_and_supported_architectures(self):
-        for version in ["v0.1.0", "v0.01.0-rc.1", "v0.1.0-rc.0", "v0.1.0-rc.1;echo bad"]:
-            with self.assertRaises(ValueError):
-                release.build(version, ["arm64"], Path("/tmp/unused-release-output"))
-        with self.assertRaises(ValueError):
-            release.build("v0.1.0-rc.1", ["arm64", "arm64"], Path("/tmp/unused-release-output"))
+    def test_invalid_release_selection_stops_before_checkout_or_build(self):
+        with patch.object(release, "capture") as capture:
+            for version in ["v0.01.0", "v0.01.0-rc.1", "v0.1.0-rc.0", "v0.1.0-rc.1;echo bad"]:
+                with self.subTest(version=version), self.assertRaisesRegex(ValueError, "use vX"):
+                    release.build(version, ["arm64"], Path("/tmp/unused-release-output"))
+            for version in ("v0.1.0", "v0.1.0-rc.1"):
+                with self.assertRaisesRegex(ValueError, "unique linux architectures"):
+                    release.build(version, ["arm64", "arm64"], Path("/tmp/unused-release-output"))
+            capture.assert_not_called()
 
 
 if __name__ == "__main__":
