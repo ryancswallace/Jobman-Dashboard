@@ -1,14 +1,36 @@
 # Initial release implementation status
 
-Updated: 2026-10-06. **Engineering prerelease v0.1.0-rc.10 is published and its
-published binaries pass synthetic Lab activation and authenticated checks. Final
-acceptance remains open.** Corporate identity, real APNs, signed managed-device,
-manual accessibility, pilot/operations and stable Diagnose provider gates remain.
+Updated: 2026-11-08. **Engineering prerelease v0.1.0-rc.11 is published with
+passing release and package distribution workflows. Final acceptance remains
+open.** Corporate identity, real APNs, signed managed-device, manual
+accessibility, pilot/operations and stable Diagnose provider gates remain.
 Historical checkpoints below retain their original versions, failures and counts.
+RC10 Lab activation evidence has not been rerun against RC11.
 
 The adopted [implementation prompt](IMPLEMENTATION_PROMPT.md),
 [requirements](REQUIREMENTS.md) and [design](DESIGN.md) govern this work.
 Later checkpoints supersede earlier merge, version and connectivity statements.
+
+## Current RC11 checkpoint — 2026-11-08
+
+- [RC11](https://github.com/ryancswallace/Jobman-Dashboard/releases/tag/v0.1.0-rc.11)
+  was published from `2c6358a8bc986a25d6db86ce1ce2814d3c75f635` by successful
+  [release run 42505219446](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/42505219446),
+  with unsigned native marketing version `0.1.0`, build `13`. Exact-source main
+  CI, repository checks, CodeQL, fuzz and Scorecard passed before publication.
+- Reproducible archive/package builds, both architecture package lifecycle tests
+  and container payload/runtime checks passed. Independent public downloads
+  verified all 25 assets and 26 asset/container attestations, package-to-archive
+  identities, container digest and native identity. Exact hashes and verification
+  scope are in the [release handoff](RELEASE_HANDOFF.md) and
+  [sanitized receipt](evidence/rc11-distribution.json).
+- [Cloudsmith run 42505808404](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/42505808404)
+  published and verified all six RC11 packages through the existing shared
+  `jobman/stable` channel. RC identity and all external acceptance gates remain.
+  No RC11 Lab activation, corporate identity, APNs, signed-device, manual
+  accessibility or pilot acceptance was performed. Core `v1.9.0` and Diagnose
+  `v0.7.0-rc.1` remain the embedded upstream versions; candidate manifests retain
+  final-release ineligibility and unverified Control compatibility.
 
 ## Web layout checkpoint — 2026-10-11
 
@@ -17,7 +39,7 @@ theme refinements deployed as web-only assets over the RC10 Lab services. This
 is subsequent engineering preview evidence, not a replacement RC10 publication
 or completion of the external acceptance gates.
 
-## Current RC10 checkpoint
+## Historical RC10 checkpoint
 
 - [RC10](https://github.com/ryancswallace/Jobman-Dashboard/releases/tag/v0.1.0-rc.10)
   published through [run37515898448](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37515898448)

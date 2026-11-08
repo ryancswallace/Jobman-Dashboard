@@ -1,6 +1,51 @@
 # Jobman Dashboard initial-release handoff
 
-## Current candidate — RC10
+## Current candidate — RC11
+
+[RC11](https://github.com/ryancswallace/Jobman-Dashboard/releases/tag/v0.1.0-rc.11)
+was published as an engineering prerelease at `2026-11-08T17:35:58Z`, from
+`2c6358a8bc986a25d6db86ce1ce2814d3c75f635`. It includes the responsive web work,
+repository scaffolding, reviewed dependency updates and PostgreSQL deadline-test
+repair merged since RC10. Unsigned iPhone marketing version `0.1.0`, build `13`,
+uses the same source.
+[Main CI](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/42504390754)
+and [repository checks](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/42504390753)
+passed, together with CodeQL, fuzz and Scorecard.
+
+[Release run 42505219446](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/42505219446)
+passed reproducible Linux archive/package builds, unsigned native packaging,
+installation/reinstallation/removal on amd64 and arm64 in Ubuntu, Fedora and
+Alpine, both container platform payload/runtime checks, and publication.
+Independent public downloads verified all 25 assets, all 26 asset/container
+attestations against the exact main source and release workflow, the six
+package-to-archive identities, the versioned container digest, and native build
+identity. The [sanitized verification receipt](evidence/rc11-distribution.json)
+distinguishes those independent checks from workflow execution evidence.
+
+| Artifact | Verified SHA-256 or manifest digest |
+| --- | --- |
+| `jobman-dashboard_v0.1.0-rc.11_linux_amd64.tar.gz` | `3cc795eaa4457119ab380732b8df4bd611638dd07b2380eb368c09be254c1462` |
+| `jobman-dashboard_v0.1.0-rc.11_linux_arm64.tar.gz` | `57be2f9eda64f8a66569d5a46b525563561db2fbd9a6ae0a1bae6ccc7e44af8e` |
+| `JobmanDashboard-unsigned.xcarchive.tar.gz` (build `13`) | `c32e3025431fb22244ddb8aa1866ad618849ef4c5e31ee12e058110ea3a2c772` |
+| `ghcr.io/ryancswallace/jobman-dashboard:v0.1.0-rc.11` | `sha256:7e4648f73da2bc04e1fedbb2b29ac6f186f50db30d4a14fd83c477842a6a098e` |
+
+[Cloudsmith run 42505808404](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/42505808404)
+published and verified all six RC11 Linux packages in the existing shared
+`jobman/stable` repository. Independent public registry downloads matched all
+source DEB/APK hashes and RPM content outside the registry signature header.
+This channel name does not promote Dashboard to a
+stable release. The candidate embeds Core `v1.9.0` and Diagnose `v0.7.0-rc.1`;
+both Linux manifests retain `finalReleaseEligible: false` and
+`controlCompatibilityVerified: false`.
+
+RC11 has no new Lab activation or external acceptance evidence. Corporate
+AD FS/direct AD, real APNs, signing/company-managed-device delivery, manual
+accessibility, pilot/operations and compatible stable Diagnose acceptance remain
+open. The native archive remains unsigned and non-installable. Historical RC10
+Lab and distribution evidence below applies only to its recorded artifacts; this
+post-publication receipt supplements the immutable RC11 build-time documentation.
+
+## Historical RC10 handoff — retained unchanged
 
 Published source: `5b20dfb7a51d206aeb7132db94d961a14b6ab03e`, including merged
 [PR19](https://github.com/ryancswallace/Jobman-Dashboard/pull/19),
