@@ -1,12 +1,13 @@
-# Final candidate packaging and release gates
+# Candidate packaging and publication
 
 This procedure distinguishes local/CI validation from the controlled engineering
 RC publisher. Local builds and `ci.yml` candidate dispatches do not tag or publish.
 The main-only `release.yml` workflow publishes a reviewed RC after exact-source
 checks and protected-environment approval; see [distribution](DISTRIBUTION.md).
-Neither path authorizes production installation, source deployment or Apple
-distribution, or completes the external acceptance gates in
-[implementation status](IMPLEMENTATION_STATUS.md).
+These paths describe artifact publication. The [first-release scope](FIRST_RELEASE_SCOPE.md)
+records completed product review and moves the other integration/acceptance work
+to later releases. Artifact publication does not itself configure a production
+installation or sign/distribute an Apple app.
 
 The curated Linux documentation includes the
 [recorded-run contract](RUN_SELECTION.md) and
@@ -19,11 +20,11 @@ Neither document turns a pending acceptance into a passing one.
 Candidate builds accept checksum-verified immutable released versions, prereleases
 and development pseudo-versions. The current source pins Core `v1.9.0` and
 Diagnose `v0.7.0-rc.1`; Control `v0.2.0` is verified deployed on both Dashboard Lab
-sources. Diagnose real-provider acceptance and a compatible stable release remain
-open; see the exact tuple and pending evidence in [release handoff](RELEASE_HANDOFF.md).
-Final release requires reviewed, published compatible stable tags for Jobman Core,
-Jobman Control and Jobman Diagnose, followed by explicit dependency-pin updates
-and the required checks. Do not substitute the latest old tag merely to make a
+sources. Diagnose real-provider acceptance, compatible stable publication and
+subsequent dependency updates are post-release work; see the exact tuple in
+[release handoff](RELEASE_HANDOFF.md). The approved first release may retain the
+recorded compatible candidate dependency. Applicable checks still verify the
+actual dependency tuple used by each build. Do not substitute the latest old tag merely to make a
 version string stable: it must include the reviewed behavior used by Dashboard.
 
 Dashboard embeds Core and Diagnose as Go modules. Their exact compiled versions
@@ -41,11 +42,12 @@ including `bounded-run-catalog`, monitoring reads, durable terminal events,
 log/artifact metadata and source identity. Verify both source deployments where
 multi-source behavior is claimed. Keep the original-event, cursor binding,
 current authorization and historical-run evidence associated with those exact
-versions. A module-only check cannot satisfy this gate.
+versions. A module-only check does not establish separately deployed Control behavior.
 
 The current builder accepts only `vX.Y.Z-rc.N`. Adding final-version publication
-support is a separate reviewed step after the release gates close; there is no
-flag that waives upstream or external acceptance.
+support is not implemented by this RC-only builder. Its version syntax and
+manifest fields describe the tooling, not additional acceptance conditions for
+the approved first-release scope. Do not rewrite already published candidates.
 
 ## Controlled RC publication
 
@@ -129,4 +131,6 @@ retains the original tar and inventory with sanitized `native-provenance.json`,
 excluding raw logs, runner paths and build commands from release assets. Native
 archives are not claimed to be byte-reproducible. An unsigned archive is not an installable IPA and proves no
 signing, APNs, physical-device, company-managed-device or distribution behavior.
-Existing organization inputs and external acceptance remain required.
+Organization signing and integration work is scheduled after the first release;
+those physical requirements still apply whenever an installable native build is
+actually produced.

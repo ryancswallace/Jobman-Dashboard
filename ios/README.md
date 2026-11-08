@@ -1,5 +1,10 @@
 # Jobman Dashboard for iPhone
 
+Product review is complete under the [first-release scope](../docs/FIRST_RELEASE_SCOPE.md).
+Managed signing/distribution, real APNs and additional organization-device
+acceptance are scheduled for later releases. The published archive remains
+unsigned and cannot be installed directly; these limitations are accepted.
+
 Native SwiftUI client for the private Dashboard API. Development target: iOS 18 or later, iPhone only. The current bundle identifier (`org.jobman.dashboard`) is a development placeholder; it is not a claim that an Apple identifier or signing profile has been registered.
 
 ## Build and test
@@ -43,7 +48,7 @@ xcrun swift -module-cache-path /private/tmp/jobman-dashboard-icon-module-cache s
 ```
 
 Create a Release **unsigned** device archive without signing credentials from a
-clean committed checkout (see [final candidate gates](../docs/FINAL_CANDIDATE.md)):
+clean committed checkout (see [candidate packaging](../docs/FINAL_CANDIDATE.md)):
 
 ```sh
 python3 scripts/test-package-app.py
@@ -153,7 +158,7 @@ navigation; a settings write or skipped test is not acceptance. No host-wide
 preferences change. Do not run another test/configuration process on the same
 simulator concurrently. This checks rendered simulator behavior, not VoiceOver,
 Voice Control, actual Control authorization or a managed device. Evidence and
-remaining gates are in [graph client acceptance](../docs/GRAPH_CLIENT_ACCEPTANCE.md).
+recorded coverage is in [graph client acceptance](../docs/GRAPH_CLIENT_ACCEPTANCE.md).
 
 ## Identity and data handling
 
@@ -178,7 +183,7 @@ Device simulator workflows additionally require `--dashboard-device-fixtures` wi
 
 ## Signing and internal delivery
 
-Copy `Config/Local.xcconfig.example` to ignored `Config/Local.xcconfig` only after the actual team and app identity are known. Keep keys/profiles outside the repository. Debug uses the development APNs environment; Release uses production. This setting must match the eventual signing profile and provider topic. Production distribution channel, team/account, app icon/export configuration, APNs ownership and real managed-device acceptance remain release work. No distribution archive or company install has been claimed.
+Copy `Config/Local.xcconfig.example` to ignored `Config/Local.xcconfig` only after the actual team and app identity are known. Keep keys/profiles outside the repository. Debug uses the development APNs environment; Release uses production. This setting must match the eventual signing profile and provider topic. Managed distribution, organization signing inputs, APNs ownership and real managed-device acceptance are post-release work. No distribution archive or company install has been claimed.
 
 The personal test phone can establish development interaction, login and push evidence once authorized signing/VPN/APNs prerequisites exist. It cannot establish acceptance under company management policy.
 
@@ -194,9 +199,9 @@ On October 3, 2026:
 
 - Native device verification on October 4: four focused simulator workflows passed for explicit attachment/removal, explicit account switch/remote removal, existing-binding upgrade with disabled/muted settings preserved, and background cancellation before reservation acknowledgment. The full **20-test** regression run subsequently passed **19 tests**; its single failure was an XCTest center tap that did not activate the visible Sign out label. Video and accessibility hierarchy confirmed no sign-out action occurred. The same offline sign-out workflow passed at **00:08:58 EDT** after targeting the visible label; it verifies immediate account-content purge with only the narrow revocation queued during a synthetic outage. All 20 unique workflows therefore have passing evidence, but the initial full run is not claimed as entirely green. Focused background/uncertain-admission checks also passed after permission lifecycle fixes. Rendered attachment, switch, disabled/muted preferences, removal, canceled reservation, uncertainty and offline sign-out screens were inspected. Final core count is 60; unsigned Release compilation passes. Actual system permission prompts, APNs delivery and physical Keychain/device acceptance are outside these fixtures.
 
-- Native inbox/device checkpoint on October 4: **65 core tests passed** and the unsigned Release simulator build passed. The combined **24-workflow** simulator run passed **23 tests**; the existing report/citation test missed a transient forbidden message that a successful periodic job refresh replaced. The recording confirms the report/citation were purged and the notice was displayed. The unchanged isolated case passed at **00:44:46 EDT**. A DEBUG-only manual-data-refresh fixture then made that assertion deterministic while retaining independent authorization polling; the focused case passed at **00:47:56 EDT**. The full run is not claimed as 24/24 green. All four new inbox workflows passed: bounded pages, exact original rule version/read state, explicit empty versus all scope, authorization outage without false zero/automatic retry, revoked detail purge, and opaque notification navigation with fresh foreground data. Core coverage adds strict inbox identity/scope/expiry/count checks and 64-page navigation eviction. Final partial/empty history, matched-rule, delivery, outage, revoked detail, foreground destination and offline sign-out screenshots were inspected. Real APNs and company-managed-device acceptance remain external gates.
+- Native inbox/device checkpoint on October 4: **65 core tests passed** and the unsigned Release simulator build passed. The combined **24-workflow** simulator run passed **23 tests**; the existing report/citation test missed a transient forbidden message that a successful periodic job refresh replaced. The recording confirms the report/citation were purged and the notice was displayed. The unchanged isolated case passed at **00:44:46 EDT**. A DEBUG-only manual-data-refresh fixture then made that assertion deterministic while retaining independent authorization polling; the focused case passed at **00:47:56 EDT**. The full run is not claimed as 24/24 green. All four new inbox workflows passed: bounded pages, exact original rule version/read state, explicit empty versus all scope, authorization outage without false zero/automatic retry, revoked detail purge, and opaque notification navigation with fresh foreground data. Core coverage adds strict inbox identity/scope/expiry/count checks and 64-page navigation eviction. Final partial/empty history, matched-rule, delivery, outage, revoked detail, foreground destination and offline sign-out screenshots were inspected. Real APNs and company-managed-device acceptance are later-release work.
 
-- A fresh full suite on exact rc.2 source `42d153b4672aeb5cdb2d7395f052b8c6a095f5e1` passed **24 tests with zero failures in553.953s**, ending **06:07:34 EDT on October4**. Result bundle `/private/tmp/jobman-dashboard-rc2-ui-42d153b.xcresult` and log `/private/tmp/jobman-dashboard-rc2-ui-42d153b.log` are retained. Rendered overview, graph, report findings, partial inbox, authorization outage, rule editor, delivery preferences and offline sign-out screenshots were inspected. This supersedes the earlier combined-run failure while retaining its diagnostic history. These are synthetic simulator workflows; manual VoiceOver/largest Dynamic Type, physical Keychain/APNs and managed-device acceptance remain separate gates.
+- A fresh full suite on exact rc.2 source `42d153b4672aeb5cdb2d7395f052b8c6a095f5e1` passed **24 tests with zero failures in553.953s**, ending **06:07:34 EDT on October4**. Result bundle `/private/tmp/jobman-dashboard-rc2-ui-42d153b.xcresult` and log `/private/tmp/jobman-dashboard-rc2-ui-42d153b.log` are retained. Rendered overview, graph, report findings, partial inbox, authorization outage, rule editor, delivery preferences and offline sign-out screenshots were inspected. This supersedes the earlier combined-run failure while retaining its diagnostic history. These are synthetic simulator workflows; manual VoiceOver/largest Dynamic Type, physical Keychain/APNs and managed-device validation are later-release work.
 
 
 - Native audit checkpoint on October4: the full iPhone18Pro simulator run completed **32 tests, one intentional accessibility-profile skip, zero failures in733.333s**. It covers the prior workflows plus page replacement, foreground manual reads, pasted connected-origin links and selected historical runs. Subsequent review tightened run ID/Int64/execution/source validation; all **81 core tests** passed. The selected-run UI retest passed, and two new focused regressions passed for a manual7-day overview refresh queued behind a job-page read (**43.415s**) and authorization purge during a page read followed by a successful manual retry (**22.733s**). The first queued-window test queried a standalone numeric label even though SwiftUI exposes the whole button; its failure is retained and the corrected combined-label assertion passed without weakening the expected168 value. This is not claimed as a fresh34-test full-suite run. Rendered page, paused-log freshness, run selection/report prefill,7-day overview and post-authorization job screens were inspected.

@@ -37,4 +37,4 @@ contradictory-total rejection, real TLS adapter selectors/large sizes, and HTTP 
 A43-test web suite includes artifact page/run navigation. Chrome inspection of
 the explicit two-source synthetic fixture verified50+5 rows, scope breadcrumbs,
 actual run labels and the bytes-unverified disclosure. Real Control integration
-remains a separate acceptance gate.
+is scheduled as later-release validation under the [approved scope](FIRST_RELEASE_SCOPE.md).

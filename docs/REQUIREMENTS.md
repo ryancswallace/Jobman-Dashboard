@@ -1,14 +1,16 @@
 # Jobman Dashboard initial requirements
 
-Status: Draft 0.5 with confirmed first-release scope, development model, and device ownership  
-Updated: October 3, 2026  
+Status: Product review complete; first-release scope amended November 8, 2026
+
+Updated: November 8, 2026
+
 Decision owner: Ryan Wallace
 
 Implementation design: [First-release design and work plan](DESIGN.md)
 
 Jobman Dashboard will let people monitor Jobman work from a web browser and an iOS application. It should answer three practical questions: what is happening, what needs attention, and what evidence explains the current state.
 
-This document records the agreed product boundaries and proposes acceptance criteria, integration work, and development milestones. The first release includes workload groups, diagnosis reports, all discussed alert scopes, aggregation across Control deployments, and the union of permissions from assigned roles. Confirmed decisions appear below. **Detailed acceptance criteria and implementation choices remain proposals; none of this document claims that Dashboard is already implemented.**
+The [November 8 release decision](FIRST_RELEASE_SCOPE.md) accepts the implemented baseline and its limitations for the first production release. Ryan's review is complete. Agent reliability is included; all other unfinished implementation, integration, acceptance and operational work is postponed to later releases. The detailed requirements and original milestones below remain the product roadmap. They do not reinstate postponed work as first-release conditions, and no unperformed check is recorded as passed.
 
 ## Confirmed product decisions
 
@@ -20,8 +22,8 @@ This document records the agreed product boundaries and proposes acceptance crit
 | D03 Job actions | The first release is monitoring only. |
 | D04 Monitoring depth | Job lifecycle, logs, outcomes, and evidence freshness first. CPU/GPU/memory utilization and cluster capacity come in a later release. |
 | D05 Hosting | Self-hosted on the organization's private network. |
-| D06 iOS delivery | A native iOS application, distributed internally. |
-| D07 Notifications | First-release background alerts support watched jobs, all of a user's jobs, and selected namespaces, with configurable failure and completion events. |
+| D06 iOS delivery | Native iOS application; managed internal distribution is scheduled after the first production release. |
+| D07 Notifications | Implemented rules/history support watched jobs, all of a user's jobs, and selected namespaces, with configurable failure/completion events. Real APNs delivery integration and acceptance are later-release work; background push may be unavailable initially. |
 | D09 Log storage | Support NFS and local filesystem logs first. S3 byte delivery is deferred. |
 | D10 Identity and teams | Active Directory is the identity source. Membership in specially created AD groups maps teams to namespaces. |
 | D11 Workload groups and diagnosis | Slurm arrays, collections, dependency graphs, and diagnosis reports are available in the first release. |
@@ -31,7 +33,7 @@ This document records the agreed product boundaries and proposes acceptance crit
 | D15 Organizational views | Provide namespace switching and an aggregate view across the user's authorized namespaces. |
 | D16 Sign-in service | Use AD FS as the federation/sign-in service for Active Directory users. |
 | D17 AD group mappings | One-to-one mappings between dedicated AD groups and namespace-scoped roles. Only direct membership counts; nested groups are excluded. |
-| D18 Device ownership — confirmed portion | Production targets company-managed iPhones. Ryan can test on a personally owned phone with no management controls. The internal distribution mechanism and signing ownership remain open. |
+| D18 Device ownership — confirmed portion | Production targets company-managed iPhones. Ryan can test on a personally owned phone with no management controls. Internal distribution and signing arrangements are later-release work. |
 | D19 Mobile network access | VPN access to the private network is available. |
 | D20 Control deployments | Support one or multiple Control deployments, with aggregation across namespaces within a deployment and across deployments. |
 | D21 Log-reader identity | Run the log-reading service as a user with ACL access to all managed log files across workload users. End-user namespace authorization still governs each log request. |
@@ -96,13 +98,13 @@ Control must enforce this policy for metadata, groups, reports, log delivery, an
 
 ## Release scope
 
-**MVP** means the agreed first supported product release, including web and native iPhone clients. Internal milestones may deliver subsets; the release includes every confirmed capability below.
+**First production release** means the implemented baseline plus the agent reliability correction, as approved on November 8. Web and native iPhone implementations are included with the accepted limits in [FIRST_RELEASE_SCOPE.md](FIRST_RELEASE_SCOPE.md). The broader capability targets below remain the roadmap; any unfinished portion is scheduled after this release.
 
 | Priority | Included capabilities |
 | --- | --- |
-| MVP monitoring | AD FS and direct group mappings; permission unions; all-member namespace visibility; one or multiple Control connections; namespace switching; aggregates within/across deployments; paginated jobs; detail; freshness; NFS/local logs; artifact metadata; targets; refresh; deep links; accessible layouts. |
-| MVP workload investigation | Slurm arrays, collections, dependency graphs, child/node navigation, and diagnosis reports with evidence citations in both clients. |
-| MVP alerts and delivery | Alerts for watched jobs, all own jobs, and selected namespaces; configurable failure/completion outcomes; background iOS delivery; a 30-day inbox; and installation/upgrades through the selected internal iOS channel. |
+| Implemented monitoring baseline and roadmap | AD FS and direct group mappings; permission unions; all-member namespace visibility; one or multiple Control connections; namespace switching; aggregates within/across deployments; paginated jobs; detail; freshness; NFS/local logs; artifact metadata; targets; refresh; deep links; accessible layouts. |
+| Implemented workload investigation | Slurm arrays, collections, dependency graphs, child/node navigation, and diagnosis reports with evidence citations in both clients. |
+| Alerts and later delivery | Implemented watched-job, own-job and namespace rules, failure/completion outcomes and 30-day inbox. Real background iOS delivery and managed internal installation/upgrades are scheduled for later releases. |
 | Follow-up | Broader text/label search, saved views, full run/event timelines, agent fleet health, utilization and cluster-capacity telemetry, artifact downloads, historical trends, and native iPad support. |
 | Separate expansion | Standalone connectors; cancellation and other job mutations; namespace and target administration; S3 log byte delivery; hosted multi-organization service; Android, widgets, and Live Activities. |
 
@@ -287,7 +289,7 @@ Keep credentials in platform-appropriate secure storage. Do not ship database, s
 
 If mutations are later approved, require server authorization, clear target identification, explicit confirmation for destructive actions, idempotency, pending-result recovery, and audit history. Do not offer pause/resume/rerun solely because standalone Jobman supports them; shared mode has a different capability set.
 
-## Quality requirements and release acceptance
+## Quality targets and validation roadmap
 
 The scale and notification-retention baseline has been accepted. The other targets below are proposed engineering acceptance criteria, not measured capabilities or service guarantees.
 
@@ -305,7 +307,7 @@ The scale and notification-retention baseline has been accepted. The other targe
 | Compatibility | Publish a tested Dashboard/Control contract matrix. Test both clients against shared contract fixtures, handle additive fields, and show an actionable message for unsupported versions. |
 | Operations | Document private installation, TLS/OIDC and AD group setup, NFS/local ACLs, APNs connectivity, internal iOS installation/upgrades, and backup/restore for new durable state. Assign signing and push credential renewal owners. Record safe errors and freshness/delivery metrics without job content. |
 
-Before release, demonstrate these scenarios in both clients where applicable:
+The following scenarios describe validation coverage. Completed evidence remains recorded in the status document; unperformed scenarios are post-release follow-up under the approved scope:
 
 1. An authorized user opens a namespace, follows a job through completion, and reads its stdout and stderr.
 2. A failed job, a stale running job, and a disconnected client remain visibly distinct.
@@ -319,19 +321,19 @@ Before release, demonstrate these scenarios in both clients where applicable:
 10. Produce and display a valid diagnosis report from a representative failed shared job, follow authorized citations, and distinguish missing/outdated evidence and optional generated content. Recommendations cannot execute job changes.
 11. Exercise watched-job, all-own-job, and namespace rules across multiple sources for selected unsuccessful, success, cancellation, and all-terminal events. Overlapping rules and replay produce one inbox entry per user/source event. Verify new matching jobs, access removal, 30-day history expiry, and disabled push.
 
-Control's documented production acceptance work remains a dependency for production deployment. A working Dashboard pilot does not establish production readiness of the underlying execution infrastructure.
+The accepted first-release scope does not claim untested behavior in the underlying execution infrastructure. Additional Control deployment acceptance follows the post-release roadmap.
 
-## Decisions for Ryan
+## Post-release integration inputs
 
-Product scope is confirmed above. D08 remains open; D14 and D18 are partially resolved by the confirmed development model and device ownership. Internal iOS distribution remains explicitly open. Detailed acceptance targets and implementation proposals still require design validation.
+Ryan's first-release review is complete. The following inputs are collected when their later-release integrations are scheduled; they are not outstanding first-release decisions.
 
 | Decision | Confirmed status and remaining input | Proposed starting point |
 | --- | --- | --- |
-| D08 Push operations | Unknown for now: permission for outbound Apple connectivity, Apple application identity/APNs credential owner, and notification-service operator. | Develop event processing and delivery integration with test fixtures while collecting these inputs; verify actual APNs delivery before release. |
-| D14 Delivery constraints | Confirmed: Ryan and Codex will develop together, with Codex doing most hands-on implementation. Still unspecified: first-pilot date, private hosting capacity/budget, and production maintenance ownership. | Plan incremental implementation and review around Ryan and Codex. Establish dates from integration evidence; identify a production operator before deployment. |
+| D08 Push operations | Unknown for now: permission for outbound Apple connectivity, Apple application identity/APNs credential owner, and notification-service operator. | Develop event processing and delivery integration with test fixtures while collecting these inputs; verify actual APNs delivery when the later push integration is delivered. |
+| D14 Delivery constraints | Confirmed: Ryan and Codex will develop together, with Codex doing most hands-on implementation. Still unspecified: first-pilot date, private hosting capacity/budget, and production maintenance ownership. | Plan incremental implementation and review around Ryan and Codex. Establish dates from integration evidence; record operating ownership as the later operations rollout is organized. |
 | D18 Internal app distribution | Confirmed: company-managed production phones, with Ryan's unmanaged personal phone available for testing. Still unknown: existing Apple accounts, MDM, approved distribution channel, signing owner, and update/removal process. | Use the personal phone for development checks when prerequisites are available; verify final installation and upgrades on company-managed phones through the selected internal channel. |
 
-D08 and the unresolved portion of D18 remain infrastructure items for the network and device-management owners. They can remain open while application development proceeds, but actual push delivery and managed-device distribution must pass release acceptance. D14 now establishes the development model; timing, hosting, and ongoing operation remain separate inputs. The adopted feature scope must be reflected in estimates and milestones rather than treating groups, diagnosis, or multiple sources as optional work.
+D08 and the remaining D18 integration inputs belong to the later network/device-management work. D14 records the development model; additional timing, hosting and operating arrangements follow the same post-release schedule. The November 8 scope decision accepts unavailable components without claiming their integration or acceptance is complete.
 
 ### Integration details to collect
 
@@ -345,7 +347,7 @@ These are implementation inputs under the confirmed decisions, not proposals to 
 - Control deployment registry, source-specific trust/audience settings and store mappings, supported versions, submitter-identity exposure, and fixtures that distribute the agreed capacity across multiple sources.
 - Shared-job evidence and report-production contracts; initial proposal is on-demand deterministic analysis. AI-provider invocation remains separate from displaying diagnosis reports. Minimum iOS version and persistent offline storage are still implementation/product details to settle; iPad support is already deferred.
 
-## Proposed development milestones
+## Original development milestones and later roadmap
 
 | Milestone | Reviewable outcome |
 | --- | --- |
@@ -356,6 +358,6 @@ These are implementation inputs under the confirmed decisions, not proposals to 
 | Notification and pilot acceptance | Complete all alert scopes/outcome selectors, overlap deduplication, 30-day inbox history, and internal iOS install/upgrade. Exercise source outages, role changes, large groups, and the agreed load envelope with real users and jobs. |
 | Release planning | Confirm production dependencies, supported versions, distribution, operating ownership, and follow-up scope based on pilot findings. |
 
-Implementation estimates should follow the integration proof. The main dependencies are Control's permission-union model, source discovery/aggregation, group navigation APIs, shared-job diagnosis, log delivery, and notification/event services. These are first-release requirements and must be included in the delivery plan.
+Implementation estimates should follow the integration proof. The main dependencies are Control's permission-union model, source discovery/aggregation, group navigation APIs, shared-job diagnosis, log delivery, and notification/event services. Any unfinished portion of these original milestones is now post-release work.
 
 Codex will perform most hands-on development with Ryan collaborating on decisions, review, and available device testing. Proceed through small, tested implementation slices; infrastructure-dependent proofs remain tracked until the required access and credentials are available. No pilot date, hosting allocation, or production maintenance owner has been committed yet.

@@ -61,5 +61,5 @@ work retention, increased/decreased replay retention and source outages.
 Explicit operator replay, reconciliation, restore holds and resume are described
 in [EVENT_RECOVERY.md](EVENT_RECOVERY.md). Notification evaluation and inbox
 integration pass [deployed synthetic acceptance](LAB_NOTIFICATIONS.md); real APNs
-remains an external gate. Paused feeds must not be manually reset in SQL to
+is later-release validation under the [approved scope](FIRST_RELEASE_SCOPE.md). Paused feeds must not be manually reset in SQL to
 pretend complete delivery. These tests do not establish full release readiness.

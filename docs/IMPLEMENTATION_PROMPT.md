@@ -1,5 +1,15 @@
 Implement Jobman Dashboard through its complete initial release, using the documented requirements and design. Begin implementation now and take responsibility for coding, integration, verification, GitHub delivery, release preparation, and fixing failures.
 
+## Adopted scope amendment — November 8, 2026
+
+Ryan considers all of his review work complete. Address agent reliability for the
+first production release and postpone all other unfinished work to subsequent
+releases. Ryan accepts that some components will not work immediately. Follow
+[FIRST_RELEASE_SCOPE.md](FIRST_RELEASE_SCOPE.md); it supersedes conflicting
+original scope/completion language below. Keep known limitations factual and do
+not present the postponed work as outstanding first-release acceptance.
+
+
 ## Source of truth and scope
 
 Read these documents in full:
@@ -7,7 +17,7 @@ Read these documents in full:
 - /Users/rcw/home/code/jobman-dashboard/docs/REQUIREMENTS.md
 - /Users/rcw/home/code/jobman-dashboard/docs/DESIGN.md
 
-Implement all requirements R01–R22 and work packages WP01–WP15. Use the documented engineering proposals as the starting design. Make routine implementation decisions yourself. If evidence supports a better technical approach that preserves the requirements, document the reason and update the design. Ask before materially changing product scope, security policy, or deployment commitments. Do not silently defer required features to a later release.
+Retain R01–R22 and WP01–WP15 as the full product roadmap. Deliver the approved implemented baseline and agent reliability correction for the first production release; schedule every other unfinished item afterward. Use the documented engineering proposals as the starting design. Make routine implementation decisions yourself. If evidence supports a better technical approach that preserves the requirements, document the reason and update the design. Ask before materially changing product scope, security policy, or deployment commitments. The November 8 deferrals are explicit user instructions; record their accepted limitations without reopening review.
 
 The authorized repositories are:
 
@@ -38,7 +48,7 @@ I explicitly authorize you, for the five repositories listed above, to:
 - Add or update necessary GitHub Actions workflows and enable the required build/test workflows; trigger, monitor, and rerun CI; inspect failures and artifacts; fix failures and rerun the affected checks.
 - Merge your implementation PRs after applicable checks pass and an independent review has no unresolved blocking findings. Respect existing branch protections and approval requirements; do not bypass or weaken them.
 - Use the existing release/versioning workflows, including tags, GitHub releases, versioned Go dependencies, packages, and container artifacts necessary for this work. This includes normal release automation triggered by authorized merges. Inspect those workflows before triggering them so publication and deployment effects are understood.
-- Publish clearly labeled Dashboard prereleases/release candidates as appropriate. Publish the completed initial Dashboard release only when its required acceptance gates pass. Keep incomplete or externally unverified work labeled as a release candidate.
+- Publish clearly labeled Dashboard prereleases/release candidates as appropriate. Use the approved November 8 scope when describing the first production release. Deferred external integrations do not require retaining a candidate label; published artifacts must still accurately identify their source, version and verification scope.
 
 Keep existing repository visibility and access policy. Use the established versioning conventions, preserve published tags, and avoid force-pushing shared/protected branches. Push only task-related changes. Do not use local sibling-module replacements as a substitute for a reproducible release; publish and consume compatible dependencies in the correct order.
 
@@ -67,26 +77,26 @@ The current Lab uses Keycloak test OIDC, not AD FS. Record what Lab tests prove 
 
 ## Implementation and verification expectations
 
-Deliver the full web and native iPhone applications plus all required upstream service/contract changes. Preserve the monitoring-only product boundary, direct AD role unions and active-session revocation, source-qualified authorization, multi-Control aggregation, safe cross-user NFS/local log reads, arrays/collections/graphs, real deterministic diagnosis, every agreed alert scope/outcome, and durable notification history.
+Preserve the implemented web and native iPhone baseline and make the agent reliability correction. Other unfinished application/upstream work follows the approved post-release scope. Preserve the monitoring-only product boundary, direct AD role unions and active-session revocation, source-qualified authorization, multi-Control aggregation, safe cross-user NFS/local log reads, arrays/collections/graphs, real deterministic diagnosis, every agreed alert scope/outcome, and durable notification history.
 
 Implement real end-to-end behavior. Test doubles and fixtures support development but cannot replace required integrations. Keep public contracts versioned, migrations forward-only, and existing supported behavior compatible. Bound queries, memory, concurrency, file reads, queues, and retries.
 
 Install needed project-local dependencies and verified development/Lab artifacts using the repositories' conventions. Run servers, browsers, Xcode builds and simulators, database/container tests, and Lab workloads as needed. Inspect rendered web/native interfaces and fix usability, accessibility, and error-state problems. Prepare development builds for my personal test iPhone and coordinate physical-device steps with me when needed.
 
-Run meaningful focused checks during iteration, then the relevant full repository, cross-repository, CI, and release gates. Follow the design's T01–T12 acceptance groups and agreed scale. Use independent review for authorization, migrations, source isolation, log access, event replay/deduplication, diagnosis validation, and release readiness. Fix regressions and actionable findings; do not disable tests or protections to obtain a green result. Record exact failures, skips, and unverified scope.
+Run meaningful focused checks during iteration, then the relevant full repository, cross-repository, CI, and release gates. Use the design's T01–T12 groups to identify applicable automated regression checks; the postponed integration/manual acceptance groups remain later-release work. Use independent review for authorization, migrations, source isolation, log access, event replay/deduplication, diagnosis validation, and release readiness. Fix regressions and actionable findings; do not disable tests or protections to obtain a green result. Record exact failures, skips, and unverified scope.
 
 ## External inputs and approval boundaries
 
 Confirmed: you and I are developing together, with you performing most hands-on work. Production phones are company-managed; I can test on an unmanaged personal iPhone. APNs connectivity/ownership and the internal distribution/signing channel remain unknown. Pilot timing, production hosting allocation, and ongoing operating ownership remain unspecified.
 
-Build everything that can be completed without those inputs and ask for each concrete prerequisite when it becomes necessary. Do not invent credentials, signing entitlements, network permission, operating ownership, or successful physical-device tests. Do not weaken authentication or substitute Keycloak for the selected production AD FS integration to avoid a blocker.
+Postpone the unfinished work associated with those inputs to later releases; do not request them as first-release prerequisites. Do not invent credentials, signing entitlements, network permission, operating ownership, or successful physical-device tests. Do not weaken authentication or substitute Keycloak for the selected production AD FS integration to avoid a blocker.
 
 Before spending money, accepting account/license agreements, enrolling in an Apple program, changing production AD/AD FS/MDM/network systems, deploying or migrating production, or distributing the app to company users, prepare the artifacts, validation results, exact proposed action, and recovery plan, then obtain the necessary approval. Existing GitHub CI/release operations are authorized above; new paid capacity or increased spending limits require approval. Respect tool/platform approval requirements.
 
 ## Definition of done
 
-The initial release is complete when all R01–R22 and WP01–WP15 are implemented and verified, required CI and acceptance gates pass, changes and compatible dependencies are delivered to GitHub, reproducible release artifacts and installation/upgrade/operations documentation exist, and the required real AD FS, APNs, and company-managed-device checks have succeeded.
+The first production release uses the accepted implemented baseline plus the agent reliability correction, with applicable code checks and accurate artifact provenance. Ryan's review is complete. Unfinished R01–R22/WP01–WP15 work, corporate AD FS, real APNs, managed-device delivery, further manual acceptance, stable Diagnose and operations expansion are post-release follow-up, not completion conditions for this release.
 
-If external inputs prevent final acceptance, finish every unblocked implementation, test, documentation, CI, and release-candidate task. Then report an externally blocked release candidate with the smallest concrete list of remaining inputs/actions and their owners where known. Preserve accurate goal/status records; do not label the full release complete or waive requirements simply because those inputs are unavailable.
+Describe unavailable or unverified components as accepted first-release limitations and record their later-release follow-up. Do not report the first release as externally blocked by work Ryan explicitly postponed. Preserve accurate status and evidence: accepted deferral does not mean a test passed, an integration works, or an unpublished artifact has been released.
 
 The final handoff must include versions/commit hashes, PR and CI links, release artifacts, installation and test commands, requirement coverage, Lab and device evidence, known limitations, and any remaining production approvals. Start by inspecting the repositories and Lab, establishing the durable status tracker, and implementing the first dependency-complete slice. Proceed without an additional general go-ahead.
