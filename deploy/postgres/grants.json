@@ -115,7 +115,10 @@
           "updated_at"
         ],
         "insert": [
-          "account_id"
+          "account_id",
+          "timezone",
+          "appearance",
+          "refresh_seconds"
         ],
         "update": [
           "revision",
@@ -502,7 +505,8 @@
           "job_id",
           "equivalent_key",
           "subject",
-          "state"
+          "state",
+          "expires_at"
         ]
       },
       "dashboard_report_requesters": {
@@ -1048,7 +1052,8 @@
           "namespace_id",
           "job_id",
           "recorded_at",
-          "event_payload"
+          "event_payload",
+          "expires_at"
         ]
       },
       "dashboard_notification_inbox_matches": {

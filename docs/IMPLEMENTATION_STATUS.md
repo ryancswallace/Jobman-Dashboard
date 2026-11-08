@@ -78,6 +78,23 @@ Later checkpoints supersede earlier merge, version and connectivity statements.
   their original engineering-candidate eligibility flag and unverified Control
   compatibility. These recorded flags do not reinstate postponed product work.
 
+## External deployment configuration checkpoint — 2026-11-08
+
+[Deployment configuration](DEPLOYMENT_CONFIGURATION.md) adds offline role-specific
+validation and structural schema export, a typed public presentation projection,
+bounded accessible light/dark brand accents, new-account defaults, bounded pool/
+session/monitoring settings and future report/inbox retention. External native
+profiles stage registered identities and assets without modifying the source
+project or signing an application. Existing authorization/revocation and replay
+minimums remain enforced.
+
+Local verification covers the portable Go/web checks, generated contracts,
+packaging boundaries, a complete race-enabled store suite against disposable
+PostgreSQL, Swift core tests and unsigned simulator builds. A separate synthetic
+staged native variant verifies its compiled bundle/display identity and both URL
+registrations. These checks do not establish corporate identity-provider, real
+APNs, managed-device, production deployment or accessibility acceptance.
+
 ## Web layout checkpoint — 2026-10-11
 
 The [web layout review](UI_LAYOUT.md) covers responsive spacing, alignment and

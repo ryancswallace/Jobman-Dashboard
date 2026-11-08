@@ -112,7 +112,7 @@ func loadRuntimeMode(c config.Config, role string) (result runtimeSecrets, err e
 	if err != nil || len(key) != 32 {
 		return result, errors.New("encryption key file must contain exactly 32 private raw bytes")
 	}
-	result.identity = auth.OIDCOptions{Issuer: c.OIDC.Issuer, Audience: c.OIDC.APIAudience, WebClientID: c.OIDC.WebClientID, WebClientSecret: secret, NativeClientID: c.OIDC.NativeClientID, NativeRedirectURI: c.OIDC.NativeRedirectURI, DirectoryIDClaim: c.OIDC.DirectoryIDClaim, ClientIDClaim: c.OIDC.ClientIDClaim, PublicOrigin: c.PublicOrigin, Scopes: c.OIDC.Scopes, EncryptionKey: key, EncryptionKeyID: c.Encryption.KeyID, HTTPClient: result.identityClient}
+	result.identity = auth.OIDCOptions{Issuer: c.OIDC.Issuer, Audience: c.OIDC.APIAudience, WebClientID: c.OIDC.WebClientID, WebClientSecret: secret, NativeClientID: c.OIDC.NativeClientID, NativeRedirectURI: c.OIDC.NativeRedirectURI, DirectoryIDClaim: c.OIDC.DirectoryIDClaim, ClientIDClaim: c.OIDC.ClientIDClaim, PublicOrigin: c.PublicOrigin, Scopes: c.OIDC.Scopes, EncryptionKey: key, EncryptionKeyID: c.Encryption.KeyID, HTTPClient: result.identityClient, SessionLifetime: time.Duration(c.Operations.Effective().SessionLifetimeSeconds) * time.Second}
 	result.notifications, err = loadNotificationRuntime(c, key)
 	if err != nil {
 		return result, err
@@ -168,6 +168,30 @@ func loadRuntimeMode(c config.Config, role string) (result runtimeSecrets, err e
 }
 
 func runConfiguredMode(path, mode, migrationURLFile, checkMode string) error {
+	if mode == "validate-config" {
+		if migrationURLFile != "" {
+			return errors.New("static validation cannot accept migration credentials")
+		}
+		switch checkMode {
+		case "worker":
+			_, err := config.LoadWorker(path)
+			return err
+		case "operator":
+			_, err := config.LoadOperator(path)
+			return err
+		case "serve", "api":
+			c, err := config.Load(path)
+			if err != nil {
+				return err
+			}
+			if checkMode == "api" {
+				return validateAPIMode(c)
+			}
+			return nil
+		default:
+			return errors.New("static validation check-mode must be serve, api, worker, or operator")
+		}
+	}
 	if mode != "serve" && mode != "api" && mode != "worker" && mode != "check-config" && mode != "migrate" {
 		return errors.New("mode must be serve, api, worker, check-config, or migrate")
 	}
@@ -229,7 +253,7 @@ func runConfiguredMode(path, mode, migrationURLFile, checkMode string) error {
 		slog.Info("configuration and local key material validated; network and source authorization not tested")
 		return nil
 	}
-	db, err := store.Open(ctx, loaded.databaseURL)
+	db, err := store.OpenConfigured(ctx, loaded.databaseURL, c.Operations, c.UserDefaults, c.Retention)
 	if err != nil {
 		return err
 	}
@@ -298,6 +322,7 @@ func runConfiguredMode(path, mode, migrationURLFile, checkMode string) error {
 	if err != nil {
 		return err
 	}
+	engine.Timeout = time.Duration(c.Operations.Effective().MonitoringTimeoutMilliseconds) * time.Millisecond
 	ruleService, err := notifications.NewRuleService(db, ruleSources, eventSources, db)
 	if err != nil {
 		return err
@@ -381,7 +406,7 @@ func runConfiguredMode(path, mode, migrationURLFile, checkMode string) error {
 		background.Start(ctx)
 		defer background.Close()
 	}
-	app := &httpapi.Server{Engine: engine, Auth: identity, AuthRoutes: identity, Preferences: db, Static: loaded.static.FS()}
+	app := &httpapi.Server{Presentation: c.Presentation, Engine: engine, Auth: identity, AuthRoutes: identity, Preferences: db, Static: loaded.static.FS()}
 	app.Rules = ruleService
 	app.Inbox = inboxService
 	if notificationDevices != nil {

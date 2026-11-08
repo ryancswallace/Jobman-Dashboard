@@ -135,7 +135,7 @@ func combinedWorkerConfig(c config.Config) config.WorkerConfig {
 	if c.Reports.ObjectRoot != "" {
 		components = append(components, config.WorkerReports)
 	}
-	return config.WorkerConfig{ConfigurationRevision: c.ConfigurationRevision, DatabaseURLFile: c.DatabaseURLFile, Components: components, IdentityIssuer: c.OIDC.Issuer, Controls: c.Controls, DeliveryHold: c.Events.DeliveryHold, Reports: c.Reports, LogBrokers: c.LogBrokers, LogMappings: c.LogMappings, LogCursorKeyFile: c.LogCursorKeyFile, Notifications: c.Notifications}
+	return config.WorkerConfig{Retention: c.Retention, ConfigurationRevision: c.ConfigurationRevision, DatabaseURLFile: c.DatabaseURLFile, Components: components, IdentityIssuer: c.OIDC.Issuer, Controls: c.Controls, DeliveryHold: c.Events.DeliveryHold, Reports: c.Reports, LogBrokers: c.LogBrokers, LogMappings: c.LogMappings, LogCursorKeyFile: c.LogCursorKeyFile, Notifications: c.Notifications}
 }
 
 // Resources are fully constructed before any runner starts. Close first cancels
@@ -400,7 +400,7 @@ func runWorkerConfigured(path string, check bool) error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	db, err := store.Open(ctx, loaded.databaseURL)
+	db, err := store.OpenConfigured(ctx, loaded.databaseURL, c.Operations, nil, c.Retention)
 	if err != nil {
 		return err
 	}

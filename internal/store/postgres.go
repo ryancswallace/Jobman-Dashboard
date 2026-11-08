@@ -18,23 +18,42 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/ryancswallace/jobman-dashboard/internal/api"
+	"github.com/ryancswallace/jobman-dashboard/internal/config"
 	"github.com/ryancswallace/jobman-dashboard/internal/monitoring"
 )
 
 //go:embed migrations/*.sql
 var migrations embed.FS
 
-type Store struct{ Pool *pgxpool.Pool }
+type Store struct {
+	Pool         *pgxpool.Pool
+	userDefaults *config.UserDefaults
+	retention    *config.Retention
+}
 
 func Open(ctx context.Context, url string) (*Store, error) {
+	return OpenConfigured(ctx, url, nil, nil, nil)
+}
+
+func OpenConfigured(ctx context.Context, url string, operations *config.Operations, defaults *config.UserDefaults, retention *config.Retention) (*Store, error) {
+	if err := operations.Validate(); err != nil {
+		return nil, err
+	}
+	if err := defaults.Validate(); err != nil {
+		return nil, err
+	}
+	if err := retention.Validate(); err != nil {
+		return nil, err
+	}
+	tuning := operations.Effective()
 	cfg, err := pgxpool.ParseConfig(url)
 	if err != nil {
 		return nil, fmt.Errorf("invalid Dashboard database configuration")
 	}
-	cfg.MaxConns = 16
-	cfg.MinConns = 1
+	cfg.MaxConns = int32(tuning.DatabaseMaxConnections)
+	cfg.MinConns = int32(tuning.DatabaseMinConnections)
 	cfg.MaxConnLifetime = time.Hour
-	cfg.ConnConfig.ConnectTimeout = 5 * time.Second
+	cfg.ConnConfig.ConnectTimeout = time.Duration(tuning.DatabaseConnectTimeoutSeconds) * time.Second
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("Dashboard database connection failed")
@@ -43,7 +62,7 @@ func Open(ctx context.Context, url string) (*Store, error) {
 		pool.Close()
 		return nil, fmt.Errorf("Dashboard database is unavailable")
 	}
-	return &Store{Pool: pool}, nil
+	return &Store{Pool: pool, userDefaults: defaults, retention: retention}, nil
 }
 func (s *Store) Close() { s.Pool.Close() }
 

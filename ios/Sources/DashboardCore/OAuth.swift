@@ -29,7 +29,9 @@ public struct NativeOAuthConfiguration: Codable, Sendable {
               !clientId.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
               !scopes.isEmpty, scopes.count <= 64, Set(scopes).count == scopes.count,
               scopes.contains("openid"), scopes.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 256 && $0.rangeOfCharacter(from: .whitespacesAndNewlines.union(.controlCharacters)) == nil }),
-              redirectURI == "jobman-dashboard-auth://callback",
+              NativeBuildSettings.validScheme(NativeBuildSettings.authenticationScheme),
+              NativeBuildSettings.authenticationScheme != NativeBuildSettings.contentScheme,
+              redirectURI == NativeBuildSettings.redirectURI,
               resource == nil || (resource!.utf8.count <= 512 && !resource!.isEmpty && resource!.rangeOfCharacter(from: .controlCharacters) == nil)
         else { throw OAuthError.invalidConfiguration }
     }

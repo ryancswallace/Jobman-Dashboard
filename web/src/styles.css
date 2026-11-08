@@ -1955,3 +1955,38 @@ body {
   color: var(--accent);
   font-weight: 600;
 }
+
+.deployment-heading {
+  padding: 12px 24px;
+}
+nav[aria-label="Organization help"] {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* Only validated brand color pairs can set these internally owned variables. */
+:root[data-brand-theme="custom"] {
+  --accent: var(--brand-light-accent);
+  --brand-foreground: var(--brand-light-foreground);
+}
+:root[data-brand-theme="custom"][data-appearance="dark"] {
+  --accent: var(--brand-dark-accent);
+  --brand-foreground: var(--brand-dark-foreground);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-brand-theme="custom"]:not([data-appearance="light"]):not(
+      [data-appearance="dark"]
+    ) {
+    --accent: var(--brand-dark-accent);
+    --brand-foreground: var(--brand-dark-foreground);
+  }
+}
+:root[data-brand-theme="custom"] .button:not(.secondary) {
+  background: var(--accent);
+  color: var(--brand-foreground);
+}
+:root[data-brand-theme="custom"]
+  :is(button, a, input, select, summary, [tabindex]):focus-visible {
+  outline-color: var(--accent);
+}

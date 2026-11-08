@@ -60,6 +60,12 @@ func (s *Store) ResolveIdentity(ctx context.Context, identity auth.Identity) (mo
 		if _, err := tx.Exec(ctx, `INSERT INTO dashboard_accounts(id,directory_id,display_name) VALUES($1::uuid,$2::uuid,$3)`, id, identity.DirectoryID, identity.DisplayName); err != nil {
 			return actor, err
 		}
+		// Snapshot defaults on account creation. Reconfiguration never resets
+		// saved preferences or retroactively changes existing accounts.
+		defaults := s.userDefaults.Preferences()
+		if _, err := tx.Exec(ctx, `INSERT INTO dashboard_preferences(account_id,timezone,appearance,refresh_seconds) VALUES($1::uuid,$2,$3,$4)`, id, defaults.Timezone, defaults.Appearance, defaults.RefreshSeconds); err != nil {
+			return actor, err
+		}
 	} else if err != nil {
 		return actor, err
 	} else if disabled != nil {

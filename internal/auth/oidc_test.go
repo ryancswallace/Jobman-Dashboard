@@ -220,6 +220,34 @@ func TestBrowserCodeFlowSessionCSRFAndLogout(t *testing.T) {
 	}
 }
 
+func TestConfiguredBrowserSessionLifetimeRespectsTokenExpiry(t *testing.T) {
+	for _, lifetime := range []time.Duration{10 * time.Minute, 2 * time.Hour} {
+		t.Run(lifetime.String(), func(t *testing.T) {
+			f := newOIDCFixture(t)
+			f.o.options.SessionLifetime = lifetime
+			cookie, state := f.begin(t)
+			r := httptest.NewRequest("GET", "https://dashboard.example/auth/callback?state="+state+"&code=synthetic", nil)
+			r.AddCookie(cookie)
+			w := httptest.NewRecorder()
+			f.o.callback(w, r)
+			if w.Code != 303 {
+				t.Fatalf("callback failed: %d", w.Code)
+			}
+			store := f.o.store.(*memoryIdentityStore)
+			if len(store.sessions) != 1 {
+				t.Fatal("missing session")
+			}
+			maximum := min(lifetime, time.Hour) // Synthetic identity token expires in one hour.
+			for _, session := range store.sessions {
+				actual := session.ExpiresAt.Sub(session.CreatedAt)
+				if actual > maximum || actual < maximum-2*time.Second {
+					t.Fatalf("session expiry ignored configured/token bound: %s", actual)
+				}
+			}
+		})
+	}
+}
+
 func TestNativeTokensRequireAudienceClientAndDirectory(t *testing.T) {
 	f := newOIDCFixture(t)
 	for _, mode := range []string{"valid", "id-token", "id-token-with-api-audience", "web-audience", "wrong-client", "missing-directory", "nil-directory", "future-nbf", "forged", "mixed-cookie"} {

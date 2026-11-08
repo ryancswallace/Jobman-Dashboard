@@ -1,7 +1,7 @@
 {
   "apiVersion": "0.1.0-alpha.1",
   "generator": "scripts/generate-contracts.py",
-  "openapiSha256": "d5961683e61b4e8d0dbb66981da90a71c015fe69a872f4fc9a0e4ca61c35a949",
+  "openapiSha256": "1c1e57813c5a79a8fb302a3c63bda3a887ee18d8b51169cf80afbfbc20027f7a",
   "operations": [
     "bootstrap",
     "job",
@@ -44,7 +44,8 @@
     "revalidateRule",
     "targets",
     "workloads",
-    "revokeNativeDevice"
+    "revokeNativeDevice",
+    "getPresentation"
   ],
-  "schemaCount": 86
+  "schemaCount": 91
 }

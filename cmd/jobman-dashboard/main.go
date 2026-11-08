@@ -15,6 +15,7 @@ import (
 
 	"github.com/ryancswallace/jobman-dashboard/internal/api"
 	"github.com/ryancswallace/jobman-dashboard/internal/buildinfo"
+	"github.com/ryancswallace/jobman-dashboard/internal/config"
 	"github.com/ryancswallace/jobman-dashboard/internal/fixtures"
 	"github.com/ryancswallace/jobman-dashboard/internal/httpapi"
 	"github.com/ryancswallace/jobman-dashboard/internal/monitoring"
@@ -42,8 +43,8 @@ func run() error {
 	fs := flag.NewFlagSet("jobman-dashboard", flag.ContinueOnError)
 	fixture := fs.Bool("fixture", false, "serve synthetic development data, loopback only")
 	configPath := fs.String("config", "", "absolute production JSON configuration path")
-	mode := fs.String("mode", "serve", "serve, api, worker, check-config, or migrate")
-	checkMode := fs.String("check-mode", "serve", "configuration role for check-config: serve, api, or worker")
+	mode := fs.String("mode", "serve", "serve, api, worker, check-config, validate-config, config-schema, or migrate")
+	checkMode := fs.String("check-mode", "serve", "configuration role: serve, api, worker, or operator (static validation/schema only)")
 	migrationURL := fs.String("migration-database-url-file", "", "private migration identity database URL file (migrate mode only)")
 	listen := fs.String("listen", "127.0.0.1:8088", "HTTP bind address")
 	web := fs.String("web", "web/dist", "compiled static web directory")
@@ -52,6 +53,12 @@ func run() error {
 	}
 	if fs.NArg() != 0 {
 		return errors.New("unexpected positional arguments")
+	}
+	if *mode == "config-schema" {
+		if *fixture || *configPath != "" || *migrationURL != "" {
+			return errors.New("schema export does not accept fixture or configuration inputs")
+		}
+		return config.WriteSchema(os.Stdout, *checkMode)
 	}
 	if !*fixture {
 		if *configPath == "" {

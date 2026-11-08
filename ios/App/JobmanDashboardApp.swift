@@ -1,5 +1,6 @@
 import DashboardCore
 import SwiftUI
+import UIKit
 
 @main
 struct JobmanDashboardApp: App {
@@ -13,17 +14,18 @@ struct JobmanDashboardApp: App {
                 if store.previewMode {
                     Text("SYNTHETIC PREVIEW • No live sign-in or job data").font(.caption.bold()).frame(maxWidth: .infinity).padding(8).background(.yellow.opacity(0.25)).accessibilityIdentifier("fixtureBanner")
                 }
+                DeploymentNotices()
                 Group {
                     if store.signedIn { DashboardTabs() } else { ConnectionView() }
                 }
             }
             .environment(store)
-            .tint(Color(red: 0.12, green: 0.43, blue: 0.42))
+            .tint(store.presentation.brandTint)
             .preferredColorScheme(store.bootstrap?.preferences.appearance == "dark" ? .dark : store.bootstrap?.preferences.appearance == "light" ? .light : nil)
             .overlay {
                 if scenePhase != .active {
                     Color(uiColor: .systemBackground).ignoresSafeArea()
-                        .overlay(Label("Jobman Dashboard", systemImage: "square.grid.2x2.fill").font(.title2))
+                        .overlay(Label(store.presentation.productName, systemImage: "square.grid.2x2.fill").font(.title2))
                 }
             }
             .onOpenURL { if let route = DashboardRoute(url: $0) { store.open(route) } }
@@ -56,6 +58,7 @@ private struct ConnectionView: View {
             Form {
                 Section {
                     DashboardBrand().font(.title.bold())
+                    if !store.presentation.organizationName.isEmpty { Text(store.presentation.organizationName).font(.headline) }
                     Text("View job progress, read logs and investigate results on your organization's private network.").foregroundStyle(.secondary)
                 }
                 Section("Connect to your organization") {
@@ -65,11 +68,19 @@ private struct ConnectionView: View {
                     Text("Connect to your private network or VPN first. Use the address supplied by your administrator.").font(.footnote)
                     Button { Task { await store.signIn() } } label: {
                         if store.busy { ProgressView("Opening organization sign-in…") }
-                        else { Label("Sign in with your organization", systemImage: "person.crop.circle.badge.checkmark") }
+                        else { Label(store.presentation.authLabel, systemImage: "person.crop.circle.badge.checkmark") }
                     }.disabled(store.busy || store.address.isEmpty)
+                }
+                if !store.presentation.helpLinks.isEmpty {
+                    Section("Help") { ForEach(store.presentation.helpLinks, id: \.url) { link in
+                        if let url = URL(string: link.url) { Link(link.label, destination: url) }
+                    } }
                 }
                 if let error = store.error { Section { ErrorMessage(error: error) } }
                 if store.pendingRoute != nil { Section { Text("An update is waiting. Sign in and connect to your private network to view it.") } }
+                if !store.presentation.footerText.isEmpty && store.presentation.footerText != "Private workspace" {
+                    Section { Text(store.presentation.footerText).font(.footnote) }
+                }
             }.navigationTitle("Connect")
         }
     }
@@ -198,6 +209,7 @@ struct StatusBadge: View {
 
 // Uses the supplied transparent artwork without applying the app's tint.
 struct DashboardBrand: View {
+    @Environment(DashboardStore.self) private var store
     @Environment(\.colorScheme) private var colorScheme
     var width: CGFloat = 220
 
@@ -207,10 +219,12 @@ struct DashboardBrand: View {
                 .renderingMode(.original)
                 .resizable()
                 .scaledToFit()
-                .frame(width: width, height: width * 131.6 / 420.1)
-                .accessibilityLabel("Jobman Dashboard")
+                .frame(width: width)
+                .accessibilityLabel(store.presentation.productName)
+        } else if UIImage(named: "DashboardLogoLight") != nil {
+            Image("DashboardLogoLight").renderingMode(.original).resizable().scaledToFit().frame(width: width).accessibilityLabel(store.presentation.productName)
         } else {
-            Label("Jobman Dashboard", systemImage: "square.grid.2x2.fill")
+            Label(store.presentation.productName, systemImage: "square.grid.2x2.fill")
         }
     }
 }

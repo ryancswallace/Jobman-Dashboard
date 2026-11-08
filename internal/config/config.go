@@ -16,28 +16,34 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/ryancswallace/jobman-dashboard/internal/presentation"
 )
 
 const MaxConfigBytes int64 = 256 << 10
 const MaxSecretBytes int64 = 1 << 20
 
 type Config struct {
-	Observability         *Observability     `json:"observability,omitempty"`
-	ConfigurationRevision int64              `json:"configurationRevision"`
-	PublicOrigin          string             `json:"publicOrigin"`
-	Listen                string             `json:"listen"`
-	WebRoot               string             `json:"webRoot"`
-	ServerTLS             ServerTLS          `json:"serverTLS"`
-	DatabaseURLFile       string             `json:"databaseURLFile"`
-	OIDC                  OIDC               `json:"oidc"`
-	Encryption            Encryption         `json:"encryption"`
-	LogCursorKeyFile      string             `json:"logCursorKeyFile,omitempty"`
-	Controls              []Control          `json:"controls"`
-	LogBrokers            []RemoteBroker     `json:"logBrokers"`
-	LogMappings           []RemoteLogMapping `json:"logMappings"`
-	Reports               Reports            `json:"reports"`
-	Events                Events             `json:"events"`
-	Notifications         Notifications      `json:"notifications"`
+	Presentation          *presentation.Config `json:"presentation,omitempty"`
+	UserDefaults          *UserDefaults        `json:"userDefaults,omitempty"`
+	Operations            *Operations          `json:"operations,omitempty"`
+	Retention             *Retention           `json:"retention,omitempty"`
+	Observability         *Observability       `json:"observability,omitempty"`
+	ConfigurationRevision int64                `json:"configurationRevision"`
+	PublicOrigin          string               `json:"publicOrigin"`
+	Listen                string               `json:"listen"`
+	WebRoot               string               `json:"webRoot"`
+	ServerTLS             ServerTLS            `json:"serverTLS"`
+	DatabaseURLFile       string               `json:"databaseURLFile"`
+	OIDC                  OIDC                 `json:"oidc"`
+	Encryption            Encryption           `json:"encryption"`
+	LogCursorKeyFile      string               `json:"logCursorKeyFile,omitempty"`
+	Controls              []Control            `json:"controls"`
+	LogBrokers            []RemoteBroker       `json:"logBrokers"`
+	LogMappings           []RemoteLogMapping   `json:"logMappings"`
+	Reports               Reports              `json:"reports"`
+	Events                Events               `json:"events"`
+	Notifications         Notifications        `json:"notifications"`
 }
 
 type Events struct {
@@ -227,6 +233,18 @@ func checkKeys(decoder *json.Decoder, schema reflect.Type, path string) error {
 }
 
 func (c Config) Validate() error {
+	if err := presentation.Effective(c.Presentation).Validate(); err != nil {
+		return err
+	}
+	if err := c.UserDefaults.Validate(); err != nil {
+		return err
+	}
+	if err := c.Operations.Validate(); err != nil {
+		return err
+	}
+	if err := c.Retention.Validate(); err != nil {
+		return err
+	}
 	if err := c.Observability.Validate(); err != nil {
 		return err
 	}
@@ -291,8 +309,11 @@ func (c Config) Validate() error {
 	if !text(c.Encryption.KeyID, 64) {
 		return errors.New("encryption.keyId must be a nonempty identifier of at most 64 bytes")
 	}
-	if c.OIDC.NativeRedirectURI != "jobman-dashboard-auth://callback" {
-		return errors.New("oidc.nativeRedirectURI must match the registered native callback jobman-dashboard-auth://callback")
+	if !presentation.ValidRedirect(c.OIDC.NativeRedirectURI) {
+		return errors.New("oidc.nativeRedirectURI requires a registered private scheme and exact callback host")
+	}
+	if strings.TrimSuffix(c.OIDC.NativeRedirectURI, "://callback") == presentation.Effective(c.Presentation).ContentLinkScheme {
+		return errors.New("native OAuth and content schemes must differ")
 	}
 	if len(c.OIDC.Scopes) == 0 || len(c.OIDC.Scopes) > 32 {
 		return errors.New("oidc.scopes requires 1 to 32 unique scopes including openid")

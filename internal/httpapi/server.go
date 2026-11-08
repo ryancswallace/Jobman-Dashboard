@@ -16,6 +16,7 @@ import (
 
 	"github.com/ryancswallace/jobman-dashboard/internal/api"
 	"github.com/ryancswallace/jobman-dashboard/internal/monitoring"
+	"github.com/ryancswallace/jobman-dashboard/internal/presentation"
 )
 
 type Authenticator interface {
@@ -26,17 +27,18 @@ type AuthFunc func(*http.Request) (monitoring.Actor, error)
 func (f AuthFunc) Authenticate(r *http.Request) (monitoring.Actor, error) { return f(r) }
 
 type Server struct {
-	Engine      *monitoring.Engine
-	Auth        Authenticator
-	Static      fs.FS
-	FixtureMode bool
-	AuthRoutes  interface{ RegisterRoutes(*http.ServeMux) }
-	Preferences PreferenceStore
-	Logs        LogService
-	Reports     ReportService
-	Rules       RuleService
-	Devices     DeviceService
-	Inbox       InboxService
+	Presentation *presentation.Config
+	Engine       *monitoring.Engine
+	Auth         Authenticator
+	Static       fs.FS
+	FixtureMode  bool
+	AuthRoutes   interface{ RegisterRoutes(*http.ServeMux) }
+	Preferences  PreferenceStore
+	Logs         LogService
+	Reports      ReportService
+	Rules        RuleService
+	Devices      DeviceService
+	Inbox        InboxService
 }
 type actorKey struct{}
 
@@ -50,6 +52,9 @@ func (s *Server) Handler() http.Handler {
 
 func (s *Server) handler(requestTimeout time.Duration) http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /presentation", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, presentation.Effective(s.Presentation))
+	})
 	s.registerGroupRoutes(mux)
 	s.registerTargetRoutes(mux)
 	s.registerReportRoutes(mux)

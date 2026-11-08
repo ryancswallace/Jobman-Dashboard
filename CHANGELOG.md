@@ -6,6 +6,11 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
+- Support external deployment presentation, new-account preferences, bounded
+  operational tuning and future report/inbox retention. Add offline role-specific
+  configuration validation and structural schema export. Expose only typed public
+  presentation to clients, and stage isolated native identity/asset profiles
+  without changing the generic source project or signing an app.
 - Record completed first-release product review, the accepted implemented baseline
   plus agent reliability, and the explicit deferral of all other unfinished work
   to later releases. Preserve known limitations and historical verification facts;

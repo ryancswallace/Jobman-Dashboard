@@ -1,3 +1,4 @@
+import { contentScheme } from "./presentation";
 import type { JobRef } from "./models";
 function component(value: string) {
   if (
@@ -11,7 +12,7 @@ function component(value: string) {
   return encodeURIComponent(value);
 }
 /** Content links carry IDs only; the native application must authorize the destination. */
-export const nativeJobLink = (job: JobRef) =>
-  `jobman-dashboard://job/${component(job.deploymentId)}/${component(job.namespaceId)}/${component(job.jobId)}`;
-export const nativeInboxLink = (id: string) =>
-  `jobman-dashboard://inbox/${component(id)}`;
+export const nativeJobLink = (job: JobRef, scheme = "jobman-dashboard") =>
+  `${contentScheme(scheme)}://job/${component(job.deploymentId)}/${component(job.namespaceId)}/${component(job.jobId)}`;
+export const nativeInboxLink = (id: string, scheme = "jobman-dashboard") =>
+  `${contentScheme(scheme)}://inbox/${component(id)}`;

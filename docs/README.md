@@ -25,6 +25,7 @@ old destructive scenarios. Use the [Lab catalog](LAB_RUN_CATALOG.md).
 - [Authentication and private configuration](AUTHENTICATION.md)
 - [Compatibility](COMPATIBILITY.md)
 - [Configuration](CONFIGURATION.md)
+- [Deployment configuration and native variants](DEPLOYMENT_CONFIGURATION.md)
 - [Containers](CONTAINERS.md)
 - [Bounded dependency-failure acceptance](DEPENDENCY_FAILURE_ACCEPTANCE.md)
 - [Jobman Dashboard first-release design](DESIGN.md)

@@ -29,6 +29,12 @@ Project source references and the scheme are reproducible with `python3 scripts/
 
 ## Branding
 
+For organization identity, authentication/content URL registrations, logos and
+icons, use an external [native build profile](../docs/DEPLOYMENT_CONFIGURATION.md).
+`scripts/stage-profile.py` produces a new isolated source/project tree and never
+signs or deploys an app. Runtime presentation is an explicitly public projection;
+custom native URL registrations remain compiled into the signed app.
+
 Dark appearance uses `../assets/logo-transparent-dashboard.svg` in the connection
 screen and Overview toolbar. Keep its copies in
 `App/Assets.xcassets/DashboardLogoDark.imageset` and

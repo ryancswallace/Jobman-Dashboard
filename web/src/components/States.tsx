@@ -1,3 +1,8 @@
+import {
+  usePresentation,
+  DeploymentNotices,
+  DeploymentHelp,
+} from "../lib/presentation";
 import { Link } from "react-router-dom";
 import type { ReactNode } from "react";
 import type { Meta } from "../lib/models";
@@ -35,6 +40,7 @@ export function ErrorNotice({
   error: { code: string; message: string; requestId?: string };
   retry?: () => void;
 }) {
+  const presentation = usePresentation();
   const session = error.code === "unauthenticated";
   return (
     <div className="notice error" role="alert">
@@ -48,7 +54,7 @@ export function ErrorNotice({
           className="button"
           href={`/auth/login?returnTo=${encodeURIComponent(safeReturnPath(location.pathname + location.search))}`}
         >
-          Sign in
+          {presentation.authLabel}
         </a>
       ) : (
         retry && (
@@ -69,20 +75,24 @@ export function ConnectionScreen({
   error?: { code: string; message: string };
   onRetry: () => void;
 }) {
+  const presentation = usePresentation();
   return (
     <main className="connection">
       <img
-        src="/logo.svg"
+        src={presentation.logoPath}
         className="connection-logo brand-light"
-        alt="Jobman Dashboard"
+        alt={presentation.productName}
       />
       <img
-        src="/logo-transparent-dashboard.svg"
+        src={presentation.logoDarkPath}
         className="connection-logo brand-dark"
-        alt="Jobman Dashboard"
+        alt={presentation.productName}
       />
       <div className="connection-card">
-        <p className="eyebrow">YOUR PRIVATE MONITORING WORKSPACE</p>
+        <p className="eyebrow">
+          {presentation.organizationName || "YOUR PRIVATE MONITORING WORKSPACE"}
+        </p>
+        <DeploymentNotices />
         <h1>
           Know what’s running.
           <br />
@@ -98,13 +108,14 @@ export function ConnectionScreen({
           <ErrorNotice error={error} retry={onRetry} />
         ) : (
           <a className="button" href="/auth/login">
-            Sign in with your organization
+            {presentation.authLabel}
           </a>
         )}
         <p className="muted small">
           Use your organization’s private network or VPN. Sign in using your
           organization’s account.
         </p>
+        <DeploymentHelp />
       </div>
     </main>
   );

@@ -1,3 +1,4 @@
+import { usePresentation } from "../lib/presentation";
 import { jobStatus, statusConfidence } from "../lib/format";
 import { useMemo } from "react";
 import { RunSelector } from "../components/RunSelector";
@@ -27,6 +28,7 @@ import { Reports } from "../components/Reports";
 import { JobExecution } from "../components/JobExecution";
 import { SelectedRunFacts } from "../components/SelectedRunFacts";
 export function JobDetailPage() {
+  const presentation = usePresentation();
   const { deploymentId = "", namespaceId = "", jobId = "" } = useParams(),
     { bootstrap, identity } = useSession(),
     [search, setSearch] = useSearchParams(),
@@ -81,7 +83,10 @@ export function JobDetailPage() {
         actions={
           job && (
             <>
-              <a className="button secondary" href={nativeJobLink(ref)}>
+              <a
+                className="button secondary"
+                href={nativeJobLink(ref, presentation.contentLinkScheme)}
+              >
                 Open in app
               </a>
               <Link

@@ -31,6 +31,7 @@ package-check: ## Verify candidate packaging boundaries.
 	python3 -m unittest discover -s scripts -p 'test_*.py'
 	python3 -m unittest discover -s devel -p 'test_*.py'
 	python3 -m unittest discover -s deploy/postgres -p 'test_*.py'
+	python3 -m unittest discover -s ios/scripts -p 'test_native_profile.py'
 
 candidate: ## Build canonical committed-source candidate bundles (VERSION and OUTPUT_DIR required).
 	@test -n "$$VERSION" -a -n "$$OUTPUT_DIR" || (echo 'Set VERSION=vX.Y.Z-rc.N and OUTPUT_DIR to a new absolute directory.'; exit 1)

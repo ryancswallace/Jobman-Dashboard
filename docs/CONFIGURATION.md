@@ -5,6 +5,10 @@ from the role-specific examples in [deploy](../deploy/README.md); copy and edit
 them outside the repository. Placeholder values are intentionally unusable.
 Do not substitute fixture authentication for organization access.
 
+[Deployment configuration](DEPLOYMENT_CONFIGURATION.md) covers offline validation,
+role-specific schema export, public branding/notices, new-account defaults,
+bounded operational settings, retention and external native build profiles.
+
 [Authentication](AUTHENTICATION.md) covers AD FS/OIDC, service registration,
 delegation, audience and directory claims. [Process modes](PROCESS_MODES.md)
 describes API and worker configuration. [Purpose keys](PURPOSE_KEYS.md) documents

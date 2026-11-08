@@ -20,6 +20,8 @@ checks rather than introduce a second queue or in-memory ownership system.
 | `api` | Web/native authentication, reads, authorized rule/device/preferences mutations, report enqueue/read, inbox read state | HTTPS |
 | `worker` | Only the explicitly selected components below | None |
 | `check-config` | Strict role-specific configuration and local material validation; no external request or state mutation | None |
+| `validate-config` | Offline role-specific structural and semantic validation without opening credentials | None |
+| `config-schema` | Export the current role's structural JSON Schema without configuration input | None |
 | `migrate` | Forward migrations using a separately supplied DDL identity | None |
 | `status` | Local database observation in JSON or Prometheus format | None |
 | `events` | Explicit operator recovery/hold commands with their existing approval receipts | None |
