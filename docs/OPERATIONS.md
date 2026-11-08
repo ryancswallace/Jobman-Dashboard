@@ -2,9 +2,9 @@
 
 This runbook applies to the implemented API, worker and broker services. The
 engineering candidate has synthetic Lab evidence, not production acceptance.
-Assign a named on-call owner for the Dashboard service, identity/directory,
-Control sources, PostgreSQL/backups, NFS, and Apple signing/push before production
-rollout. Those assignments and the proposed RPO15minutes/RTO4hours remain open.
+Additional operating-owner assignments for Dashboard, identity/directory, Control,
+PostgreSQL/backups, NFS and Apple signing/push, and measured RPO15minutes/RTO4hours
+validation are post-release work under [FIRST_RELEASE_SCOPE.md](FIRST_RELEASE_SCOPE.md).
 The role names below identify responsibility, not an assertion that someone has
 accepted it.
 

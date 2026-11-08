@@ -1,7 +1,9 @@
 # Release engineering
 
-Dashboard remains an engineering prerelease. The authoritative release tuple,
-acceptance receipts and external blockers are in
+The [approved first-production-release scope](docs/FIRST_RELEASE_SCOPE.md) records
+completed product review and the accepted post-release deferrals. Published
+artifacts currently retain their engineering-prerelease identity. Exact release
+tuples and acceptance receipts are in
 [FINAL_CANDIDATE.md](docs/FINAL_CANDIDATE.md),
 [RELEASE_HANDOFF.md](docs/RELEASE_HANDOFF.md) and
 [IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md).
@@ -41,11 +43,13 @@ candidate, create accounts or run migrations. Container builds use the separate
 source Dockerfile and are not pushed automatically. Avoid treating snapshot
 metadata as a claim of reproducible, accepted release bytes.
 
-## Promotion boundaries
+## Publication and later delivery
 
-Actual AD FS/direct AD, real APNs, signing/internal distribution, company-managed
-phone and pilot checks remain required. Compatible reviewed upstream releases and
-explicit dependency repinning also remain necessary. No semantic-release hook, `latest` update, Homebrew formula, Apple distribution
+Corporate identity acceptance, real APNs, managed signing/distribution, pilot
+checks and stable Diagnose publication are post-release work under the approved
+scope. Their absence does not reopen product review or prevent the first
+production release. Preserve compatible dependency pins and report their actual
+versions; a release label does not establish untested interoperability. No semantic-release hook, `latest` update, Homebrew formula, Apple distribution
 or stable tag is automatically produced by this scaffold.
 The controlled RC publisher adds versioned GHCR images, canonical Linux packages,
 SPDX inventories and GitHub attestations. Optional Cloudsmith distribution uses a
@@ -57,4 +61,6 @@ these intentional differences from the sibling CLI/service releases.
 Production deployment/migration, organizational identity/network changes, company
 phone distribution and paid account changes retain the approval boundaries in the
 adopted [implementation prompt](docs/IMPLEMENTATION_PROMPT.md). Normal local checks,
-GitHub CI and an engineering snapshot do not waive them.
+GitHub CI and an engineering snapshot do not authorize those external actions.
+These operational permission boundaries are separate from the completed product
+review and the accepted post-release scope.

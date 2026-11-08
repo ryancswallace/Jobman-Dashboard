@@ -6,8 +6,9 @@ verification, roles, migration, private configuration and service setup. Read
 [release status](FINAL_CANDIDATE.md) before selecting an exact candidate.
 
 The native app requires a separately signed build; follow [iPhone packaging](../ios/README.md).
-Unsigned CI archives cannot be installed on phones. Internal distribution and
-actual company-managed-device acceptance remain external release gates.
+Unsigned CI archives cannot be installed on phones. Managed internal distribution and device acceptance are scheduled after the
+first release; this accepted limitation is recorded in the
+[first-release scope](FIRST_RELEASE_SCOPE.md).
 
 Local GoReleaser snapshots additionally produce archives and deb/rpm/apk packages
 for repository validation. Packages install into `/opt/jobman-dashboard/snapshot`

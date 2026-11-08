@@ -80,8 +80,8 @@ sha256sum -c SHA256SUMS
 
 Execute binaries only on their matching architecture. `version` opens no runtime
 configuration or network connection. A candidate manifest records development
-dependency pseudo-versions accurately; compatible released upstream tags remain
-a separate final-release gate. Never replace a published candidate in place.
+dependency versions accurately. Compatible stable Diagnose publication is
+post-release work under [FIRST_RELEASE_SCOPE.md](FIRST_RELEASE_SCOPE.md). Never replace a published candidate in place.
 
 ## Provision identities and storage
 
@@ -235,5 +235,6 @@ timeouts. No public source endpoint, CORS workaround or CDN is required.
 
 The proposed RPO15minutes/RTO4hours still require an operating owner and measured
 restore acceptance. A package build alone proves neither. Actual AD FS, APNs,
-company-managed iPhone distribution, agreed load and the remaining T01–T12 gates
-are tracked in [implementation status](IMPLEMENTATION_STATUS.md).
+company-managed iPhone distribution and further deployment-specific validation
+follow the [post-release roadmap](FIRST_RELEASE_SCOPE.md). Existing measured
+evidence remains in [implementation status](IMPLEMENTATION_STATUS.md).

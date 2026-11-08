@@ -85,4 +85,4 @@ PostgreSQL tests verify leases, atomic rollback, overlapping rules, source/accou
 isolation, token rotation, stale provider responses, permission loss, restore
 holds and mid-write authorization expiry. These tests do not establish real APNs
 delivery or company-managed iPhone acceptance. Deployed multi-Control event
-acceptance and the agreed load envelope remain separate release gates.
+acceptance and additional deployment load validation are post-release work under the [approved scope](FIRST_RELEASE_SCOPE.md).
