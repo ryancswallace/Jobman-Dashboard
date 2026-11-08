@@ -1,0 +1,100 @@
+{
+  "archiveSHA256": {
+    "JobmanDashboard-unsigned.xcarchive.tar.gz": "c32e3025431fb22244ddb8aa1866ad618849ef4c5e31ee12e058110ea3a2c772",
+    "jobman-dashboard_v0.1.0-rc.11_linux_amd64.tar.gz": "3cc795eaa4457119ab380732b8df4bd611638dd07b2380eb368c09be254c1462",
+    "jobman-dashboard_v0.1.0-rc.11_linux_arm64.tar.gz": "57be2f9eda64f8a66569d5a46b525563561db2fbd9a6ae0a1bae6ccc7e44af8e"
+  },
+  "assetAndOCIAttestations": 26,
+  "assetCount": 25,
+  "checksumManifestSHA256": "be7ecb5d94c795f915ee5df0682bc3dc1ffbbd1b6548e093bfb2cba60eee3c2c",
+  "cloudsmith": {
+    "packages": [
+      {
+        "filename": "jobman-dashboard_v0.1.0-rc.11_linux_amd64.deb",
+        "packageId": "Yhv4Frg1SxaG",
+        "publicDownloadVerified": true,
+        "registryFilename": "jobman-dashboard_v0.1.0-rc.11_linux_amd64.deb",
+        "registrySHA256": "b534a536d10f9994f9a79e7c8cd3c58391caf921b4bbc48a64fac13cdce4d736",
+        "sourceContentVerified": true,
+        "sourceSHA256": "b534a536d10f9994f9a79e7c8cd3c58391caf921b4bbc48a64fac13cdce4d736"
+      },
+      {
+        "filename": "jobman-dashboard_v0.1.0-rc.11_linux_amd64.rpm",
+        "packageId": "CyntwQCdXRgn",
+        "publicDownloadVerified": true,
+        "registryFilename": "jobman-dashboard_v0.1.0-rc.11_linux_amd64.rpm",
+        "registrySHA256": "15fe43b4bb830462085bd7e23099a10948e07b31a9fbcf9e26cf196295a22bc9",
+        "sourceContentVerified": true,
+        "sourceSHA256": "5f99f0f788a71f08549af7a950a1cb2692e73f7b8aae22e3e2d1ea30dd952fd8"
+      },
+      {
+        "filename": "jobman-dashboard_v0.1.0-rc.11_linux_amd64.apk",
+        "packageId": "0YhJWrfc1X3V",
+        "publicDownloadVerified": true,
+        "registryFilename": "jobman-dashboard-0-1-0-rc-11-0.1.0_rc.11-r1.apk",
+        "registrySHA256": "9213b43a82038f65462df51fe415141ee8b82ef654e03172e4de6c98fdcf2277",
+        "sourceContentVerified": true,
+        "sourceSHA256": "9213b43a82038f65462df51fe415141ee8b82ef654e03172e4de6c98fdcf2277"
+      },
+      {
+        "filename": "jobman-dashboard_v0.1.0-rc.11_linux_arm64.deb",
+        "packageId": "FgVl5mHHp3Ay",
+        "publicDownloadVerified": true,
+        "registryFilename": "jobman-dashboard_v0.1.0-rc.11_linux_arm64.deb",
+        "registrySHA256": "e24c36e4da2d15a36e9618a7ae19cf1524e15a35065e1c9ea30e61222c7e79b5",
+        "sourceContentVerified": true,
+        "sourceSHA256": "e24c36e4da2d15a36e9618a7ae19cf1524e15a35065e1c9ea30e61222c7e79b5"
+      },
+      {
+        "filename": "jobman-dashboard_v0.1.0-rc.11_linux_arm64.rpm",
+        "packageId": "HKB1TlQa45VL",
+        "publicDownloadVerified": true,
+        "registryFilename": "jobman-dashboard_v0.1.0-rc.11_linux_arm64.rpm",
+        "registrySHA256": "e53afc1411a6882fa9f4fded6fdc8850d62a2c84512c6bbcfac2d2e81eb71d55",
+        "sourceContentVerified": true,
+        "sourceSHA256": "69d8f7e3e9c926c1e5a1bcbc4e3602aa3143e5c0a55eeddd996b1ab15b5118ae"
+      },
+      {
+        "filename": "jobman-dashboard_v0.1.0-rc.11_linux_arm64.apk",
+        "packageId": "uiqy4Z4sRnyy",
+        "publicDownloadVerified": true,
+        "registryFilename": "jobman-dashboard-0-1-0-rc-11-0.1.0_rc.11-r1.apk",
+        "registrySHA256": "0a8a22d1673e72806627387f38736c5bcddf6d6407037e223d89131df6c3b46f",
+        "sourceContentVerified": true,
+        "sourceSHA256": "0a8a22d1673e72806627387f38736c5bcddf6d6407037e223d89131df6c3b46f"
+      }
+    ],
+    "packagesVerifiedByPublisher": 6,
+    "publisherRevision": "2c6358a8bc986a25d6db86ce1ce2814d3c75f635",
+    "repository": "jobman/stable",
+    "workflowConclusion": "success",
+    "workflowRun": "https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/42505808404"
+  },
+  "containerIndexDigest": "sha256:7e4648f73da2bc04e1fedbb2b29ac6f186f50db30d4a14fd83c477842a6a098e",
+  "containerTagMatchesDigest": true,
+  "nativeActualInfo": {
+    "CFBundleIdentifier": "org.jobman.dashboard",
+    "CFBundleShortVersionString": "0.1.0",
+    "CFBundleVersion": "13",
+    "DTSDKName": "iphoneos26.5",
+    "DTXcode": "2660"
+  },
+  "nativeInstallable": false,
+  "nativeMode": "unsigned",
+  "packageArchiveIdentitiesVerified": 6,
+  "publishedAt": "2026-11-08T17:35:58Z",
+  "releaseId": 438405825,
+  "revision": "2c6358a8bc986a25d6db86ce1ce2814d3c75f635",
+  "state": "published-prerelease",
+  "status": "passed",
+  "upstreamReleasePins": {
+    "controlCompatibilityVerified": false,
+    "core": "v1.9.0",
+    "diagnose": "v0.7.0-rc.1",
+    "finalReleaseEligible": false
+  },
+  "verificationScope": "Independent public downloads, all asset checksums and asset/container attestations, package-to-archive identity, container tag digest, and unsigned native archive identity. Installation and container runtime evidence is supplied by the passing release workflow. No RC11 Lab, corporate identity, APNs, signed device, accessibility or pilot acceptance was performed.",
+  "verifiedAt": "2026-11-08T17:38:19.106145+00:00",
+  "version": "v0.1.0-rc.11",
+  "workflowRun": "https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/42505219446"
+}
