@@ -97,7 +97,7 @@ Set `reports.objectRoot` and optionally `reports.redactionFile` in the productio
 configuration. The redaction file must be private and contain only the two JSON
 arrays above. An absent policy leaves metadata reports available and explicitly
 rejects new log-tail requests. Omission of report configuration supports staged
-monitoring upgrades; the initial release requires report storage enabled. The
+monitoring upgrades; report generation requires report storage enabled. The
 service derives the companion version from its embedded immutable Go dependency;
 local module replacements and workspace `(devel)` dependencies are rejected.
 Configured private files, including redaction policies and service keys, must
@@ -112,5 +112,6 @@ store. `GOWORK=off python3 scripts/test-lab-postgres.py` uses disposable schemas
 and private synthetic credentials. Tests cover deduplication, aliases, leases,
 revocation, source recovery, retries, retained quota, publication crash recovery
 and paired retention. These tests do not establish production AD FS, live Slurm,
-Apple delivery or full release acceptance. Compatible released dependency tags
-and the broader acceptance plan remain required.
+Apple delivery or additional deployment validation. Unfinished stable dependency
+delivery and additional validation are scheduled after the first production
+release under [the approved scope](FIRST_RELEASE_SCOPE.md).

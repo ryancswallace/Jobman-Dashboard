@@ -106,10 +106,12 @@ running Dashboard/Control commits, configuration revisions, resources, source
 identity checks and CI alongside the result. A stale fixture receipt alone does
 not prove that the deployed source or configuration still matches it.
 
-Additional T11 acceptance still required: simultaneous log follows and group
-drill-downs, terminal-event bursts, slow dependency behavior, memory/queue bounds,
-and actual client rendering/accessibility under load. Keep those results distinct
-from this metadata HTTP slice.
+Additional T11 scenarios outside this metadata HTTP slice include simultaneous
+log follows and group drill-downs, terminal-event bursts, slow dependency behavior,
+memory/queue bounds, and client rendering/accessibility under load. Later
+checkpoints record completed scenarios; any unfinished validation is later-release
+work under [the approved scope](FIRST_RELEASE_SCOPE.md). Keep each result tied to
+its actual scenario and source.
 
 
 ## Recorded acceptance — October 4

@@ -67,8 +67,9 @@ The database transaction uses repeatable-read isolation without worker row locks
 a five-second total context deadline, a two-second statement timeout and a
 500-millisecond lock timeout. Queries use source-qualified pending indexes and
 return at most the configured source set. Global activation/provider aggregates
-remain timeout-bounded. Load measurements at the agreed scale are still required;
-no new index or schema is added merely to claim that acceptance.
+remain timeout-bounded. Additional load measurements are later-release work under
+[the approved scope](FIRST_RELEASE_SCOPE.md); this implementation alone does not
+establish those measurements.
 
 Missing feed rows are `uninitialized`, with no fabricated queue or checkpoint
 values. A failed query, invalid stored checkpoint or cancelled request produces

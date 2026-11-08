@@ -8,7 +8,9 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 - Record completed first-release product review, the accepted implemented baseline
   plus agent reliability, and the explicit deferral of all other unfinished work
-  to later releases. Preserve known limitations and historical verification facts.
+  to later releases. Preserve known limitations and historical verification facts;
+  describe earlier acceptance plans as superseded history throughout the runbooks.
+  Record verified host/Slurm credential recovery and preserved job/log evidence.
 
 - Update Go to 1.26.10 and refresh frontend dependencies, including the Vitest
   security fixes. Keep local, container and CI toolchains aligned.

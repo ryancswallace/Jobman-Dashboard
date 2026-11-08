@@ -25,4 +25,6 @@ part of the initial Dashboard release.
 
 The detailed [design](DESIGN.md) and [operations](OPERATIONS.md) specify additional
 limits. Report vulnerabilities through [SECURITY.md](../SECURITY.md). This document
-summarizes implemented boundaries; external identity/device acceptance remains open.
+summarizes implemented boundaries. External identity/device validation is
+scheduled after the first production release under the
+[approved scope](FIRST_RELEASE_SCOPE.md); no such validation is claimed here.

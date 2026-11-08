@@ -24,14 +24,13 @@ remains tracked separately; this audit does not duplicate those operations.
 These were the original implementation findings; completed repairs retain their evidence and unfinished work now follows the November 8 post-release scope. Their automated evidence does
 not replace actual AD FS acceptance, signed APNs delivery, supported-browser
 visual/assistive-technology checks, or installation/accessibility on company
-managed iPhones. The recorded browser policy block remains in force; no alternate
-driver or origin is an acceptance workaround. The Apple distribution decision,
+managed iPhones. Browser policy blocked access at the original audit checkpoint;
+later status entries record successful live browser checks. The Apple distribution decision,
 signing/APNs ownership and real device inputs belong to the post-release roadmap.
 
 R01–R02/R07/R10–R17/R19–R20/R22 have corresponding implementation and focused
 tests; their remaining system evidence is recorded in the status document.
-This audit is not a claim that every production acceptance gate for those
-requirements has passed. Upstream protected reviews, released dependency pins,
+This audit claims only the specific checks recorded for those requirements. Upstream protected reviews, released dependency pins,
 and candidate provenance retain their recorded meaning without reinstating postponed first-release conditions.
 
 The [final candidate procedure](FINAL_CANDIDATE.md) carries this audit in the

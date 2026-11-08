@@ -1,8 +1,9 @@
 # Linux candidate packages and service installation
 
 Status: the engineering candidate is published and its split services pass actual
-Lab installation/restart checks. The first release's integrated gates are still
-open; a candidate is not production acceptance. Production installation,
+Lab installation/restart checks. Product review is complete under the
+[approved first-release scope](FIRST_RELEASE_SCOPE.md); additional integration
+work is scheduled for later releases. Production installation,
 AD/AD FS changes and distribution require the approvals in the adopted
 implementation prompt. The isolated synthetic Lab has separate testing authority.
 
@@ -11,7 +12,7 @@ Each service can expose its own private operator socket using
 separate mode0700 runtime directories. Configure an explicit socket path inside
 the corresponding directory; metrics never share the browser listener.
 
-See [final candidate gates](FINAL_CANDIDATE.md) for the exact-source packaging
+See [candidate packaging and publication](FINAL_CANDIDATE.md) for the exact-source packaging
 sequence, compatible upstream tags and unsigned native provenance. The bundled
 [run-selection contract](RUN_SELECTION.md) and [release gap audit](RELEASE_GAP_AUDIT.md)
 retain the behavior and acceptance boundaries used for review.

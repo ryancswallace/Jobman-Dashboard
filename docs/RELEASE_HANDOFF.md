@@ -106,7 +106,7 @@ version-owned packages, non-root containers and explicit service activation.
 | --- | --- |
 | Embedded Core `v1.9.0` | `c0c651f8a555bb56d1bdb1e65f56c47c288dd285`; published stable module |
 | Deployed Control `v0.2.0` | `733dea9001116ebd9327351e40168491f780b870`; both Dashboard Lab sources verified; pre-RC10 checks passed 46 authenticated GETs, 30 exact command reads and eight namespace denials |
-| Embedded Diagnose `v0.7.0-rc.1` | `d9021503db6346d363a82d381bd400da1542f04f`; published candidate; real-provider acceptance and compatible stable publication remain open |
+| Embedded Diagnose `v0.7.0-rc.1` | `d9021503db6346d363a82d381bd400da1542f04f`; published candidate; real-provider validation and compatible stable publication are later-release work |
 
 RC8 failed after pushing its immutable container index
 `sha256:c29824b09c16c30064de593f30fcd764abe0a047871cc4d0492a36e61c1ca8d5`;
@@ -119,9 +119,10 @@ Original [RC8](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37
 and [RC9](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37512314090)
 runs and their failures remain evidence; neither is relabeled as a successful release.
 
-Final acceptance remains open for corporate AD FS/direct AD, real APNs, signed
-company-managed-device delivery, manual accessibility and pilot/operating owners,
-plus stable Diagnose acceptance. The earlier synthetic Lab Chrome-access blocker
+Corporate AD FS/direct AD, real APNs, signed company-managed-device delivery,
+manual accessibility, additional pilot/operations work and stable Diagnose
+validation are scheduled after the first production release under the
+[approved scope](FIRST_RELEASE_SCOPE.md). No unperformed validation is claimed. The earlier synthetic Lab Chrome-access blocker
 and old PR-approval backlog are resolved; their RC7 statements below are historical.
 Cloudsmith distribution completed successfully on October 6 in
 [run 37535796557](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37535796557),
@@ -134,13 +135,16 @@ Cloudsmith normalizes APK filenames; exact name/version/architecture checks
 preserve identity across both architectures. Dashboard remains a prerelease;
 this publication does not imply production or company-device acceptance.
 
-## Historical RC7 handoff — retained unchanged
+## Historical RC7 handoff
 
-The following record preserves the original RC7 tuple, hashes and acceptance
-statements. Current versions and outstanding actions are summarized above.
+The following record preserves the original RC7 tuple, hashes and verification
+facts. Historical plans are described as such; the November 8 scope decision
+supersedes their release conditions. Current versions and later-release work
+are summarized above.
 
-Status: **release candidate; final acceptance remains open**. This handoff is
-supported by exact candidate checks in the synthetic Lab. See
+Recorded status: **RC7 engineering candidate**, supported by exact candidate
+checks in the synthetic Lab. Corporate integration and device validation had
+not been performed; unfinished work is now scheduled for later releases. See
 [implementation status](IMPLEMENTATION_STATUS.md) for the chronological evidence,
 retained failures and requirement/work-package coverage. Nothing in this document
 authorizes a production installation or company app distribution.
@@ -150,16 +154,18 @@ authorizes a production installation or company app distribution.
 | Component | Exact candidate | Delivery / evidence |
 | --- | --- | --- |
 | Dashboard API, worker, broker and web | `v0.1.0-rc.7`; `d10fb5f813efa3599a0bc5f79b3ca88826210510` | [Passing candidate CI37229091125](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37229091125); packages verified; all 13 Lab upgrade phases and 57 authenticated run/log GET checks pass |
-| Native iPhone app | Marketing version `0.1.0`, build `9`; same Dashboard source | Same passing CI; verified unsigned arm64 iPhoneOS archive; signing/device acceptance pending |
+| Native iPhone app | Marketing version `0.1.0`, build `9`; same Dashboard source | Same passing CI; verified unsigned arm64 iPhoneOS archive; signing/device validation was not performed at RC7 |
 | Jobman Control | `63641e922a4452bd6d63d6c41c5726b49fbfa6cf` | [PR29](https://github.com/ryancswallace/Jobman-Control/pull/29); full CI, PostgreSQL run-catalog tests and both Lab source upgrades pass |
-| Jobman producer ACL/Slurm integration | `7eae7cc7164a308ca8d12de9011610ef6177a7a0` | [PR54](https://github.com/ryancswallace/Jobman/pull/54); CI and independent review pass; formal approval remains |
-| Jobman Diagnose integration | `883f563b981e7fbd6ab6cbdb16d4489bbaf757fd` | [PR11](https://github.com/ryancswallace/Jobman-Diagnose/pull/11); CI and independent review pass; formal approval remains |
+| Jobman producer ACL/Slurm integration | `7eae7cc7164a308ca8d12de9011610ef6177a7a0` | [PR54](https://github.com/ryancswallace/Jobman/pull/54); CI and independent review pass; formal approval was pending at the RC7 checkpoint |
+| Jobman Diagnose integration | `883f563b981e7fbd6ab6cbdb16d4489bbaf757fd` | [PR11](https://github.com/ryancswallace/Jobman-Diagnose/pull/11); CI and independent review pass; formal approval was pending at the RC7 checkpoint |
 
 Dashboard embeds immutable public development module versions, with verified
 checksums: Core `v1.8.1-0.20261003211041-62ac89b14547` and
 Diagnose `v0.6.1-0.20261003234632-f47b6058c06e`. These differ from the separate
-producer/Control executable revisions above. Final release requires compatible
+producer/Control executable revisions above. The RC7 plan called for compatible
 published stable upstream tags and renewed dependency/compatibility checks.
+Later publication records supersede that version plan; unfinished stable
+Diagnose work is scheduled after the first production release.
 GitHub branch protection and required eligible approvals remain enabled.
 
 Published artifacts: [v0.1.0-rc.7 prerelease](https://github.com/ryancswallace/Jobman-Dashboard/releases/tag/v0.1.0-rc.7). The ten uploaded assets were downloaded and verified against the reviewed checksums; the tag resolves to the exact candidate source.
@@ -270,8 +276,9 @@ execution feature or invented historical execution is claimed.
 
 Web fixture rendering and automated accessibility checks, native simulator
 workflows and inspected screenshots establish their stated synthetic coverage.
-Live browser access is blocked by the current browser policy and needs an
-approved environment. Simulator/Keycloak evidence does not establish actual
+At the RC7 checkpoint, browser policy blocked live browser access. Later
+checkpoints record successful browser checks; no new browser-review prerequisite
+is created by this historical result. Simulator/Keycloak evidence does not establish actual
 AD FS, APNs, physical Keychain behavior, manual accessibility or company-managed
 phone acceptance.
 
