@@ -120,7 +120,7 @@ def configuration(bundle, metadata):
             "platform": "linux", "version": metadata["version"], "release": "1", "mtime": stamp,
             "maintainer": "Ryan Wallace <ryancswallace@gmail.com>", "license": "MIT",
             "homepage": "https://github.com/ryancswallace/Jobman-Dashboard",
-            "description": "Jobman Dashboard candidate; explicit operator activation required.",
+            "description": "Jobman Dashboard " + ("engineering candidate" if "-rc." in metadata["version"] else "full release") + "; explicit operator activation required.",
             "disable_globbing": True, "contents": contents}
 
 
