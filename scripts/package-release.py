@@ -17,8 +17,8 @@ import tarfile
 import tempfile
 
 NFPM_VERSION = "v2.47.0"
-VERSION = re.compile(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-rc\.([1-9][0-9]*)\Z")
-ARCHIVE = re.compile(r"jobman-dashboard_(v[0-9.]+-rc\.[0-9]+)_linux_(amd64|arm64)\.tar\.gz\Z")
+VERSION = re.compile(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-rc\.([1-9][0-9]*))?\Z")
+ARCHIVE = re.compile(r"jobman-dashboard_(v[0-9.]+(?:-rc\.[0-9]+)?)_linux_(amd64|arm64)\.tar\.gz\Z")
 MAX_BYTES = 1024 * 1024 * 1024
 MAX_FILES = 10000
 MAX_METADATA_BYTES = 4 * 1024 * 1024
@@ -88,7 +88,7 @@ def unpack_archive(archive, destination):
         raise ValueError("archive member checksums or inventory disagree")
     metadata = json.loads((destination / "build.json").read_text())
     if (metadata.get("version") != version or metadata.get("architecture") != architecture
-            or metadata.get("os") != "linux" or metadata.get("releaseState") != "candidate"
+            or metadata.get("os") != "linux" or metadata.get("releaseState") != ("candidate" if "-rc." in version else "release")
             or metadata.get("formatVersion") != 1
             or not isinstance(metadata.get("revision"), str)
             or not re.fullmatch(r"[0-9a-f]{40}", metadata["revision"])

@@ -16,7 +16,7 @@ spec.loader.exec_module(package)
 def fixture(directory, version="v0.1.0-rc.8", architecture="arm64", mutate=None, extra=None):
     """Synthetic executables for packaging/lifecycle tests, never release artifacts."""
     name = f"jobman-dashboard_{version}_linux_{architecture}"
-    metadata = {"formatVersion": 1, "releaseState": "candidate", "version": version,
+    metadata = {"formatVersion": 1, "releaseState": "candidate" if "-rc." in version else "release", "version": version,
                 "architecture": architecture, "os": "linux", "revision": "a" * 40,
                 "sourceDateEpoch": 1700000000}
     files = {"build.json": json.dumps(metadata).encode(), "LICENSE": b"fixture license\n",
@@ -102,7 +102,12 @@ class PackageTests(unittest.TestCase):
                 package.package(root, root, Path("/unused"))
 
     def test_version_identity_is_validated_before_package_names(self):
-        for version in ("v0.1.0", "v0.1.0-rc.0", "v0.01.0-rc.1", "../escape"):
+        self.assertEqual(package.package_name("v0.1.0"), "jobman-dashboard-0-1-0")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            archive = fixture(root, version="v0.1.0")
+            self.assertEqual(package.unpack_archive(archive, root / "unpacked")["releaseState"], "release")
+        for version in ("v0.01.0", "v0.1.0-rc.0", "v0.01.0-rc.1", "../escape"):
             with self.subTest(version=version), self.assertRaises(ValueError):
                 package.package_name(version)
 

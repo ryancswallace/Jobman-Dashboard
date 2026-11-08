@@ -1,8 +1,9 @@
 # Maintenance and support
 
-Jobman Dashboard is an engineering prerelease with best-effort support. The latest
-candidate and `main` are the active development targets. Stable compatibility and
-production readiness remain subject to the [release gates](docs/RELEASE_HANDOFF.md).
+Jobman Dashboard v0.1.0 is the first full release with best-effort support and a
+pre-v1 compatibility contract. The latest full release and `main` are the active
+support targets. [Approved scope](docs/FIRST_RELEASE_SCOPE.md) records accepted
+limitations; deployment-specific readiness requires its own configuration and evidence.
 
 For a reproducible issue, provide Dashboard and Control revisions, browser/iOS
 version, OS/architecture, installation method, affected feature, safe error code,

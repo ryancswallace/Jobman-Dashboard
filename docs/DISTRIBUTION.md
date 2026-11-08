@@ -1,6 +1,8 @@
-# Candidate distribution
+# Release distribution
 
-Dashboard publishes engineering release candidates. Product review is complete
+Dashboard publishes full releases (`vX.Y.Z`) and engineering candidates
+(`vX.Y.Z-rc.N`). Full releases are non-prerelease/latest on GitHub; candidates
+remain prereleases and are not marked latest. Product review is complete
 for the [approved first-production-release scope](FIRST_RELEASE_SCOPE.md).
 Corporate AD FS/direct AD, APNs, signed managed-device delivery, manual
 accessibility and additional pilot/operations work are scheduled for later
@@ -9,7 +11,7 @@ archive is retained for provenance; it cannot be installed on a phone.
 
 ## Artifact contract
 
-A release selects one clean main commit and a new `vX.Y.Z-rc.N` version. Never
+A release selects one clean main commit and a new canonical version. Never
 replace a published tag, asset or container version. The release workflow requires
 successful current main-commit CI, repository checks, CodeQL, fuzz and Scorecard
 runs, then separately approved publication through the `main` environment.

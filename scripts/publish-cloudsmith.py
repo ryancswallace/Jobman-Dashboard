@@ -19,7 +19,7 @@ spec.loader.exec_module(release)
 def alpine_identity(filename):
     if not filename.endswith(".apk"):
         return None
-    match = re.fullmatch(r"jobman-dashboard_(v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+)_linux_(amd64|arm64)\.apk", filename)
+    match = re.fullmatch(r"jobman-dashboard_(v[0-9]+\.[0-9]+\.[0-9]+(?:-rc\.[0-9]+)?)_linux_(amd64|arm64)\.apk", filename)
     release.need(match, "Invalid canonical Alpine filename")
     version, arch = match.groups()
     name = "jobman-dashboard-" + version[1:].replace(".", "-")
@@ -121,10 +121,10 @@ def main():
     parser.add_argument("--destination", default=os.environ.get("CLOUDSMITH_REPOSITORY", "jobman/stable"))
     args = parser.parse_args()
     release.need(re.fullmatch(r"[a-z0-9][a-z0-9_-]*/[a-z0-9][a-z0-9_-]*", args.destination), "Invalid Cloudsmith destination")
-    release.need(release.RC.fullmatch(args.version) and release.REPOSITORY.fullmatch(args.repository), "Expected repository and RC version")
+    release.need(release.VERSION.fullmatch(args.version) and release.REPOSITORY.fullmatch(args.repository), "Expected repository and canonical release version")
     release.need(os.environ.get("CLOUDSMITH_API_KEY"), "Configure the main environment CLOUDSMITH_API_KEY before dispatch")
     selected = release.api(f"repos/{args.repository}/releases/tags/{args.version}")
-    release.need(selected["draft"] is False and selected["prerelease"] is True and selected["tag_name"] == args.version, "Only a published engineering RC can be distributed")
+    release.need(selected["draft"] is False and selected["prerelease"] is bool(release.RC.fullmatch(args.version)) and selected["tag_name"] == args.version, "Published release channel differs from the selected version")
     reference = release.api(f"repos/{args.repository}/git/ref/tags/{args.version}")
     release.need(reference["object"]["type"] == "commit", "Expected the immutable lightweight RC tag")
     args.revision = reference["object"]["sha"]
@@ -143,7 +143,8 @@ def main():
                 command = ["cloudsmith", "list", "packages", args.destination, "--output-format", "json", "--query", registry_query(name)]
                 state, record = package_state(json.loads(release.capture(command)), name, checksums[name])
                 if state == "missing":
-                    release.run(["cloudsmith", "push", kind, args.destination + "/" + distro + "/any-version", str(package), "--tags", "rc,source-sha256-" + checksums[name]], timeout=600)
+                    channel = "rc" if release.RC.fullmatch(args.version) else "stable"
+                    release.run(["cloudsmith", "push", kind, args.destination + "/" + distro + "/any-version", str(package), "--tags", channel + ",source-sha256-" + checksums[name]], timeout=600)
                 # Do not re-upload pending records. Synchronization may add an
                 # RPM signature; only that signature area may differ.
                 for attempt in range(12):

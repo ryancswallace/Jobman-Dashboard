@@ -15,10 +15,10 @@ github.com/jackc/puddle/v2 v2.2.3 h1:f8HoREISb3l5eO9coPgK7U3hKLhWGokOFVcThl5jrao
 github.com/jackc/puddle/v2 v2.2.3/go.mod h1:vriiEXHvEE654aYKXXjOvZM39qJ0q+azkZFrfEOc3H4=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/ryancswallace/jobman v1.9.0 h1:7vrEdH65svEQKt9CdlPTFFE8LF8d+rJHokLJ2U9kRoo=
-github.com/ryancswallace/jobman v1.9.0/go.mod h1:gNd0CgFzR27pH5FXPg7G2md4z2LEvQSRW7EJYfxrquo=
-github.com/ryancswallace/jobman-diagnose v0.7.0-rc.1 h1:h/093kWgbzNckHGMsykobm2/oA8kyGuJFif5hFOa8zo=
-github.com/ryancswallace/jobman-diagnose v0.7.0-rc.1/go.mod h1:ibQZ07tFhWaq2sfh0mRLmIT2ULePbz0mYR2JqUYPODU=
+github.com/ryancswallace/jobman v1.10.1 h1:cLIAjwozYjDfvN2T6CGgOcylCFLIWwyWOO7CpKRmts8=
+github.com/ryancswallace/jobman v1.10.1/go.mod h1:MBUWcM+QnZrrHjbdmAECGXNWTH6JmKt3JY+I7id/KYM=
+github.com/ryancswallace/jobman-diagnose v0.7.0-rc.3 h1:zFnYPs4/IHiJhl7BBaq0ipvHuG72k+0EMQQg6Ospjyw=
+github.com/ryancswallace/jobman-diagnose v0.7.0-rc.3/go.mod h1:E2R6/bKb7ESzeIQToQPimvuA1cA72zj2XcFwzboCi74=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
@@ -26,8 +26,8 @@ github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 golang.org/x/oauth2 v0.37.0 h1:JUlcxA8oAtauLfiH8FX2/FkAWHAdi0QtGCGc+hofE98=
 golang.org/x/oauth2 v0.37.0/go.mod h1:IxwZNxUULJmpBFf9K/9NTMSIfZZuvuTy1gGxhigP/58=
-golang.org/x/sync v0.23.0 h1:KameEIfc1IkluZyXWLn39Wd4tURc6GbCiISGiZm2bQk=
-golang.org/x/sync v0.23.0/go.mod h1:sUUOizhqBxiL6pEWpqNLUiaJn1ShEbZ6BBqskPbjZm0=
+golang.org/x/sync v0.24.0 h1:iqiDrGoDgyuvAKrhLQthUEzU/R378N78gXbBjxed7oA=
+golang.org/x/sync v0.24.0/go.mod h1:sUUOizhqBxiL6pEWpqNLUiaJn1ShEbZ6BBqskPbjZm0=
 golang.org/x/sys v0.49.0 h1:XbzkgYJHdqh/8m2Uu0W/dQv8nktxx4BFHp1M0gROTXA=
 golang.org/x/sys v0.49.0/go.mod h1:hNLxWAXmnKAxqDtdwIYC4bM9oQPEecfsnNMuSxOs3og=
 golang.org/x/text v0.41.0 h1:vz/seA0lnX87Othu2f/0L24RcgrXD9/YFTSuGjj3rH8=

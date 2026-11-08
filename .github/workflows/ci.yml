@@ -63,6 +63,8 @@ jobs:
       - name: Select the pinned npm version
         run: npm install --global "npm@$(cat npm.version)" --ignore-scripts --no-audit --fund=false
       - run: npm ci --prefix web
+      - name: Check reachable Go and locked web vulnerabilities
+        run: make vulncheck
       - run: make quick-check coverage-check
         env:
           JOBMAN_DASHBOARD_TEST_DATABASE_URL: postgres://postgres:synthetic-ci-only@127.0.0.1:5432/dashboard_test?sslmode=disable

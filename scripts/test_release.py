@@ -5,6 +5,7 @@ from pathlib import Path
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location("build_release", Path(__file__).with_name("build-release.py"))
 release = importlib.util.module_from_spec(spec)
@@ -33,6 +34,10 @@ class ReleaseTests(unittest.TestCase):
         self.assertTrue(result["stableVersions"])
         self.assertFalse(result["controlCompatibilityVerified"])
         self.assertFalse(result["finalReleaseEligible"])
+        stable = release.upstream_release_pins({"dashboard": modules}, "v0.1.0")
+        self.assertTrue(stable["finalReleaseEligible"])
+        self.assertFalse(stable["controlCompatibilityVerified"])
+        self.assertEqual(stable["scopeDocument"], "docs/FIRST_RELEASE_SCOPE.md")
         for version in ("v1.2.4-0.20260101000000-abcdef012345", "v1.2.3-rc.1", "v1.2.3+incompatible", "v01.2.3"):
             changed = [dict(m) for m in modules]; changed[0]["Version"] = version
             self.assertFalse(release.upstream_release_pins({"dashboard": changed})["stableVersions"])
@@ -128,12 +133,15 @@ class ReleaseTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 release.write_checksums(root)
 
-    def test_only_explicit_candidates_and_supported_architectures(self):
-        for version in ["v0.1.0", "v0.01.0-rc.1", "v0.1.0-rc.0", "v0.1.0-rc.1;echo bad"]:
-            with self.assertRaises(ValueError):
-                release.build(version, ["arm64"], Path("/tmp/unused-release-output"))
-        with self.assertRaises(ValueError):
-            release.build("v0.1.0-rc.1", ["arm64", "arm64"], Path("/tmp/unused-release-output"))
+    def test_invalid_release_selection_stops_before_checkout_or_build(self):
+        with patch.object(release, "capture") as capture:
+            for version in ["v0.01.0", "v0.01.0-rc.1", "v0.1.0-rc.0", "v0.1.0-rc.1;echo bad"]:
+                with self.subTest(version=version), self.assertRaisesRegex(ValueError, "use vX"):
+                    release.build(version, ["arm64"], Path("/tmp/unused-release-output"))
+            for version in ("v0.1.0", "v0.1.0-rc.1"):
+                with self.assertRaisesRegex(ValueError, "unique linux architectures"):
+                    release.build(version, ["arm64", "arm64"], Path("/tmp/unused-release-output"))
+            capture.assert_not_called()
 
 
 if __name__ == "__main__":

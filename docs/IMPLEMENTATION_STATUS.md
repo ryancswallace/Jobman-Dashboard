@@ -4,11 +4,12 @@ Updated: 2026-11-08. **Product review is complete for the approved first
 production release.** Agent reliability is included in this scope; all other
 unfinished work is scheduled for later releases, with limitations accepted by
 Ryan. [First-release scope and follow-up](FIRST_RELEASE_SCOPE.md) supersedes the
-earlier acceptance conditions in this chronological record. Engineering
-prerelease v0.1.0-rc.11 is published with passing release and package distribution
-workflows; its published identity and receipts are unchanged.
+earlier acceptance conditions in this chronological record. The selected full
+release is v0.1.0 with Core v1.10.1 and Diagnose v0.7.0-rc.3 embedded; Control
+v0.3.0 is selected separately. Publication status belongs to the GitHub release
+record. RC12 and RC11 retain their exact published identities and evidence.
 Historical checkpoints below retain their original versions, failures and counts.
-RC10 Lab activation evidence has not been rerun against RC11.
+Earlier Lab activation evidence is not transferred to the selected full release.
 
 The adopted [implementation prompt](IMPLEMENTATION_PROMPT.md),
 [requirements](REQUIREMENTS.md) and [design](DESIGN.md) govern this work.
