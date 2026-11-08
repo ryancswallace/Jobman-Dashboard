@@ -598,7 +598,7 @@ func (s *NotificationEvaluationStore) CommitNotificationEvaluation(ctx context.C
 	if err != nil {
 		return result, err
 	}
-	tag, err := tx.Exec(ctx, `INSERT INTO dashboard_notification_inbox(id,account_id,deployment_id,control_instance_id,event_id,namespace_id,job_id,recorded_at,event_payload) VALUES($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8,$9) ON CONFLICT(account_id,deployment_id,control_instance_id,event_id) DO NOTHING`, inbox, actor.Account.ID, e.DeploymentID, e.ControlInstanceID, e.EventID, e.NamespaceID, e.JobID, e.RecordedAt, payload)
+	tag, err := tx.Exec(ctx, `INSERT INTO dashboard_notification_inbox(id,account_id,deployment_id,control_instance_id,event_id,namespace_id,job_id,recorded_at,event_payload,expires_at) VALUES($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8,$9,clock_timestamp()+$10*interval '1 day') ON CONFLICT(account_id,deployment_id,control_instance_id,event_id) DO NOTHING`, inbox, actor.Account.ID, e.DeploymentID, e.ControlInstanceID, e.EventID, e.NamespaceID, e.JobID, e.RecordedAt, payload, s.store.retention.Effective().InboxDays)
 	if err != nil {
 		return result, err
 	}

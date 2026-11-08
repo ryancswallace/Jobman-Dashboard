@@ -33,6 +33,12 @@ final class NativeAuthentication: NSObject, ASWebAuthenticationPresentationConte
         let code_challenge_methods_supported: [String]?
     }
 
+    func presentation(connection: DashboardConnection) async throws -> DashboardAPI.Presentation {
+        let value: DashboardAPI.Presentation = try await json(URLRequest(url: connection.baseURL.appendingPathComponent("presentation")), maximumBytes: 512 * 1024)
+        try value.validateForApp()
+        return value
+    }
+
     func signIn(connection: DashboardConnection) async throws -> String {
         generation = UUID()
         let attemptGeneration = generation
@@ -103,7 +109,7 @@ final class NativeAuthentication: NSObject, ASWebAuthenticationPresentationConte
 
     private func authenticate(url: URL) async throws -> URL {
         try await withCheckedThrowingContinuation { continuation in
-            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: "jobman-dashboard-auth") { callback, error in
+            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: NativeBuildSettings.authenticationScheme) { callback, error in
                 if let callback { continuation.resume(returning: callback) }
                 else { continuation.resume(throwing: error ?? OAuthError.rejected) }
             }
@@ -114,12 +120,12 @@ final class NativeAuthentication: NSObject, ASWebAuthenticationPresentationConte
         }
     }
 
-    private func json<T: Decodable>(_ request: URLRequest) async throws -> T {
+    private func json<T: Decodable>(_ request: URLRequest, maximumBytes: Int = 128 * 1024) async throws -> T {
         let (bytes, response) = try await network.bytes(for: request)
         guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else { throw OAuthError.rejected }
         var data = Data()
         for try await byte in bytes {
-            guard data.count < 128 * 1024 else { throw DashboardError.responseTooLarge }
+            guard data.count < maximumBytes else { throw DashboardError.responseTooLarge }
             data.append(byte)
         }
         return try JSONDecoder().decode(T.self, from: data)

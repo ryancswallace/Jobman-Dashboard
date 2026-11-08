@@ -61,7 +61,7 @@ public enum DashboardRoute: Hashable, Sendable {
 
     /// Content links carry no authority. Callers still authenticate and fetch the destination.
     public init?(url: URL) {
-        guard url.scheme?.lowercased() == "jobman-dashboard", url.user == nil, url.password == nil,
+        guard NativeBuildSettings.validScheme(NativeBuildSettings.contentScheme), url.scheme?.lowercased() == NativeBuildSettings.contentScheme, url.user == nil, url.password == nil,
               url.port == nil, url.query == nil, url.fragment == nil else { return nil }
         let parts = url.path.split(separator: "/", omittingEmptySubsequences: false).dropFirst().map(String.init)
         guard parts.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 256 && !$0.contains("/") && !$0.contains("\\") && $0 != "." && $0 != ".." }) else { return nil }
@@ -76,8 +76,8 @@ public enum DashboardRoute: Hashable, Sendable {
 
     public var url: URL? {
         switch self {
-        case .job(let ref): URL(string: "jobman-dashboard://job/\(APIPath.component(ref.deploymentId))/\(APIPath.component(ref.namespaceId))/\(APIPath.component(ref.jobId))")
-        case .inbox(let id): URL(string: "jobman-dashboard://inbox/\(APIPath.component(id))")
+        case .job(let ref): URL(string: "\(NativeBuildSettings.contentScheme)://job/\(APIPath.component(ref.deploymentId))/\(APIPath.component(ref.namespaceId))/\(APIPath.component(ref.jobId))")
+        case .inbox(let id): URL(string: "\(NativeBuildSettings.contentScheme)://inbox/\(APIPath.component(id))")
         }
     }
 }

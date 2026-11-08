@@ -5,6 +5,7 @@ import Observation
 @MainActor @Observable
 final class DashboardStore {
     var address: String = UserDefaults.standard.string(forKey: "dashboardAddress") ?? ""
+    private(set) var presentation = DashboardAPI.Presentation.appDefault
     private(set) var bootstrap: Bootstrap?
     private(set) var overview: Overview?
     private(set) var jobPage = MonitoredPage<Job, JobRef>()
@@ -83,6 +84,8 @@ final class DashboardStore {
         do {
             let connection = try DashboardConnection(address: address.trimmingCharacters(in: .whitespacesAndNewlines))
             client = DashboardTransport(connection: connection)
+            presentation = (try? await authentication.presentation(connection: connection)) ?? .appDefault
+            guard generation == sessionGeneration, !Task.isCancelled else { return }
             let token = try await authentication.signIn(connection: connection)
             let result = try await client!.bootstrap(token: token)
             guard generation == sessionGeneration, !Task.isCancelled else { return }

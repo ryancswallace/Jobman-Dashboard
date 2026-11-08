@@ -15,6 +15,7 @@ ios/.build/
 ios/**/.build/
 ios/DerivedData/
 ios/**/xcuserdata/
+ios/Config/BuildProfile.json
 
 /dist/
 /.release-generated/

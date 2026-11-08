@@ -17,6 +17,7 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/ryancswallace/jobman-dashboard/internal/monitoring"
+	"github.com/ryancswallace/jobman-dashboard/internal/presentation"
 	"golang.org/x/oauth2"
 )
 
@@ -24,6 +25,7 @@ const sessionCookie = "__Host-jobman-session"
 const loginCookie = "__Host-jobman-login"
 
 type OIDCOptions struct {
+	SessionLifetime                                                                   time.Duration
 	Issuer, Audience, WebClientID, WebClientSecret, NativeClientID, NativeRedirectURI string
 	DirectoryIDClaim, ClientIDClaim, PublicOrigin                                     string
 	Scopes                                                                            []string
@@ -55,8 +57,14 @@ func NewOIDC(ctx context.Context, o OIDCOptions, store IdentityStore) (*OIDC, er
 	if err != nil || origin.Scheme != "https" || origin.Host == "" || origin.User != nil || origin.RawQuery != "" || origin.Fragment != "" || (origin.Path != "" && origin.Path != "/") {
 		return nil, errors.New("Dashboard public origin must use HTTPS")
 	}
-	if store == nil || o.HTTPClient == nil || o.Audience == "" || o.WebClientID == "" || o.WebClientSecret == "" || o.NativeClientID == "" || o.NativeClientID == o.WebClientID || o.Audience == o.WebClientID || o.Audience == o.NativeClientID || o.DirectoryIDClaim == "" || o.ClientIDClaim == "" || o.NativeRedirectURI != "jobman-dashboard-auth://callback" {
+	if store == nil || o.HTTPClient == nil || o.Audience == "" || o.WebClientID == "" || o.WebClientSecret == "" || o.NativeClientID == "" || o.NativeClientID == o.WebClientID || o.Audience == o.WebClientID || o.Audience == o.NativeClientID || o.DirectoryIDClaim == "" || o.ClientIDClaim == "" || !presentation.ValidRedirect(o.NativeRedirectURI) {
 		return nil, errors.New("incomplete distinct web/native/API identity configuration")
+	}
+	if o.SessionLifetime == 0 {
+		o.SessionLifetime = 8 * time.Hour
+	}
+	if o.SessionLifetime < 5*time.Minute || o.SessionLifetime > 8*time.Hour {
+		return nil, errors.New("session lifetime must be 5 minutes to 8 hours")
 	}
 	o.PublicOrigin = strings.TrimSuffix(o.PublicOrigin, "/")
 	box, err := newSecretBox(o.EncryptionKey, o.EncryptionKeyID)
@@ -66,13 +74,13 @@ func NewOIDC(ctx context.Context, o OIDCOptions, store IdentityStore) (*OIDC, er
 	clientContext := oidc.ClientContext(ctx, o.HTTPClient)
 	p, err := oidc.NewProvider(clientContext, o.Issuer)
 	if err != nil {
-		return nil, errors.New("AD FS discovery failed")
+		return nil, errors.New("OIDC discovery failed")
 	}
 	endpoint := p.Endpoint()
 	for _, raw := range []string{endpoint.AuthURL, endpoint.TokenURL} {
 		u, e := url.Parse(raw)
 		if e != nil || u.Scheme != "https" || u.Host != issuer.Host || u.User != nil || u.Fragment != "" || u.RawQuery != "" {
-			return nil, errors.New("AD FS endpoints must match the configured issuer origin")
+			return nil, errors.New("OIDC endpoints must match the configured issuer origin")
 		}
 	}
 	var metadata struct {
@@ -80,14 +88,14 @@ func NewOIDC(ctx context.Context, o OIDCOptions, store IdentityStore) (*OIDC, er
 		JWKS string   `json:"jwks_uri"`
 	}
 	if err := p.Claims(&metadata); err != nil {
-		return nil, errors.New("invalid AD FS metadata")
+		return nil, errors.New("invalid OIDC metadata")
 	}
 	keys, e := url.Parse(metadata.JWKS)
 	if e != nil || keys.Scheme != "https" || keys.Host != issuer.Host || keys.User != nil || keys.Fragment != "" {
-		return nil, errors.New("AD FS key endpoint must match the configured issuer origin")
+		return nil, errors.New("OIDC key endpoint must match the configured issuer origin")
 	}
 	if len(metadata.PKCE) > 0 && !slices.Contains(metadata.PKCE, "S256") {
-		return nil, errors.New("AD FS must support S256 PKCE")
+		return nil, errors.New("OIDC must support S256 PKCE")
 	}
 	scopes := []string{"openid", "profile"}
 	for _, s := range o.Scopes {
@@ -370,7 +378,11 @@ func (o *OIDC) callback(w http.ResponseWriter, r *http.Request) {
 		authFailure(w, r)
 		return
 	}
-	expires := o.now().Add(8 * time.Hour)
+	lifetime := o.options.SessionLifetime
+	if lifetime == 0 {
+		lifetime = 8 * time.Hour
+	}
+	expires := o.now().Add(lifetime)
 	if verified.Expiry.Before(expires) {
 		expires = verified.Expiry
 	}

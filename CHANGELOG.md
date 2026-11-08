@@ -6,6 +6,12 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
+- Support external deployment presentation, new-account preferences, bounded
+  operational tuning and future report/inbox retention. Add offline role-specific
+  configuration validation and structural schema export. Expose only typed public
+  presentation to clients, and stage isolated native identity/asset profiles
+  without changing the generic source project or signing an app.
+
 - Update Go to 1.26.10 and refresh frontend dependencies, including the Vitest
   security fixes. Keep local, container and CI toolchains aligned.
 

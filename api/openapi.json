@@ -2679,6 +2679,25 @@
         },
         "summary": "Read one currently authorized run"
       }
+    },
+    "/presentation": {
+      "get": {
+        "operationId": "getPresentation",
+        "security": [],
+        "summary": "Public deployment presentation only; no authentication or runtime configuration.",
+        "responses": {
+          "200": {
+            "description": "Public presentation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Presentation"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6242,6 +6261,159 @@
           "workingDirectory"
         ],
         "additionalProperties": false
+      },
+      "PresentationLink": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label",
+          "url"
+        ],
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2048,
+            "format": "uri"
+          }
+        }
+      },
+      "PresentationNotice": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "text",
+          "severity"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning"
+            ]
+          }
+        }
+      },
+      "Presentation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schemaVersion",
+          "productName",
+          "organizationName",
+          "authLabel",
+          "headerText",
+          "footerText",
+          "logoPath",
+          "logoDarkPath",
+          "contentLinkScheme",
+          "helpLinks",
+          "notices"
+        ],
+        "properties": {
+          "schemaVersion": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "productName": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "organizationName": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "authLabel": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "headerText": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "footerText": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "logoPath": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "logoDarkPath": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "contentLinkScheme": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "helpLinks": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "$ref": "#/components/schemas/PresentationLink"
+            }
+          },
+          "notices": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "$ref": "#/components/schemas/PresentationNotice"
+            }
+          },
+          "theme": {
+            "$ref": "#/components/schemas/PresentationTheme"
+          }
+        }
+      },
+      "PresentationTheme": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "light",
+          "dark"
+        ],
+        "properties": {
+          "light": {
+            "$ref": "#/components/schemas/PresentationAccentPair"
+          },
+          "dark": {
+            "$ref": "#/components/schemas/PresentationAccentPair"
+          }
+        }
+      },
+      "PresentationAccentPair": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "accent",
+          "foreground"
+        ],
+        "properties": {
+          "accent": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "foreground": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          }
+        }
       }
     }
   }

@@ -47,16 +47,22 @@ func run() error {
 	}
 	fs := flag.NewFlagSet("jobman-log-broker", flag.ContinueOnError)
 	path := fs.String("config", "", "absolute broker JSON configuration path")
-	mode := fs.String("mode", "serve", "serve or check-config")
+	mode := fs.String("mode", "serve", "serve, check-config, validate-config, or config-schema")
 	if err := fs.Parse(os.Args[1:]); err != nil {
 		return err
 	}
-	if *path == "" || (*mode != "serve" && *mode != "check-config") || fs.NArg() != 0 {
+	if *mode == "config-schema" && *path == "" && fs.NArg() == 0 {
+		return config.WriteSchema(os.Stdout, "broker")
+	}
+	if *path == "" || (*mode != "serve" && *mode != "check-config" && *mode != "validate-config") || fs.NArg() != 0 {
 		return errors.New("broker requires --config and serve or check-config mode")
 	}
 	c, err := config.LoadBroker(*path)
 	if err != nil {
 		return err
+	}
+	if *mode == "validate-config" {
+		return nil
 	}
 	ids := make([]string, len(c.Controls))
 	for i, source := range c.Controls {

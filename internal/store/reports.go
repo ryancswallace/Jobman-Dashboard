@@ -132,7 +132,7 @@ func (s *Store) EnqueueReport(ctx context.Context, a monitoring.Actor, subject r
 		if idErr != nil {
 			return empty, idErr
 		}
-		task, err = scanReport(tx.QueryRow(ctx, `INSERT INTO dashboard_report_tasks AS t(id,deployment_id,namespace_id,job_id,equivalent_key,subject,state) VALUES($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,'queued') RETURNING `+reportColumns, id, subject.DeploymentID, subject.NamespaceID, subject.JobID, fingerprint, encoded))
+		task, err = scanReport(tx.QueryRow(ctx, `INSERT INTO dashboard_report_tasks AS t(id,deployment_id,namespace_id,job_id,equivalent_key,subject,state,expires_at) VALUES($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,'queued',clock_timestamp()+$7*interval '1 day') RETURNING `+reportColumns, id, subject.DeploymentID, subject.NamespaceID, subject.JobID, fingerprint, encoded, s.retention.Effective().ReportDays))
 		if err != nil {
 			return empty, err
 		}

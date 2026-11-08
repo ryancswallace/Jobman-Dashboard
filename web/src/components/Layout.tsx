@@ -1,3 +1,8 @@
+import {
+  usePresentation,
+  DeploymentNotices,
+  DeploymentHelp,
+} from "../lib/presentation";
 import { useEffect, useRef } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../lib/session";
@@ -13,6 +18,7 @@ const navigation = [
   ["/settings", "Settings", "⚙"],
 ];
 export function Layout() {
+  const presentation = usePresentation();
   const { bootstrap, scope, setScope, identity } = useSession(),
     location = useLocation(),
     navigate = useNavigate();
@@ -55,13 +61,17 @@ export function Layout() {
         <NavLink
           to="/"
           className="brand"
-          aria-label="Jobman Dashboard overview"
+          aria-label={`${presentation.productName} overview`}
         >
-          <img className="brand-light" src="/logo.svg" alt="Jobman Dashboard" />
+          <img
+            className="brand-light"
+            src={presentation.logoPath}
+            alt={presentation.productName}
+          />
           <img
             className="brand-dark"
-            src="/logo-transparent-dashboard.svg"
-            alt="Jobman Dashboard"
+            src={presentation.logoDarkPath}
+            alt={presentation.productName}
           />
         </NavLink>
         <p className="nav-label">WORKSPACE</p>
@@ -85,7 +95,7 @@ export function Layout() {
         <div className="sidebar-footer">
           <span className="connection-dot" aria-hidden="true" />
           <span>
-            Private workspace
+            {presentation.organizationName || presentation.footerText}
             <br />
             <small>Monitoring only</small>
           </span>
@@ -188,12 +198,14 @@ export function Layout() {
             incomplete.
           </div>
         )}
+        <DeploymentNotices />
         <main ref={main} id="main" className="main-content">
           <Outlet key={identity} />
         </main>
         <footer className="workspace-footer">
-          Jobman Dashboard
-          <span>Job information from your connected Control servers.</span>
+          {presentation.productName}
+          <span>{presentation.footerText}</span>
+          <DeploymentHelp />
         </footer>
       </div>
     </div>

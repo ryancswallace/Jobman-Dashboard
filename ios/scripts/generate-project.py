@@ -2,8 +2,13 @@
 """Generate the small native project from checked-in source lists; no XcodeGen dependency."""
 from pathlib import Path
 import hashlib
+import json
+import re
+from native_profile import read_profile, project_settings
 
 root = Path(__file__).resolve().parent.parent
+profile_path=root / "Config/BuildProfile.json"
+profile=read_profile(profile_path) if profile_path.exists() else None
 objects = []
 
 
@@ -56,9 +61,15 @@ for index, mode in enumerate(["Debug", "Release"]):
     active_arch = "YES" if mode == "Debug" else "NO"
     projectconfigs.append(obj("projectconfig:" + mode, f"isa = XCBuildConfiguration; buildSettings = {{ CLANG_ENABLE_MODULES = YES; SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 18.0; SWIFT_VERSION = 6.0; SWIFT_STRICT_CONCURRENCY = complete; ONLY_ACTIVE_ARCH = {active_arch}; }}; name = {mode};"))
     settings = 'ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CODE_SIGN_ENTITLEMENTS = Config/Dashboard.entitlements; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = Config/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = org.jobman.dashboard; PRODUCT_NAME = "$(TARGET_NAME)"; TARGETED_DEVICE_FAMILY = 1; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SUPPORTS_MACCATALYST = NO; SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO; CURRENT_PROJECT_VERSION = 1; MARKETING_VERSION = 0.1.0; ENABLE_USER_SCRIPT_SANDBOXING = YES;'
+    settings += ' JOBMAN_DISPLAY_NAME = "Jobman Dashboard"; JOBMAN_AUTH_SCHEME = jobman-dashboard-auth; JOBMAN_CONTENT_SCHEME = jobman-dashboard; JOBMAN_AUTH_LABEL = "Sign in with your organization";'
     settings += ' SWIFT_OPTIMIZATION_LEVEL = "-Onone"; DEBUG_INFORMATION_FORMAT = dwarf;' if mode == "Debug" else ' SWIFT_COMPILATION_MODE = wholemodule; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";'
+    if profile:
+        # Profiles are loaded only from the isolated generated staging tree.
+        for key, value in project_settings(profile).items():
+            settings = re.sub(r"\b"+key+r" = (?:\"[^\"]*\"|[^;]*);", lambda _: key+" = "+json.dumps(value)+";", settings)
     targetconfigs.append(obj("targetconfig:" + mode, f"isa = XCBuildConfiguration; baseConfigurationReference = {configs[index]}; buildSettings = {{ {settings} }}; name = {mode};"))
-    testconfigs.append(obj("testconfig:" + mode, f'isa = XCBuildConfiguration; buildSettings = {{ CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = org.jobman.dashboard.uitests; PRODUCT_NAME = "$(TARGET_NAME)"; TEST_TARGET_NAME = JobmanDashboard; TARGETED_DEVICE_FAMILY = 1; }}; name = {mode};'))
+    test_bundle = json.dumps(profile["bundleIdentifier"]+".uitests") if profile else "org.jobman.dashboard.uitests"
+    testconfigs.append(obj("testconfig:" + mode, f'isa = XCBuildConfiguration; buildSettings = {{ CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = {test_bundle}; PRODUCT_NAME = "$(TARGET_NAME)"; TEST_TARGET_NAME = JobmanDashboard; TARGETED_DEVICE_FAMILY = 1; }}; name = {mode};'))
 
 
 def configlist(name, values):

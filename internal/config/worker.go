@@ -21,6 +21,8 @@ const (
 // static root, server TLS identity or authentication master encryption key. Strict
 // decoding rejects those fields before any credential is read.
 type WorkerConfig struct {
+	Operations            *Operations        `json:"operations,omitempty"`
+	Retention             *Retention         `json:"retention,omitempty"`
 	Observability         *Observability     `json:"observability,omitempty"`
 	ConfigurationRevision int64              `json:"configurationRevision"`
 	DatabaseURLFile       string             `json:"databaseURLFile"`
@@ -59,6 +61,15 @@ func DecodeWorker(r io.Reader) (WorkerConfig, error) {
 }
 
 func (c WorkerConfig) Validate() error {
+	if err := c.Operations.Validate(); err != nil {
+		return err
+	}
+	if c.Operations != nil && (c.Operations.SessionLifetimeSeconds != 0 || c.Operations.MonitoringTimeoutMilliseconds != 0) {
+		return errors.New("worker operations only accepts database settings")
+	}
+	if err := c.Retention.Validate(); err != nil {
+		return err
+	}
 	if err := c.Observability.Validate(); err != nil {
 		return err
 	}

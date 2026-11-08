@@ -1,3 +1,4 @@
+import { usePresentation } from "../lib/presentation";
 import { nativeInboxLink } from "../lib/privateLinks";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
@@ -346,6 +347,7 @@ export function InboxPage() {
   );
 }
 export function InboxDetailPage() {
+  const presentation = usePresentation();
   const { inboxId = "" } = useParams(),
     { identity, bootstrap } = useSession(),
     [generation, setGeneration] = useState(0);
@@ -372,7 +374,10 @@ export function InboxDetailPage() {
             {result.data && !result.error && (
               <a
                 className="button secondary"
-                href={nativeInboxLink(result.data.id)}
+                href={nativeInboxLink(
+                  result.data.id,
+                  presentation.contentLinkScheme,
+                )}
               >
                 Open in app
               </a>
