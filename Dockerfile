@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-ARG GO_VERSION=1.26.6
+ARG GO_VERSION=1.26.10
 ARG NODE_VERSION=26.5.1
 FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-bookworm-slim@sha256:9e6f9357d371591e32ab6f2d8a26d63bdd0d17c29eee3f4f3e7e454d9634bf73 AS web
 ARG NPM_VERSION=11.17.0
@@ -11,7 +11,7 @@ COPY contracts/typescript/ /src/contracts/typescript/
 COPY web/ ./
 RUN npm run build
 
-FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-bookworm@sha256:116d58cbd88c1297624acc6e967a060012422bacf9930927e23fb719189c6f36 AS build
+FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-bookworm@sha256:5de7c99eb78ca5e515a4c340235d0955ec5964a5071c492c15503d7c267da473 AS build
 ENV CGO_ENABLED=0 GOTOOLCHAIN=local GOWORK=off GOFLAGS=-mod=readonly
 WORKDIR /src
 COPY go.mod go.sum ./

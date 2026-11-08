@@ -40,7 +40,7 @@ catalogs, group detail, inbox/device reads, and all three personal alert scopes:
 ```sh
 JOBMAN_DASHBOARD_LAB_ROOT=/absolute/path/to/jobman-lab \
 JOBMAN_DASHBOARD_LAB_PREVIEW=1 \
-GOWORK=off GOTOOLCHAIN=go1.26.6 \
+GOWORK=off GOTOOLCHAIN=go1.26.10 \
 go test -tags=integration ./internal/auth -run '^TestLabPreviewWorkflows$' -count=1 -v
 ```
 

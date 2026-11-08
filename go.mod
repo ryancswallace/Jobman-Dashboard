@@ -2,7 +2,7 @@ module github.com/ryancswallace/jobman-dashboard
 
 go 1.26.0
 
-toolchain go1.26.6
+toolchain go1.26.10
 
 require (
 	github.com/coreos/go-oidc/v3 v3.21.0

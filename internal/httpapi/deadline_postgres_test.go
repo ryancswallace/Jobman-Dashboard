@@ -102,7 +102,23 @@ func TestDynamicDeadlineCancelsStalledPostgresConnection(t *testing.T) {
 	if err != nil {
 		t.Fatal("wire fixture startup failed:", err)
 	}
-	defer db.Close()
+	poolClosed := make(chan struct{})
+	var closePool sync.Once
+	closeDatabase := func() {
+		t.Helper()
+		closePool.Do(func() {
+			go func() {
+				db.Close()
+				close(poolClosed)
+			}()
+		})
+		select {
+		case <-poolClosed:
+		case <-time.After(time.Second):
+			t.Error("canceled SQL retained a pooled connection")
+		}
+	}
+	t.Cleanup(closeDatabase)
 	s := &Server{Auth: AuthFunc(func(r *http.Request) (monitoring.Actor, error) {
 		_, err := db.Pool.Exec(r.Context(), "SELECT 1 /* deadline_probe */")
 		return monitoring.Actor{Account: api.Account{ID: "synthetic"}}, err
@@ -133,7 +149,12 @@ func TestDynamicDeadlineCancelsStalledPostgresConnection(t *testing.T) {
 		t.Fatal("healthy follow-up could not acquire a database connection:", err)
 	}
 	_ = response.Body.Close()
-	if response.StatusCode != 404 || queries.Load() != 2 || db.Pool.Stat().AcquiredConns() != 0 {
-		t.Fatal("canceled SQL retained a connection or blocked the next request")
+	if response.StatusCode != 404 || queries.Load() != 2 {
+		t.Fatalf("healthy follow-up returned status %d after %d queries", response.StatusCode, queries.Load())
 	}
+	// pgx destroys canceled connections asynchronously. A statistics snapshot
+	// can still count that connection as acquired after its socket closes.
+	// Closing the pool waits for every acquired connection to be returned and
+	// destroyed, so it verifies cleanup without racing the destructor.
+	closeDatabase()
 }
