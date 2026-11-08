@@ -2,7 +2,8 @@
 """Build secret-free Linux candidate bundles from an exact committed Git tree.
 
 No tag, upload, installation, service change, or Git mutation is performed.
-Only vX.Y.Z-rc.N candidates are currently supported: final acceptance is open.
+Only vX.Y.Z-rc.N candidates are supported by this builder.
+Approved product scope is recorded separately in docs/FIRST_RELEASE_SCOPE.md.
 """
 import argparse
 import datetime
