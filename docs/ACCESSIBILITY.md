@@ -82,6 +82,13 @@ Sampled rendered dark-theme text contrast was 14.53:1 for the main heading,
 stale-status badge. The focused main landmark and table displayed a
 three-pixel outline.
 
+A separate Chrome 156 profile rendered the Jobs page with the system light
+scheme. Six sampled text pairs ranged from 5.11:1 for the warning badge to
+14.55:1 for the heading. Setting Chrome's page zoom to 200% reduced the
+1280 CSS pixel viewport to 640 CSS pixels without page-level horizontal
+overflow. Tab and Enter activated the skip link and focused the main
+landmark with its three-pixel outline.
+
 The native core ran 91 tests and the unsigned iOS 27 simulator build passed.
 At the largest Dynamic Type setting, the initial graph journey failed to reach
 the group type selector. Job groups now places the type choices above scope
@@ -90,7 +97,7 @@ opt-in iPhone 18 Pro simulator test passed with maximum accessibility text and
 Reduce Motion in 87 seconds. It reached the graph's node list and dependency
 controls and restored both simulator settings.
 
-Live screen-reader speech, the light-theme contrast matrix, browser zoom at
-200%, deployed preference and access changes, and managed iPhone VoiceOver
-remain open. The Chrome accessibility tree supplied roles and names for
-inspection. Physical device behavior needs its own acceptance record.
+Live screen-reader speech, a full contrast matrix across screens and states,
+deployed preference and access changes, and managed iPhone VoiceOver remain
+open. The Chrome accessibility tree supplied roles and names for inspection.
+Physical device behavior needs its own acceptance record.
