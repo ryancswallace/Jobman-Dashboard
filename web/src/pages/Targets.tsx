@@ -71,7 +71,12 @@ export function TargetsPage() {
         <Spinner label="Loading target configuration" />
       ) : result.data?.data.items.length ? (
         <section className="panel target-catalog">
-          <div className="table-wrap">
+          <div
+            className="table-wrap"
+            role="region"
+            aria-label="Targets"
+            tabIndex={0}
+          >
             <table>
               <thead>
                 <tr>

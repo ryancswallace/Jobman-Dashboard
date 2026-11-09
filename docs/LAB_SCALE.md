@@ -114,6 +114,28 @@ work under [the approved scope](FIRST_RELEASE_SCOPE.md). Keep each result tied t
 its actual scenario and source.
 
 
+### Loopback fixture checkpoint, 2026-11-09 UTC
+
+A local ARM64 macOS build served the checked-in two-source, 240-job
+`--fixture`. Twenty-five concurrent synthetic viewers completed eight
+iterations of four requests each. Timings include connection, response, JSON
+decoding and validation. Every request had a five-second deadline and a
+512 KiB read ceiling.
+
+| Request | Valid samples | p50 ms | p95 ms | Max ms | Max bytes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 50-row source-qualified job list | 200 | 5.377 | 14.791 | 17.641 | 30,416 |
+| Complete two-source overview | 200 | 3.114 | 6.313 | 8.878 | 807 |
+| Source-qualified stale job detail | 200 | 3.124 | 5.477 | 7.328 | 902 |
+| Unavailable log dependency (expected HTTP 503) | 200 | 2.987 | 5.555 | 10.263 | 221 |
+
+Post-run service RSS was 29,408 KiB. The fixture has no configured event,
+log-delivery or report service, so those capacity limits remain unmeasured in
+this checkpoint. The earlier deployed 100,000-job metadata result below is a
+separate workload. Use the agreed pilot mix to measure sustained event bursts,
+concurrent log follows, report requests and first-useful-render latency with
+resource and alert thresholds before accepting pilot capacity.
+
 ## Recorded acceptance — October 4
 
 Exact Dashboard `9b1c65e31db8a849ebe2dfa00caf4474bef8e7d2`, configuration8,
