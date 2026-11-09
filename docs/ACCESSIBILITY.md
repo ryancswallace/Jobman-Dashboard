@@ -59,9 +59,45 @@ workload content from another environment.
 | iPhone display and input | Use largest supported Dynamic Type, increased contrast, Reduce Motion, light/dark mode and Voice Control on a representative company-managed phone. | Content and actions remain reachable, labels do not obscure values, motion is not required to understand status, named controls can be activated. |
 | Access changes | Remove an actual direct role grant while a private screen is open, then restore it; exercise network/VPN loss and recovery. | Cleared private content cannot be read from retained UI; current errors/status are announced without presenting stale data as authorized. |
 
-Automated DOM evidence is complete for the listed cases. The current browser
-automation environment rejected the live preview with `ERR_BLOCKED_BY_CLIENT`;
-no alternate-origin/browser bypass was attempted. Manual rendered-browser and
-assistive-technology checks remain open. Existing simulator workflow passes
-are recorded separately in `IMPLEMENTATION_STATUS.md`; they do not satisfy
-physical or company-managed iPhone accessibility acceptance.
+The earlier deployed preview attempt returned `ERR_BLOCKED_BY_CLIENT`. The
+loopback check below uses the explicitly synthetic fixture. Existing simulator
+workflow passes are recorded separately in `IMPLEMENTATION_STATUS.md`.
+
+### Rendered synthetic web check, 2026-11-09 UTC
+
+Chrome rendered the loopback fixture with two synthetic deployments. Keyboard
+activation of the skip link initially changed the fragment without moving
+focus. At 320 CSS pixels, the wide job table could overflow inside a container
+that lacked a keyboard focus target. After the changes, Enter focused the main
+landmark, and ArrowRight moved the labeled job results region 40 CSS pixels.
+The 320-pixel document had no page-level horizontal overflow. The 830-pixel
+table scrolled inside a 282-pixel region.
+
+Keyboard activation moved focus to the heading for all seven workspace
+routes and a source-qualified job detail. The detail and list both displayed
+the stale confidence as “Outdated” with explanatory text. Fixture settings,
+rules and inbox showed the unavailable-service state in an alert region.
+Sampled rendered dark-theme text contrast was 14.53:1 for the main heading,
+6.01:1 for active navigation, 6.69:1 for inactive navigation and 6.88:1 for the
+stale-status badge. The focused main landmark and table displayed a
+three-pixel outline.
+
+A separate Chrome 156 profile rendered the Jobs page with the system light
+scheme. Six sampled text pairs ranged from 5.11:1 for the warning badge to
+14.55:1 for the heading. Setting Chrome's page zoom to 200% reduced the
+1280 CSS pixel viewport to 640 CSS pixels without page-level horizontal
+overflow. Tab and Enter activated the skip link and focused the main
+landmark with its three-pixel outline.
+
+The native core ran 91 tests and the unsigned iOS 27 simulator build passed.
+At the largest Dynamic Type setting, the initial graph journey failed to reach
+the group type selector. Job groups now places the type choices above scope
+and presents separate selected-state buttons at accessibility sizes. The
+opt-in iPhone 18 Pro simulator test passed with maximum accessibility text and
+Reduce Motion in 87 seconds. It reached the graph's node list and dependency
+controls and restored both simulator settings.
+
+Live screen-reader speech, a full contrast matrix across screens and states,
+deployed preference and access changes, and managed iPhone VoiceOver remain
+open. The Chrome accessibility tree supplied roles and names for inspection.
+Physical device behavior needs its own acceptance record.

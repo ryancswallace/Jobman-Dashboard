@@ -9,9 +9,15 @@ final class GraphCeilingUITests: XCTestCase {
         app.launchArguments = ["--dashboard-ui-fixtures", "--dashboard-graph-ceiling-fixtures", "--dashboard-manual-refresh-fixtures"]
         app.launch()
         XCTAssertTrue(app.staticTexts["fixtureBanner"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Job groups"].tap(); app.buttons["Graphs"].tap()
+        app.tabBars.buttons["Job groups"].tap()
+        let graphs = app.buttons.matching(NSPredicate(
+            format: "identifier == %@ OR label == %@", "workload-kind-graph", "Graphs"
+        )).firstMatch
+        reveal(graphs, app: app)
+        graphs.tap()
         let graph = app.staticTexts["Synthetic ceiling graph"]
-        XCTAssertTrue(graph.waitForExistence(timeout: 10)); graph.tap()
+        reveal(graph, app: app)
+        graph.tap()
         XCTAssertTrue(app.staticTexts["Whole group summary"].waitForExistence(timeout: 10))
         return app
     }
@@ -110,9 +116,13 @@ final class GraphCeilingUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["graphCenter"].label, node(0))
     }
     private func reveal(_ element: XCUIElement, app: XCUIApplication, up: Bool = true) {
+        let top = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.54))
+        let bottom = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.77))
         for _ in 0..<24 {
             if element.exists && element.isHittable { return }
-            if up { app.swipeUp() } else { app.swipeDown() }
+            let start = up ? bottom : top
+            let end = up ? top : bottom
+            start.press(forDuration: 0.08, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.10)
         }
         capture("Unreachable synthetic graph control", app)
         XCTAssertTrue(element.exists && element.isHittable)
