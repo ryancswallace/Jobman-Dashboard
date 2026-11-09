@@ -249,12 +249,17 @@ it("supports keyboard entry and places route focus on the new heading", async ()
   const user = userEvent.setup();
   await user.tab();
   expect(screen.getByRole("link", { name: "Skip to content" })).toHaveFocus();
+  await user.keyboard("{Enter}");
+  expect(screen.getByRole("main")).toHaveFocus();
   await user.click(screen.getByRole("link", { name: "Jobs" }));
   await waitFor(() =>
     expect(
       screen.getByRole("heading", { level: 1, name: "Jobs" }),
     ).toHaveFocus(),
   );
+  expect(
+    await screen.findByRole("region", { name: "Job results" }),
+  ).toHaveAttribute("tabindex", "0");
   await user.click(
     await screen.findByRole("link", { name: "Synthetic analysis" }),
   );

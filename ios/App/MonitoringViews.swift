@@ -228,12 +228,55 @@ struct JobDetailView: View {
 }
 
 struct WorkloadsView: View {
+    private enum Kind: String, CaseIterable {
+        case collection, array, graph
+
+        var title: LocalizedStringKey {
+            switch self {
+            case .collection: "Collections"
+            case .array: "Arrays"
+            case .graph: "Graphs"
+            }
+        }
+    }
+
     @Environment(DashboardStore.self) private var store
-    @State private var kind = "collection"
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var kind = Kind.collection
+
     var body: some View {
         List {
-            Section { ScopeMenu(); Text("Collections group jobs together. Arrays run related Slurm tasks. Graphs show jobs and the dependencies between them.").font(.footnote).foregroundStyle(.secondary); Picker("Group type", selection: $kind) { Text("Collections").tag("collection"); Text("Arrays").tag("array"); Text("Graphs").tag("graph") }.pickerStyle(.segmented) }
-            PagedRows<Workload, WorkloadRow>(path: "/api/v1/workloads/\(kind)") { workload in WorkloadRow(workload: workload) }.id(kind)
+            Section {
+                if dynamicTypeSize.isAccessibilitySize {
+                    Text("Group type").accessibilityAddTraits(.isHeader)
+                    ForEach(Kind.allCases, id: \.self) { choice in
+                        Button {
+                            kind = choice
+                        } label: {
+                            HStack {
+                                Text(choice.title)
+                                Spacer()
+                                if choice == kind {
+                                    Image(systemName: "checkmark").accessibilityHidden(true)
+                                }
+                            }
+                        }
+                        .accessibilityAddTraits(choice == kind ? .isSelected : [])
+                        .accessibilityIdentifier("workload-kind-\(choice.rawValue)")
+                    }
+                } else {
+                    Picker("Group type", selection: $kind) {
+                        ForEach(Kind.allCases, id: \.self) { choice in
+                            Text(choice.title).tag(choice)
+                        }
+                    }.pickerStyle(.segmented)
+                }
+                ScopeMenu()
+                Text("Collections group jobs together. Arrays run related Slurm tasks. Graphs show jobs and the dependencies between them.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            PagedRows<Workload, WorkloadRow>(path: "/api/v1/workloads/\(kind.rawValue)") { workload in WorkloadRow(workload: workload) }.id(kind)
         }.navigationTitle("Job groups")
     }
 }

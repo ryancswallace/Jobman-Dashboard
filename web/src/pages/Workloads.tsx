@@ -105,7 +105,12 @@ export function WorkloadsPage() {
         <Spinner label="Loading job groups" />
       ) : result.data?.data.items.length ? (
         <section className="panel">
-          <div className="table-wrap">
+          <div
+            className="table-wrap"
+            role="region"
+            aria-label="Job groups"
+            tabIndex={0}
+          >
             <table>
               <thead>
                 <tr>
@@ -330,7 +335,12 @@ export function WorkloadDetailPage() {
                   </p>
                 </div>
               </div>
-              <div className="table-wrap">
+              <div
+                className="table-wrap"
+                role="region"
+                aria-label="Group members"
+                tabIndex={0}
+              >
                 <table>
                   <thead>
                     <tr>
