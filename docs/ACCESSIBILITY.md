@@ -83,6 +83,13 @@ stale-status badge. The focused main landmark and table displayed a
 three-pixel outline.
 
 The native core ran 91 tests and the unsigned iOS 27 simulator build passed.
+At the largest Dynamic Type setting, the initial graph journey failed to reach
+the group type selector. Job groups now places the type choices above scope
+and presents separate selected-state buttons at accessibility sizes. The
+opt-in iPhone 18 Pro simulator test passed with maximum accessibility text and
+Reduce Motion in 87 seconds. It reached the graph's node list and dependency
+controls and restored both simulator settings.
+
 Live screen-reader speech, the light-theme contrast matrix, browser zoom at
 200%, deployed preference and access changes, and managed iPhone VoiceOver
 remain open. The Chrome accessibility tree supplied roles and names for

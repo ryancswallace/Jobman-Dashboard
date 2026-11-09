@@ -8,6 +8,8 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 - Move keyboard focus to the main region when activating “Skip to content.”
   Label scrollable tables and make their horizontal scrolling keyboard reachable.
+- Present the native job-group choices as separate labeled buttons at
+  accessibility text sizes, with the current choice exposed as selected.
 - Add immutable full-release publication with stable GitHub/latest identity,
   channel-consistent packages, container checks, provenance and verified draft
   promotion. Retain candidate support and accepted first-release limitations.
