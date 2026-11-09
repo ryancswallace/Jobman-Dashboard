@@ -6,7 +6,7 @@ toolchain go1.26.10
 
 require (
 	github.com/coreos/go-oidc/v3 v3.21.0
-	github.com/go-jose/go-jose/v4 v4.1.7
+	github.com/go-jose/go-jose/v4 v4.1.9
 	github.com/jackc/pgx/v5 v5.12.0
 	github.com/ryancswallace/jobman v1.10.1
 	github.com/ryancswallace/jobman-diagnose v0.7.0-rc.3
