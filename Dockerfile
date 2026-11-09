@@ -35,7 +35,7 @@ RUN apk add --no-cache ca-certificates tini tzdata \
     && chown dashboard:dashboard /var/lib/jobman-dashboard /run/jobman-dashboard
 COPY --from=build /out/ /usr/local/bin/
 COPY --from=web /src/web/dist/ /usr/share/jobman-dashboard/web/
-COPY LICENSE THIRD_PARTY_NOTICES.md /usr/share/licenses/jobman-dashboard/
+COPY LICENSE THIRD_PARTY_NOTICES.md THIRD_PARTY_INVENTORY.json /usr/share/licenses/jobman-dashboard/
 ARG VERSION=development
 ARG VCS_REF=unknown
 ARG BUILD_DATE=unknown

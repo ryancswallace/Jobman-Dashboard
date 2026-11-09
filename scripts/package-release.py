@@ -94,9 +94,15 @@ def unpack_archive(archive, destination):
             or not re.fullmatch(r"[0-9a-f]{40}", metadata["revision"])
             or type(metadata.get("sourceDateEpoch")) is not int or metadata["sourceDateEpoch"] <= 0):
         raise ValueError("archive provenance disagrees with canonical candidate identity")
-    required = {"bin/jobman-dashboard", "bin/jobman-log-broker", "web/index.html", "LICENSE"}
+    required = {"bin/jobman-dashboard", "bin/jobman-log-broker", "web/index.html", "web/third-party-web.json", "LICENSE", "THIRD_PARTY_NOTICES.md", "THIRD_PARTY_INVENTORY.json"}
     if not required.issubset(observed):
         raise ValueError("archive lacks required runtime or license files")
+    for field, name in (("thirdPartyInventorySHA256", "THIRD_PARTY_INVENTORY.json"), ("thirdPartyNoticesSHA256", "THIRD_PARTY_NOTICES.md")):
+        if metadata.get(field) != observed[name]:
+            raise ValueError("archive third-party provenance hash disagrees: " + name)
+    third_party = json.loads((destination / "THIRD_PARTY_INVENTORY.json").read_text())
+    if third_party.get("schemaVersion") != 1 or third_party.get("sourceLocks", {}).get("web/package-lock.json") != metadata.get("webLockSHA256"):
+        raise ValueError("archive third-party inventory disagrees with source lock")
     return metadata
 
 

@@ -13,6 +13,7 @@
 !web/**
 !LICENSE
 !THIRD_PARTY_NOTICES.md
+!THIRD_PARTY_INVENTORY.json
 web/node_modules
 web/dist
 **/.env*

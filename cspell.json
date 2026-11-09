@@ -11,7 +11,9 @@
     "web/node_modules/**",
     "ios/.build/**",
     "ios/DerivedData/**",
-    "cspell.json"
+    "cspell.json",
+    "THIRD_PARTY_NOTICES.md",
+    "THIRD_PARTY_INVENTORY.json"
   ],
   "ignoreRegExpList": [
     "/\\b[0-9a-f]{32,}\\b/g",
@@ -237,6 +239,7 @@
     "reprovisioning",
     "rhysd",
     "ROCR",
+    "Rolldown",
     "rowserrcheck",
     "runtimeconfig",
     "ryancswallace",

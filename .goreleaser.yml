@@ -3,7 +3,7 @@ project_name: jobman-dashboard
 before:
   hooks:
     - go mod verify
-    - make contracts-check docs-check
+    - make contracts-check docs-check notices-check
 builds:
   - id: dashboard
     main: ./cmd/jobman-dashboard
@@ -34,6 +34,7 @@ archives:
     name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
     files:
       - LICENSE
+      - THIRD_PARTY_INVENTORY.json
       - '*.md'
       - CITATION.cff
       - docs/*.md
@@ -64,6 +65,8 @@ nfpms:
         dst: /usr/share/licenses/jobman-dashboard/LICENSE
       - src: THIRD_PARTY_NOTICES.md
         dst: /usr/share/licenses/jobman-dashboard/THIRD_PARTY_NOTICES.md
+      - src: THIRD_PARTY_INVENTORY.json
+        dst: /usr/share/licenses/jobman-dashboard/THIRD_PARTY_INVENTORY.json
       - src: docs/*.md
         dst: /usr/share/doc/jobman-dashboard/docs/
       - src: deploy/config.example.json

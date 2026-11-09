@@ -62,7 +62,7 @@ ios-core: ## Test the native Swift package on macOS.
 ios-simulator: ## Build the native simulator application on macOS.
 	./ios/scripts/build-simulator.sh
 
-quick-check: toolchain-check mod-check contracts-check package-check format-check vet test docs-check build ## Run the normal Go/web development gate.
+quick-check: toolchain-check mod-check contracts-check package-check format-check vet test docs-check build notices-check ## Run the normal Go/web development gate.
 
 check: quick-check repository-check web cross-build ## Run the complete portable gate; native checks are separate.
 
@@ -239,3 +239,13 @@ release-packages: tool-nfpm ## Package verified canonical candidate archives (IN
 release-package-smoke: ## Exercise candidate packages in disposable containers (PACKAGES_DIR, ARCH, optional PREVIOUS_PACKAGES_DIR).
 	@test -n "$$PACKAGES_DIR" -a -n "$$ARCH" || (echo 'Set PACKAGES_DIR and ARCH=amd64 or arm64.'; exit 1)
 	./devel/release-package-smoke.sh "$$PACKAGES_DIR" "$$ARCH" "$${PREVIOUS_PACKAGES_DIR:-$$PACKAGES_DIR}"
+
+.PHONY: gen-notices notices-check
+gen-notices: toolchain-check ## Regenerate observed release dependency inventory and upstream notices.
+	npm run build --prefix web
+	python3 scripts/generate-notices.py
+
+notices-check: toolchain-check ## Check notices against both service targets and the actual browser bundle.
+	node --test web/third-party.check.mjs
+	npm run build --prefix web
+	python3 scripts/generate-notices.py --check

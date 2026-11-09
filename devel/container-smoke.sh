@@ -12,5 +12,5 @@ if docker run --rm --network none --read-only --cap-drop ALL --security-opt no-n
   exit 1
 fi
 docker run --rm --network none --read-only --entrypoint /bin/sh "$image" -c \
-  'test -s /usr/share/jobman-dashboard/web/index.html && test -s /usr/share/licenses/jobman-dashboard/LICENSE'
+  'test -s /usr/share/jobman-dashboard/web/index.html && test -s /usr/share/licenses/jobman-dashboard/LICENSE && test -s /usr/share/licenses/jobman-dashboard/THIRD_PARTY_NOTICES.md && test -s /usr/share/licenses/jobman-dashboard/THIRD_PARTY_INVENTORY.json && test -s /usr/share/jobman-dashboard/web/third-party-web.json'
 echo 'container identity, metadata, assets and fail-closed startup verified'

@@ -331,9 +331,9 @@ it("keeps the new mutation abort fence after a revoked request settles late", as
   denied = true;
   fireEvent(window, new Event("online"));
   await screen.findByText("Access changed");
-  expect(calls.find((call) => call.method === "PUT")!.signal?.aborted).toBe(
-    true,
-  );
+  // The error can render before the effect that aborts the mutation runs.
+  const revoked = calls.find((call) => call.method === "PUT")!;
+  await waitFor(() => expect(revoked.signal?.aborted).toBe(true));
   denied = false;
   await user.click(screen.getByRole("button", { name: "Refresh devices" }));
   await screen.findByRole("article", { name: "Alice phone" });
