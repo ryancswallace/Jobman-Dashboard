@@ -5,7 +5,7 @@ ARG TARGETARCH
 COPY --from=certificates /etc/ssl/cert.pem /etc/ssl/certs/ca-certificates.crt
 COPY ${TARGETARCH}/bin/ /usr/local/bin/
 COPY ${TARGETARCH}/web/ /usr/share/jobman-dashboard/web/
-COPY ${TARGETARCH}/LICENSE ${TARGETARCH}/THIRD_PARTY_NOTICES.md /usr/share/licenses/jobman-dashboard/
+COPY ${TARGETARCH}/LICENSE ${TARGETARCH}/THIRD_PARTY_NOTICES.md ${TARGETARCH}/THIRD_PARTY_INVENTORY.json /usr/share/licenses/jobman-dashboard/
 COPY ${TARGETARCH}/build.json /usr/share/jobman-dashboard/build.json
 ARG VERSION
 ARG REVISION

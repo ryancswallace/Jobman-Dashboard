@@ -335,6 +335,8 @@ class PublicationTests(unittest.TestCase):
                     directory = context / arch / folder
                     directory.mkdir(parents=True)
                     (directory / 'payload').write_bytes((arch + '/' + folder).encode())
+                for name in ('LICENSE', 'THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_INVENTORY.json'):
+                    (context / arch / name).write_bytes((arch + '/' + name).encode())
             image, index_digest = 'ghcr.io/owner/dashboard', 'sha256:' + 'f' * 64
             children = {arch: image + '@' + digest for arch, digest in release.platform_manifests(self.image_index()).items()}
             commands, pulled = [], {}
@@ -366,8 +368,13 @@ class PublicationTests(unittest.TestCase):
                     self.assertEqual(args[-1], children[arch])
                 elif args[:2] == ['docker', 'cp']:
                     arch = args[2].split('-container:')[0]
-                    folder = 'web' if args[2].endswith('/web') else 'bin'
-                    shutil.copytree(context / arch / folder, args[3])
+                    if args[2].endswith('/licenses/jobman-dashboard'):
+                        target = Path(args[3]); target.mkdir()
+                        for name in ('LICENSE', 'THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_INVENTORY.json'):
+                            shutil.copyfile(context / arch / name, target / name)
+                    else:
+                        folder = 'web' if args[2].endswith('/web') else 'bin'
+                        shutil.copytree(context / arch / folder, args[3])
                 elif args[:2] != ['docker', 'rm']:
                     self.fail('Unexpected run command: ' + repr(args))
             def unconfigured(args, **kwargs):

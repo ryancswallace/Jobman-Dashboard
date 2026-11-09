@@ -1,8 +1,9 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import { thirdPartyInventory } from "./third-party.mjs";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), thirdPartyInventory()],
   server: {
     proxy: {
       "/api": "http://127.0.0.1:8088",

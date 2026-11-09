@@ -22,7 +22,14 @@ def fixture(directory, version="v0.1.0-rc.8", architecture="arm64", mutate=None,
     files = {"build.json": json.dumps(metadata).encode(), "LICENSE": b"fixture license\n",
              "bin/jobman-dashboard": f"#!/bin/sh\nprintf '%s\\n' '{version}'\n".encode(),
              "bin/jobman-log-broker": f"#!/bin/sh\nprintf '%s\\n' '{version}'\n".encode(),
-             "web/index.html": b"<html>synthetic lifecycle fixture</html>\n"}
+             "web/index.html": b"<html>synthetic lifecycle fixture</html>\n",
+             "web/third-party-web.json": b"{}\n",
+             "THIRD_PARTY_NOTICES.md": b"fixture upstream notice\n",
+             "THIRD_PARTY_INVENTORY.json": json.dumps({"schemaVersion": 1, "sourceLocks": {"web/package-lock.json": "b" * 64}}).encode()}
+    metadata.update(webLockSHA256="b" * 64,
+                    thirdPartyInventorySHA256=hashlib.sha256(files["THIRD_PARTY_INVENTORY.json"]).hexdigest(),
+                    thirdPartyNoticesSHA256=hashlib.sha256(files["THIRD_PARTY_NOTICES.md"]).hexdigest())
+    files["build.json"] = json.dumps(metadata).encode()
     files["SHA256SUMS"] = "".join(f"{hashlib.sha256(data).hexdigest()}  {path}\n"
                                  for path, data in sorted(files.items())).encode()
     if mutate:
@@ -65,6 +72,20 @@ class PackageTests(unittest.TestCase):
         for mutate in (missing, changed, unlisted):
             with self.subTest(mutate=mutate), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp)
+                with self.assertRaises(ValueError):
+                    package.unpack_archive(fixture(root, mutate=mutate), root / "out")
+
+    def test_missing_notices_and_forged_provenance_are_rejected_even_with_valid_checksums(self):
+        for target in ("THIRD_PARTY_NOTICES.md", "THIRD_PARTY_INVENTORY.json", "web/third-party-web.json", "forged"):
+            with self.subTest(target=target), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                def mutate(files):
+                    if target == "forged":
+                        files["THIRD_PARTY_INVENTORY.json"] += b" "
+                    else:
+                        files.pop(target)
+                    files["SHA256SUMS"] = "".join(f"{hashlib.sha256(data).hexdigest()}  {path}\n"
+                        for path, data in sorted(files.items()) if path != "SHA256SUMS").encode()
                 with self.assertRaises(ValueError):
                     package.unpack_archive(fixture(root, mutate=mutate), root / "out")
 

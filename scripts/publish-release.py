@@ -122,7 +122,7 @@ def context(args):
             target.mkdir()
             for folder in ("bin", "web"):
                 shutil.copytree(unpacked / folder, target / folder)
-            for name in ("LICENSE", "THIRD_PARTY_NOTICES.md", "build.json"):
+            for name in ("LICENSE", "THIRD_PARTY_NOTICES.md", "THIRD_PARTY_INVENTORY.json", "build.json"):
                 shutil.copyfile(unpacked / name, target / name)
     shutil.copyfile(ROOT / "deploy/Dockerfile.release", args.output / "Dockerfile")
 
@@ -188,6 +188,14 @@ def verify_container(args):
                     expected = args.input / arch / folder
                     actual = output / folder
                     same_payload(expected, actual)
+                licenses = output / "licenses"
+                run(["docker", "cp", container + ":/usr/share/licenses/jobman-dashboard", str(licenses)])
+                names = {"LICENSE", "THIRD_PARTY_NOTICES.md", "THIRD_PARTY_INVENTORY.json"}
+                need({p.name for p in licenses.iterdir()} == names, "Container license inventory differs")
+                for name in names:
+                    actual, expected = licenses / name, args.input / arch / name
+                    need(actual.is_file() and not actual.is_symlink() and digest(actual) == digest(expected)
+                         and (actual.stat().st_mode & 0o777) == (expected.stat().st_mode & 0o777), "Container license payload differs")
         finally:
             run(["docker", "rm", container])
     (args.output / "container.json").write_text(json.dumps({"image": args.image, "digest": args.image_digest, "platforms": ["linux/amd64", "linux/arm64"], "version": args.version, "revision": args.revision, "canonicalPayloadVerified": True}, sort_keys=True, indent=2) + "\n")

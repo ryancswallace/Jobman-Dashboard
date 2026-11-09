@@ -144,5 +144,15 @@ class ReleaseTests(unittest.TestCase):
             capture.assert_not_called()
 
 
+class NoticeDependencyTests(unittest.TestCase):
+    def test_compiled_broker_dependency_must_have_target_specific_notice(self):
+        module = {"Path": "example.test/module", "Version": "v1.0.0", "Sum": "h1:fixture"}
+        inventory = {"packages": [{"ecosystem": "go", "name": module["Path"], "version": module["Version"],
+                     "source": {"moduleSum": module["Sum"]}, "observations": [{"binary": "jobman-log-broker", "os": "linux", "architecture": "amd64"}]}]}
+        release.verify_notice_dependencies(inventory, {"jobman-log-broker": [module]}, "amd64")
+        with self.assertRaisesRegex(ValueError, "notice inventory disagrees"):
+            release.verify_notice_dependencies(inventory, {"jobman-log-broker": [module]}, "arm64")
+
+
 if __name__ == "__main__":
     unittest.main()

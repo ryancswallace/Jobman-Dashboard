@@ -27,6 +27,7 @@ FIRST_PARTY = ("github.com/ryancswallace/jobman", "github.com/ryancswallace/jobm
 STABLE_VERSION = re.compile(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\Z")
 MODULE = "github.com/ryancswallace/jobman-dashboard/internal/buildinfo"
 RUNBOOKS = (
+    "DEPENDENCY_NOTICES.md",
     "ACCESSIBILITY.md",
     "API.md",
     "APNS_PROVIDER.md",
@@ -202,6 +203,17 @@ def binary_dependencies(info):
     return sorted(result, key=lambda item: item["Path"])
 
 
+def verify_notice_dependencies(inventory, dependencies, architecture):
+    """Require the notice graph to agree with the compiled executable metadata."""
+    for binary, modules in dependencies.items():
+        observation = {"binary": binary, "os": "linux", "architecture": architecture}
+        observed = sorted((p["name"], p["version"], p["source"]["moduleSum"])
+                          for p in inventory["packages"] if p["ecosystem"] == "go" and observation in p["observations"])
+        compiled = sorted((p["Path"], p["Version"], p["Sum"]) for p in modules)
+        if observed != compiled:
+            raise ValueError("notice inventory disagrees with compiled dependencies for " + binary + "/" + architecture)
+
+
 def upstream_release_pins(dependencies, version=None):
     """Candidate provenance only; immutable pseudo-versions are not final tags."""
     found = {}
@@ -261,6 +273,7 @@ def build(version, architectures, output):
                 raise ValueError("release dependencies must have immutable versions")
         command(["npm", "ci", "--ignore-scripts", "--no-audit", "--fund=false"], source / "web", env)
         command(["npm", "run", "build"], source / "web", env)
+        command(["python3", "scripts/generate-notices.py", "--check"], source, env)
         output.mkdir(mode=0o755)
         for architecture in architectures:
             name = f"jobman-dashboard_{version}_linux_{architecture}"
@@ -275,6 +288,7 @@ def build(version, architectures, output):
                 if embedded.get("GoVersion") != versions["go"]:
                     raise ValueError("executable toolchain does not match the selected release toolchain")
                 dependencies[binary] = binary_dependencies(embedded)
+            verify_notice_dependencies(json.loads((source / "THIRD_PARTY_INVENTORY.json").read_text()), dependencies, architecture)
             if any((source / name).read_bytes() != value for name, value in locked.items()):
                 raise ValueError("build changed committed module or npm locks")
             shutil.copytree(source / "web/dist", bundle / "web")
@@ -286,9 +300,9 @@ def build(version, architectures, output):
             (bundle / "docs").mkdir()
             for name in RUNBOOKS:
                 shutil.copyfile(source / "docs" / name, bundle / "docs" / name)
-            for name in ("README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "RELEASE.md", "SECURITY.md", "SUPPORT.md", "CHANGELOG.md", "CITATION.cff", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md"):
+            for name in ("README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "THIRD_PARTY_INVENTORY.json", "RELEASE.md", "SECURITY.md", "SUPPORT.md", "CHANGELOG.md", "CITATION.cff", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md"):
                 shutil.copyfile(source / name, bundle / name)
-            metadata = {"formatVersion": 1, "releaseState": "release" if STABLE_VERSION.fullmatch(version) else "candidate", "version": version, "revision": revision, "sourceDateEpoch": epoch, "os": "linux", "architecture": architecture, "isa": "v1" if architecture == "amd64" else "v8.0", "toolchains": versions, "goModules": dependencies, "upstreamReleasePins": upstream_release_pins(dependencies, version), "scopeSHA256": digest(source / "docs/FIRST_RELEASE_SCOPE.md"), "webLockSHA256": digest(source / "web/package-lock.json")}
+            metadata = {"formatVersion": 1, "releaseState": "release" if STABLE_VERSION.fullmatch(version) else "candidate", "version": version, "revision": revision, "sourceDateEpoch": epoch, "os": "linux", "architecture": architecture, "isa": "v1" if architecture == "amd64" else "v8.0", "toolchains": versions, "goModules": dependencies, "upstreamReleasePins": upstream_release_pins(dependencies, version), "scopeSHA256": digest(source / "docs/FIRST_RELEASE_SCOPE.md"), "webLockSHA256": digest(source / "web/package-lock.json"), "thirdPartyInventorySHA256": digest(source / "THIRD_PARTY_INVENTORY.json"), "thirdPartyNoticesSHA256": digest(source / "THIRD_PARTY_NOTICES.md")}
             (bundle / "build.json").write_text(json.dumps(metadata, sort_keys=True, indent=2) + "\n")
             write_checksums(bundle)
             write_archive(bundle, output / (bundle.name + ".tar.gz"), epoch)

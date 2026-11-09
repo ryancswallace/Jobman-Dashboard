@@ -10,7 +10,7 @@ from artifacts import check
 
 class ArtifactTests(unittest.TestCase):
     def fixture(self, root, missing=None, unsafe=False):
-        required = {'bin/jobman-dashboard', 'bin/jobman-log-broker', 'web/index.html', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'RELEASE.md', 'docs/LINUX_INSTALLATION.md', 'web/assets/app.js'}
+        required = {'bin/jobman-dashboard', 'bin/jobman-log-broker', 'web/index.html', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_INVENTORY.json', 'web/third-party-web.json', 'RELEASE.md', 'docs/LINUX_INSTALLATION.md', 'web/assets/app.js'}
         for arch in ('amd64', 'arm64'):
             path = root / f'dashboard_linux_{arch}.tar.gz'
             with tarfile.open(path, 'w:gz') as tar:

@@ -43,6 +43,7 @@ No command above deploys production, contacts an AI provider, submits jobs, or p
 See the [documentation index](docs/README.md), [development guide](docs/DEVELOPMENT.md),
 [contributing policy](CONTRIBUTING.md), [security policy](SECURITY.md),
 [support](SUPPORT.md), [changelog](CHANGELOG.md), [license](LICENSE),
+[dependency notices](docs/DEPENDENCY_NOTICES.md),
 [release engineering](RELEASE.md) and [repository scaffolding parity](docs/REPOSITORY_SCAFFOLDING.md).
 Run `make help` for focused tooling; the devcontainer supports Go/web development
 and the existing macOS CI job builds the native iPhone application.
