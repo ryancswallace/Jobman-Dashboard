@@ -110,7 +110,12 @@ export function ArtifactList({
         result.data && (
           <>
             {result.data.data.items.length ? (
-              <div className="table-wrap">
+              <div
+                className="table-wrap"
+                role="region"
+                aria-label="Published artifacts"
+                tabIndex={0}
+              >
                 <table>
                   <thead>
                     <tr>

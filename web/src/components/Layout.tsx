@@ -54,7 +54,11 @@ export function Layout() {
   };
   return (
     <div className="app-shell">
-      <a className="skip-link" href="#main">
+      <a
+        className="skip-link"
+        href="#main"
+        onClick={() => main.current?.focus()}
+      >
         Skip to content
       </a>
       <aside className="sidebar">
@@ -199,7 +203,7 @@ export function Layout() {
           </div>
         )}
         <DeploymentNotices />
-        <main ref={main} id="main" className="main-content">
+        <main ref={main} id="main" className="main-content" tabIndex={-1}>
           <Outlet key={identity} />
         </main>
         <footer className="workspace-footer">
