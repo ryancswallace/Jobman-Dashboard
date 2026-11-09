@@ -96,7 +96,12 @@ function Inspector({
                     </p>
                   </div>
                 </div>
-                <div className="table-wrap">
+                <div
+                  className="table-wrap"
+                  role="region"
+                  aria-label="Graph nodes"
+                  tabIndex={0}
+                >
                   <table>
                     <thead>
                       <tr>
@@ -225,7 +230,12 @@ function Inspector({
             dependencies.data && (
               <>
                 {dependencies.data.data.items.length ? (
-                  <div className="table-wrap">
+                  <div
+                    className="table-wrap"
+                    role="region"
+                    aria-label="Graph dependencies"
+                    tabIndex={0}
+                  >
                     <table>
                       <thead>
                         <tr>

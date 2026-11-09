@@ -14,7 +14,12 @@ export function JobTable({ jobs }: { jobs: Job[] }) {
   const { bootstrap } = useSession(),
     location = useLocation();
   return (
-    <div className="table-wrap">
+    <div
+      className="table-wrap"
+      role="region"
+      aria-label="Job results"
+      tabIndex={0}
+    >
       <table>
         <caption className="sr-only">
           Jobs in your selected deployments and namespaces
