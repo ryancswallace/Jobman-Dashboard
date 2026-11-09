@@ -1,121 +1,55 @@
-# Candidate packaging and publication
+# Release packaging and publication
 
-This procedure distinguishes local/CI validation from the controlled engineering
-RC publisher. Local builds and `ci.yml` candidate dispatches do not tag or publish.
-The main-only `release.yml` workflow publishes a reviewed RC after exact-source
-checks and protected-environment approval; see [distribution](DISTRIBUTION.md).
-These paths describe artifact publication. The [first-release scope](FIRST_RELEASE_SCOPE.md)
-records completed product review and moves the other integration/acceptance work
-to later releases. Artifact publication does not itself configure a production
-installation or sign/distribute an Apple app.
-
-The curated Linux documentation includes the
-[recorded-run contract](RUN_SELECTION.md) and
-[release gap audit](RELEASE_GAP_AUDIT.md). The audit records the gaps found at that
-review; use the current status and subsequent evidence to assess their closure.
-Neither document turns a pending acceptance into a passing one.
+The protected `release.yml` publisher accepts full releases (`vX.Y.Z`) and
+engineering candidates (`vX.Y.Z-rc.N`). Follow [distribution](DISTRIBUTION.md)
+to publish and verify a version after exact-source checks. The
+[first-release scope](FIRST_RELEASE_SCOPE.md) records approved product coverage.
+Keep version-specific verification in the [release record](RELEASE_HANDOFF.md).
 
 ## Compatible upstream versions
 
-Candidate builds accept checksum-verified immutable released versions, prereleases
-and development pseudo-versions. The current source pins Core `v1.10.1` and
-Diagnose `v0.7.0-rc.3`; Control `v0.3.0` is selected for the evaluation baseline.
-Earlier Lab deployments retain their recorded versions. Diagnose real-provider acceptance, compatible stable publication and
-subsequent dependency updates are post-release work; see the exact tuple in
-[release handoff](RELEASE_HANDOFF.md). The approved first release may retain the
-recorded compatible candidate dependency. Applicable checks still verify the
-actual dependency tuple used by each build. Do not substitute the latest old tag merely to make a
-version string stable: it must include the reviewed behavior used by Dashboard.
+Dashboard embeds Core and Diagnose as immutable Go modules. `build.json`
+records the compiled modules and their checksums and includes the
+`upstreamReleasePins` summary.
+`stableVersions` checks these two modules. An unrelated transitive dependency
+can use an immutable pseudo-version. Missing or inconsistent first-party binary
+metadata fails the build. Candidate metadata records `finalReleaseEligible: false`.
+Full-release metadata binds the approved scope document.
 
-Dashboard embeds Core and Diagnose as Go modules. Their exact compiled versions
-and checksums appear in `build.json`, along with `upstreamReleasePins`. Its
-`stableVersions` checks these two first-party dependencies only; an unrelated
-transitive dependency may legitimately use an immutable pseudo-version. Missing
-or inconsistent first-party binary metadata fails the build. A stable version
-string alone does not prove that a tag is published, protected review passed, or
-the tuple is compatible. `controlCompatibilityVerified` and
-`finalReleaseEligible` remain false in engineering candidate manifests.
-
-Control is a separately deployed API, not a Dashboard Go dependency. Record the
-exact released Control tag/commit and its advertised compatible contracts,
-including `bounded-run-catalog`, monitoring reads, durable terminal events,
-log/artifact metadata and source identity. Verify both source deployments where
-multi-source behavior is claimed. Keep the original-event, cursor binding,
-current authorization and historical-run evidence associated with those exact
-versions. A module-only check does not establish separately deployed Control behavior.
-
-The builder and protected publisher accept `vX.Y.Z` full releases and
-`vX.Y.Z-rc.N` candidates. Full releases are published as non-prerelease/latest;
-candidates retain their prerelease identity and are not marked latest. Both require exact-source
-CI, including current vulnerability checks, reproducible archives/packages,
-native archive verification and all file/container attestations. Never rewrite
-published versions. Full-release metadata binds the approved scope document and
-keeps unverified integration flags false.
-
-## Controlled RC publication
-
-1. Merge the reviewed source and wait for the latest successful push runs of
-   Dashboard CI, repository checks, CodeQL, fuzz and Scorecard at that exact main
-   commit. Record the full Git SHA; source advancement requires a newly tested
-   selection.
-2. Choose the next unused `vX.Y.Z-rc.N` and an explicit native build greater than
-   the previous published build. RC7 used marketing version `0.1.0`, build `9`;
-   the selected RC10 mapping is marketing version `0.1.0`, build `12`. The release
-   workflow derives the three-component marketing version from the selected RC
-   and requires the operator-provided native build. Do not infer the native build
-   from the RC suffix.
-3. Dispatch the publisher from main:
-
-   ```sh
-   gh workflow run release.yml --repo ryancswallace/Jobman-Dashboard --ref main \
-     -f version=v0.1.0-rc.10 -f nativeBuild=12
-   ```
-
-4. The workflow builds canonical Linux archives and DEB/RPM/APK packages twice,
-   compares checksums, builds an unsigned native archive from the same source,
-   and exercises packages on amd64/arm64 in all three target distributions.
-   Review and approve the resulting `main` environment deployment. Publication
-   rechecks exact-source gates before proceeding.
-5. The approved job assembles versioned GHCR images from the canonical Linux
-   bytes, checks container payloads/runtime behavior, generates SPDX inventories
-   and attestations, stages a draft and verifies downloaded assets and their
-   publisher/source attestations before publishing a prerelease. It never tags
-   `latest` or promotes a stable release. Retain the run URLs, exact asset set,
-   source SHA, SHA256SUMS and immutable container digest.
-6. Record independent artifact review and separately authorized acceptance against
-   those exact bytes in [release handoff](RELEASE_HANDOFF.md). Keep prior successes,
-   failures and partial receipts. If publication partially fails, retain its
-   reserved version and evidence, repair the cause and choose a new RC; do not
-   replace published tags/assets/images. Optional Cloudsmith distribution runs
-   separately for a published candidate.
+Control runs separately. Record its exact released version and advertised
+contracts, including `bounded-run-catalog`, monitoring reads, durable terminal
+events, log/artifact metadata and source identity. Verify both source deployments
+for claims about multi-source behavior. Bind original-event, cursor binding,
+current authorization and historical-run evidence to those exact versions.
+The release builder leaves `controlCompatibilityVerified` false. See
+[compatibility](COMPATIBILITY.md) and the [Lab catalog](LAB_RUN_CATALOG.md).
 
 ## Validation-only candidates and local builds
 
 For a build without publication, dispatch `ci.yml` with `candidateVersion`,
-explicit `nativeVersion` and `nativeBuild` at the reviewed source. A candidate
+explicit `nativeVersion` and `nativeBuild` at the reviewed branch or tag. A candidate
 request includes the unsigned native archive and builds both Linux architectures
 twice after backend/web/PostgreSQL and native checks. This path retains CI
-artifacts; it does not create versioned native Linux packages, publish a GitHub
-release or push containers.
+artifacts for inspection.
 
 ```sh
-gh workflow run ci.yml --ref <reviewed-branch-or-commit> \
-  -f candidateVersion=v0.1.0-rc.10 -f nativeVersion=0.1.0 -f nativeBuild=12
+gh workflow run ci.yml --ref "$REVIEWED_REF" \
+  -f candidateVersion=v0.1.1 -f nativeVersion=0.1.1 -f nativeBuild=16
 ```
 
 Verify outer/inner Linux checksums, exact build metadata and native tar/inventory
 hashes against the completion receipt. Inspect the committed run-selection,
-release-gap and distribution guides. These checks do not transfer acceptance
+installation and distribution guides. These checks do not transfer acceptance
 from older versions to newly built bytes.
 
-Local equivalents are `python3 scripts/build-release.py --version <new-rc>
+Local equivalents are `python3 scripts/build-release.py --version <version>
 --output-directory <new-absolute-directory>` and, from the same clean source,
 `python3 ios/scripts/package-app.py unsigned --version <numeric-version> --build
 <numeric-build> --output <new-absolute-directory>`. To package canonical Linux
 archives locally, use `make release-packages INPUT_DIR=<candidate-directory>
 OUTPUT_DIR=<new-package-directory>`. See [Linux installation](LINUX_INSTALLATION.md)
 and the repository's `ios/README.md` for prerequisites and explicit
-signed-development commands.
+signed development commands.
 
 ## Unsigned native provenance
 

@@ -54,7 +54,7 @@ xcrun swift -module-cache-path /private/tmp/jobman-dashboard-icon-module-cache s
 ```
 
 Create a Release **unsigned** device archive without signing credentials from a
-clean committed checkout (see [candidate packaging](../docs/FINAL_CANDIDATE.md)):
+clean committed checkout (see [release packaging](../docs/FINAL_CANDIDATE.md)):
 
 ```sh
 python3 scripts/test-package-app.py

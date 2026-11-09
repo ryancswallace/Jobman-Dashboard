@@ -1,15 +1,16 @@
-# Jobman Dashboard initial-release handoff
+# Dashboard release record
 
-## Selected full-release baseline
+## Stable releases
 
-The first full release is v0.1.0, embedding Core v1.10.1 and Diagnose v0.7.0-rc.3,
-with Control v0.3.0 selected separately. The protected publisher requires current
-vulnerability and exact-source quality checks, reproducible archives/packages,
-native verification and remote file/container attestations before publishing
-non-prerelease/latest. The source-bound scope digest records accepted limitations;
-the Diagnose candidate dependency and unverified organization integrations retain
-their actual status. Publication and verification receipts are recorded separately
-from the historical checkpoints below. See [release process](../RELEASE.md).
+The first full release, [v0.1.0](https://github.com/ryancswallace/Jobman-Dashboard/releases/tag/v0.1.0),
+shipped the approved scope. [v0.1.1](https://github.com/ryancswallace/Jobman-Dashboard/releases/tag/v0.1.1)
+adds keyboard and Dynamic Type fixes and exact dependency notices. Its Linux
+packages and unsigned native build 16 come from
+`3969de10f5f9d308347eedaae73aae201643e1fc`. [Release publication](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/42624468040)
+and [Cloudsmith publication](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/42626051345)
+succeeded. Both stable releases embed Core v1.10.1 and Diagnose v0.7.0-rc.3.
+Control runs separately. See [compatibility](COMPATIBILITY.md) and the
+[release process](../RELEASE.md).
 
 The [November 8 first-release decision](FIRST_RELEASE_SCOPE.md) records Ryan's
 completed product review, includes agent reliability, and moves all other
@@ -18,7 +19,7 @@ handoffs below are superseded; their versioned evidence and artifact identities
 remain unchanged. Unverified integrations are accepted limitations, not
 outstanding first-release approvals.
 
-## Current candidate — RC11
+## Historical RC11 handoff
 
 [RC11](https://github.com/ryancswallace/Jobman-Dashboard/releases/tag/v0.1.0-rc.11)
 was published as an engineering prerelease at `2026-11-08T17:35:58Z`, from

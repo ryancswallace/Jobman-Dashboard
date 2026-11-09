@@ -1,7 +1,7 @@
 # Private deployment operations
 
 This runbook applies to the implemented API, worker and broker services. The
-engineering candidate has synthetic Lab evidence. Product review is complete
+[Lab catalog](LAB_RUN_CATALOG.md) records version-specific synthetic evidence. Product review is complete
 for the approved first-release scope; that decision does not establish additional
 production-environment verification.
 Additional operating-owner assignments for Dashboard, identity/directory, Control,

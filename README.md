@@ -1,15 +1,13 @@
 # Jobman Dashboard
 
-The first full release is `v0.1.0`, published through the protected release
-workflow after exact-source checks. See the [release page](https://github.com/ryancswallace/Jobman-Dashboard/releases)
-for publication status and the [release process](RELEASE.md) for verification.
+Download the [latest stable release](https://github.com/ryancswallace/Jobman-Dashboard/releases/latest)
+and use the [release process](RELEASE.md) to verify its source and artifacts.
 
 Private web and native iPhone monitoring for Jobman Control. The applications implement source-qualified monitoring, direct AD role unions, arrays/collections/graphs, safe logs, deterministic diagnosis, and notification rules/history. **Product review is complete for the approved first-production-release scope.** Agent reliability is included; other unfinished integrations and acceptance work are scheduled for later releases, with their limitations accepted.
 
-See [requirements](docs/REQUIREMENTS.md), [design](docs/DESIGN.md), and the live [implementation status](docs/IMPLEMENTATION_STATUS.md) for coverage, and the [first-release scope](docs/FIRST_RELEASE_SCOPE.md) for the accepted limitations and post-release roadmap.
+See [requirements](docs/REQUIREMENTS.md), [design](docs/DESIGN.md), and the [implementation record](docs/IMPLEMENTATION_STATUS.md) for coverage, and the [first-release scope](docs/FIRST_RELEASE_SCOPE.md) for the accepted limitations and post-release roadmap.
 
-The [engineering candidate](https://github.com/ryancswallace/Jobman-Dashboard/releases/tag/v0.1.0-rc.11)
-contains reproducible Linux amd64/arm64 services and web assets. Follow
+Stable releases contain reproducible Linux amd64/arm64 services and web assets. Follow
 [private installation](docs/LINUX_INSTALLATION.md) and the
 [operations runbook](docs/OPERATIONS.md); managed native signing/distribution is scheduled after the first release. Actual [subprocess](docs/LAB_EXECUTION.md) and [split-runtime](docs/LAB_SPLIT.md)
 Lab evidence identifies the exact tested revisions and limitations.

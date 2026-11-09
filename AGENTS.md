@@ -59,8 +59,7 @@ unverified scope in the handoff.
 Update the relevant runbook, documentation index and changelog for user-visible
 changes. Keep chronological acceptance evidence intact. Do not copy private Lab
 outputs into public docs. `docs/REPOSITORY_SCAFFOLDING.md` records sibling parity.
-`make snapshot` builds local engineering artifacts only; the canonical candidate
+`make snapshot` builds local engineering artifacts only; the canonical release
 builder remains `scripts/build-release.py`. No automatic stable publication is
 configured. Signing, production deployment, distribution, paid services and
-external acceptance retain the approval boundaries in the adopted implementation
-prompt. Do not apply the repository settings template merely because it exists.
+external acceptance retain the approval boundaries in `RELEASE.md`. Do not apply the repository settings template merely because it exists.

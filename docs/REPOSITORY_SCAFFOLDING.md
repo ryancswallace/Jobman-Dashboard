@@ -38,17 +38,15 @@ remain authoritative; scaffolding is not a new production-readiness claim.
   unused-code checks, race tests and formatting gate the current implementation.
 - Linux amd64/arm64 are service release targets. Native macOS/Windows service
   packages are not implied by the siblings' CLI support.
-- The committed-source candidate builder remains canonical. GoReleaser snapshots
-  remain separate. Controlled RC distribution packages the canonical bytes and
-  assembles its published image with `deploy/Dockerfile.release`; the root
-  Dockerfile still supports local source builds.
-- The main-only release workflow publishes verified engineering RC assets,
-  versioned GHCR images, SPDX inventories and GitHub attestations. A separate
-  Cloudsmith workflow uses the shared `jobman/stable` repository and a personal API key.
-  Automatic semantic version publication, stable/latest promotion, Homebrew and
-  Apple distribution are outside the current RC-only workflow. Managed Apple
-  delivery follows the approved post-release scope. Failed partial releases retain their version;
-  repairs use a new candidate rather than replacing artifacts. See
+- The committed-source release builder produces the canonical archives used by
+  Linux packages and `deploy/Dockerfile.release`. GoReleaser snapshots and the
+  root Dockerfile support local development.
+- The main-only release workflow publishes full releases and engineering
+  candidates with versioned GHCR images, SPDX inventories and GitHub
+  attestations. Cloudsmith publication uses a separate workflow for the shared
+  `jobman/stable` repository. Managed Apple delivery follows the approved
+  post-release scope. After a partial publication, retain the original version
+  and evidence and use a new version for the repair. See
   [release engineering](../RELEASE.md) and [distribution](DISTRIBUTION.md).
 - Documentation is organized around the existing `deploy/` and `scripts/` paths,
   rather than duplicating files under sibling `etc/`/`devel/updates/` paths. There
