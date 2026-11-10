@@ -162,8 +162,8 @@ because it is stored in the Dashboard repository.
    If rotation is necessary, save the new key and update every GitHub secret and
    other integration using the old key, including Jobman, Control and Diagnose.
    See the current [Cloudsmith API-key instructions](https://docs.cloudsmith.com/accounts-and-teams/api-key).
-3. Open [Dashboard environment settings](https://github.com/ryancswallace/Jobman-Dashboard/settings/environments),
-   select **main**, and under **Environment secrets** add or update
+3. As the repository owner, open the [Dashboard repository](https://github.com/ryancswallace/Jobman-Dashboard),
+   then choose **Settings → Environments → main**. Under **Environment secrets**, add or update
    `CLOUDSMITH_API_KEY` with the personal key. Never put the key in a configuration
    variable, repository file, command argument, issue, log or chat. GitHub does
    not reveal an existing secret's value for copying from a sibling repository.

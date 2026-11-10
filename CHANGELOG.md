@@ -6,6 +6,9 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
+- Replace the owner-only GitHub environment settings link with repository
+  navigation in the Cloudsmith publishing instructions.
+
 - Update release, distribution, and installation guidance for stable Dashboard
   releases. Retire the completed implementation prompt from current sources and
   release bundles while retaining the original at the published tag.

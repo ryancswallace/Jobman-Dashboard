@@ -74,4 +74,5 @@ to find the scope of each historical Lab exercise.
 - [Upgrading and recovery](UPGRADING.md)
 - [Watchdog acceptance denial contract](WATCHDOG_DENIAL_CONTRACT.md)
 
-- [Release distribution](DISTRIBUTION.md): attested Linux packages, containers, Cloudsmith setup and versioned installation.
+- [Release distribution](DISTRIBUTION.md): attested Linux packages, containers,
+  Cloudsmith setup with owner settings navigation, and versioned installation.
