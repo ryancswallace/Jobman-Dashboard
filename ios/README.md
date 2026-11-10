@@ -35,12 +35,10 @@ icons, use an external [native build profile](../docs/DEPLOYMENT_CONFIGURATION.m
 signs or deploys an app. Runtime presentation is an explicitly public projection;
 custom native URL registrations remain compiled into the signed app.
 
-Dark appearance uses `../assets/logo-transparent-dashboard.svg` in the connection
-screen and Overview toolbar. Keep its copies in
-`App/Assets.xcassets/DashboardLogoDark.imageset` and
-`../web/public/logo-transparent-dashboard.svg` identical to the source when
-updating the artwork. The native image preserves the SVG’s original colors and
-aspect ratio; light appearance retains the existing branding.
+Dark appearance uses the outlined [transparent Dashboard logo](../assets/logo-transparent-dashboard.svg)
+in the connection screen and Overview toolbar. The
+[logo maintenance guide](../assets/README.md) lists the matching web and native
+asset copies. The native image preserves the original colors and aspect ratio.
 
 ## Local iPhone archive and development export
 

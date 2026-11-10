@@ -22,6 +22,10 @@
     "/`[^`\\n]*sggavt[^`\\n]*`/g"
   ],
   "words": [
+    "Audiowide",
+    "Inkscape",
+    "miterlimit",
+    "tspan",
     "actionlint",
     "addgroup",
     "adduser",

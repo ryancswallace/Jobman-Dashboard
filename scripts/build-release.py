@@ -301,6 +301,9 @@ def build(version, architectures, output):
                 shutil.copyfile(source / "docs" / name, bundle / "docs" / name)
             for name in ("README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "THIRD_PARTY_INVENTORY.json", "RELEASE.md", "SECURITY.md", "SUPPORT.md", "CHANGELOG.md", "CITATION.cff", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md"):
                 shutil.copyfile(source / name, bundle / name)
+            (bundle / "assets").mkdir()
+            for name in ("logo-dashboard.svg", "logo-dark-dashboard.svg"):
+                shutil.copyfile(source / "assets" / name, bundle / "assets" / name)
             metadata = {"formatVersion": 1, "releaseState": "release" if STABLE_VERSION.fullmatch(version) else "candidate", "version": version, "revision": revision, "sourceDateEpoch": epoch, "os": "linux", "architecture": architecture, "isa": "v1" if architecture == "amd64" else "v8.0", "toolchains": versions, "goModules": dependencies, "upstreamReleasePins": upstream_release_pins(dependencies, version), "scopeSHA256": digest(source / "docs/FIRST_RELEASE_SCOPE.md"), "webLockSHA256": digest(source / "web/package-lock.json"), "thirdPartyInventorySHA256": digest(source / "THIRD_PARTY_INVENTORY.json"), "thirdPartyNoticesSHA256": digest(source / "THIRD_PARTY_NOTICES.md")}
             (bundle / "build.json").write_text(json.dumps(metadata, sort_keys=True, indent=2) + "\n")
             write_checksums(bundle)

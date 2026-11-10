@@ -36,6 +36,8 @@ archives:
       - LICENSE
       - THIRD_PARTY_INVENTORY.json
       - '*.md'
+      - assets/logo-dashboard.svg
+      - assets/logo-dark-dashboard.svg
       - CITATION.cff
       - docs/*.md
       - api/openapi.json

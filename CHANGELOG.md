@@ -6,6 +6,9 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
+- Outline the logo subtitle in the README and the web and iPhone clients
+  so it renders without an installed font.
+
 - Update release, distribution, and installation guidance for stable Dashboard
   releases. Retire the completed implementation prompt from current sources and
   release bundles while retaining the original at the published tag.
