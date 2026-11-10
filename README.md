@@ -1,4 +1,10 @@
-# Jobman Dashboard
+<!-- markdownlint-disable MD041 -->
+<!-- markdownlint-disable MD033 -->
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dashboard.svg">
+  <img alt="Jobman Dashboard" src="assets/logo-dark-dashboard.svg" width="420">
+</picture>
+<!-- markdownlint-enable MD033 -->
 
 Download the [latest stable release](https://github.com/ryancswallace/Jobman-Dashboard/releases/latest)
 and use the [release process](RELEASE.md) to verify its source and artifacts.
