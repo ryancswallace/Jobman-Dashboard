@@ -1,14 +1,14 @@
 # Containers
 
-## Published candidate image
+## Published release image
 
 The controlled release workflow publishes versioned amd64/arm64 GHCR images
 assembled from verified canonical Linux archives. These images use a minimal
 scratch runtime, UID/GID10001:10001, and `/usr/local/bin/jobman-dashboard` directly
 as their entry point. Use `/usr/local/bin/jobman-log-broker` for the broker.
 There is no shell or `tini` in this release image. Pin the attested digest and
-follow [candidate distribution](DISTRIBUTION.md) for verification and private
-configuration/data mounts. No prerelease updates a `latest` tag.
+follow [release distribution](DISTRIBUTION.md) for verification and private
+configuration and data mounts.
 
 ## Local source image
 
@@ -39,5 +39,5 @@ must retain its own loopback-only listener, and must not be exposed publicly.
 Use local processes or private editor forwarding for fixture development.
 
 Containers are an additional engineering deployment artifact. The canonical
-candidate and validated split-systemd installation remain documented in
+archive and split-systemd installation are documented in
 [Linux installation](LINUX_INSTALLATION.md) and [process modes](PROCESS_MODES.md).

@@ -1,19 +1,12 @@
 # Initial release implementation status
 
-Updated: 2026-11-08. **Product review is complete for the approved first
-production release.** Agent reliability is included in this scope; all other
-unfinished work is scheduled for later releases, with limitations accepted by
-Ryan. [First-release scope and follow-up](FIRST_RELEASE_SCOPE.md) supersedes the
-earlier acceptance conditions in this chronological record. The selected full
-release is v0.1.0 with Core v1.10.1 and Diagnose v0.7.0-rc.3 embedded; Control
-v0.3.0 is selected separately. Publication status belongs to the GitHub release
-record. RC12 and RC11 retain their exact published identities and evidence.
-Historical checkpoints below retain their original versions, failures and counts.
-Earlier Lab activation evidence is not transferred to the selected full release.
-
-The adopted [implementation prompt](IMPLEMENTATION_PROMPT.md),
-[requirements](REQUIREMENTS.md) and [design](DESIGN.md) govern this work.
-Later checkpoints supersede earlier merge, version and connectivity statements.
+These chronological checkpoints retain their original versions, failures and
+counts. See the [first-release scope](FIRST_RELEASE_SCOPE.md) for the accepted
+limitations, and the [release record](RELEASE_HANDOFF.md) for stable releases.
+Lab evidence applies to the exact source, environment and test named in each
+checkpoint. The [requirements](REQUIREMENTS.md) and [design](DESIGN.md) describe
+the broader product roadmap. The [original implementation prompt](https://github.com/ryancswallace/Jobman-Dashboard/blob/v0.1.1/docs/IMPLEMENTATION_PROMPT.md)
+is retained at the release tag as historical context.
 
 ## Agent reliability checkpoint — 2026-11-08
 
@@ -56,7 +49,7 @@ Later checkpoints supersede earlier merge, version and connectivity statements.
   recovered during normal Lab startup. SQLite journal inspection runs as the
   execution user so WAL/SHM sidecars retain the correct ownership.
 
-## Current RC11 checkpoint — 2026-11-08
+## Historical RC11 checkpoint — 2026-11-08
 
 - [RC11](https://github.com/ryancswallace/Jobman-Dashboard/releases/tag/v0.1.0-rc.11)
   was published from `2c6358a8bc986a25d6db86ce1ce2814d3c75f635` by successful

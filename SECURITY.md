@@ -4,7 +4,7 @@
 
 Unreleased `main` and the latest engineering release candidate receive best-effort
 security fixes. No stable production release or support SLA is established.
-See [release status](docs/FINAL_CANDIDATE.md) for outstanding acceptance.
+See [first-release scope](docs/FIRST_RELEASE_SCOPE.md) for outstanding acceptance.
 
 ## Private reporting
 

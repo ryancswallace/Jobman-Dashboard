@@ -2,14 +2,24 @@
 
 Notable changes are recorded here. Historical engineering evidence remains in
 [implementation status](docs/IMPLEMENTATION_STATUS.md) and
-[the candidate record](docs/FINAL_CANDIDATE.md).
+[the release record](docs/RELEASE_HANDOFF.md).
 
 ## Unreleased
 
+- Update release, distribution, and installation guidance for stable Dashboard
+  releases. Retire the completed implementation prompt from current sources and
+  release bundles while retaining the original at the published tag.
+
+## v0.1.1
+
+- Bundle notices for the exact shipped Go and web dependencies.
 - Move keyboard focus to the main region when activating “Skip to content.”
   Label scrollable tables and make their horizontal scrolling keyboard reachable.
 - Present the native job-group choices as separate labeled buttons at
   accessibility text sizes, with the current choice exposed as selected.
+
+## v0.1.0
+
 - Add immutable full-release publication with stable GitHub/latest identity,
   channel-consistent packages, container checks, provenance and verified draft
   promotion. Retain candidate support and accepted first-release limitations.

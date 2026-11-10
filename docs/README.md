@@ -8,10 +8,9 @@ implemented boundaries. See [repository parity](REPOSITORY_SCAFFOLDING.md) for
 shared infrastructure and intentional differences.
 
 The [requirements](REQUIREMENTS.md) and [design](DESIGN.md) specify the full target;
-[implementation status](IMPLEMENTATION_STATUS.md), [release handoff](RELEASE_HANDOFF.md)
-and [candidate evidence](FINAL_CANDIDATE.md) record what has been verified.
-Historical Lab records are version-specific evidence, not instructions to rerun
-old destructive scenarios. Use the [Lab catalog](LAB_RUN_CATALOG.md).
+[implementation record](IMPLEMENTATION_STATUS.md) and [release record](RELEASE_HANDOFF.md)
+identify the versions and environments verified. Use the [Lab catalog](LAB_RUN_CATALOG.md)
+to find the scope of each historical Lab exercise.
 
 ## Complete guide and evidence index
 
@@ -36,10 +35,9 @@ old destructive scenarios. Use the [Lab catalog](LAB_RUN_CATALOG.md).
 - [Event gaps, delivery holds and recovery](EVENT_RECOVERY.md)
 - [Control event source adapter](EVENT_SOURCE.md)
 - [Approved first-release scope and post-release follow-up](FIRST_RELEASE_SCOPE.md)
-- [Candidate packaging and publication](FINAL_CANDIDATE.md)
+- [Release packaging and publication](FINAL_CANDIDATE.md)
 - [Graph client acceptance at the supported ceiling](GRAPH_CLIENT_ACCEPTANCE.md)
-- [IMPLEMENTATION_PROMPT](IMPLEMENTATION_PROMPT.md)
-- [Initial release implementation status](IMPLEMENTATION_STATUS.md)
+- [Chronological implementation and acceptance record](IMPLEMENTATION_STATUS.md)
 - [Authorized notification history](INBOX.md)
 - [Installation](INSTALLATION.md)
 - [Job details and submitted commands](JOB_DETAILS.md)
@@ -54,7 +52,7 @@ old destructive scenarios. Use the [Lab catalog](LAB_RUN_CATALOG.md).
 - [Deployed accepted-scale validation](LAB_SCALE.md)
 - [Packaged API and worker acceptance](LAB_SPLIT.md)
 - [Synthetic Lab web-session protocol acceptance](LAB_WEB_SESSION.md)
-- [Linux candidate packages and service installation](LINUX_INSTALLATION.md)
+- [Linux release packages and service installation](LINUX_INSTALLATION.md)
 - [Storage-local log broker](LOG_BROKER.md)
 - [Durable notification processing](NOTIFICATION_PIPELINE.md)
 - [Notification retention](NOTIFICATION_RETENTION.md)
@@ -64,8 +62,8 @@ old destructive scenarios. Use the [Lab catalog](LAB_RUN_CATALOG.md).
 - [API and worker process boundaries](PROCESS_MODES.md)
 - [Private process observability](PROCESS_OBSERVABILITY.md)
 - [Separate process keys](PURPOSE_KEYS.md)
-- [Remaining product work found in the release audit](RELEASE_GAP_AUDIT.md)
-- [Jobman Dashboard initial-release handoff](RELEASE_HANDOFF.md)
+- [Historical release gap audit](RELEASE_GAP_AUDIT.md)
+- [Stable releases and historical candidate handoffs](RELEASE_HANDOFF.md)
 - [Repository scaffolding parity](REPOSITORY_SCAFFOLDING.md)
 - [Jobman Dashboard initial requirements](REQUIREMENTS.md)
 - [Selecting recorded job runs](RUN_SELECTION.md)
@@ -76,4 +74,4 @@ old destructive scenarios. Use the [Lab catalog](LAB_RUN_CATALOG.md).
 - [Upgrading and recovery](UPGRADING.md)
 - [Watchdog acceptance denial contract](WATCHDOG_DENIAL_CONTRACT.md)
 
-- [Candidate distribution](DISTRIBUTION.md): attested Linux packages, containers, personal API-key setup for the shared Cloudsmith repository, RC10 publication evidence and versioned installation.
+- [Release distribution](DISTRIBUTION.md): attested Linux packages, containers, Cloudsmith setup and versioned installation.

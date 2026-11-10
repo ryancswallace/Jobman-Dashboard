@@ -1,13 +1,14 @@
 # Release distribution
 
 Dashboard publishes full releases (`vX.Y.Z`) and engineering candidates
-(`vX.Y.Z-rc.N`). Full releases are non-prerelease/latest on GitHub; candidates
-remain prereleases and are not marked latest. Product review is complete
+(`vX.Y.Z-rc.N`). GitHub marks full releases as latest and engineering candidates as prereleases. Product review is complete
 for the [approved first-production-release scope](FIRST_RELEASE_SCOPE.md).
 Corporate AD FS/direct AD, APNs, signed managed-device delivery, manual
 accessibility and additional pilot/operations work are scheduled for later
-releases; publication does not establish evidence for those integrations. The unsigned iPhone
-archive is retained for provenance; it cannot be installed on a phone.
+releases. The iPhone archive is unsigned and retained for provenance.
+
+Download from the [stable release page](https://github.com/ryancswallace/Jobman-Dashboard/releases/latest)
+or select an exact published version from the [release record](RELEASE_HANDOFF.md).
 
 ## Artifact contract
 
@@ -33,20 +34,22 @@ runs, then separately approved publication through the `main` environment.
 - An unsigned iPhone archive has an explicit marketing version/build and the same
   source revision. Its inventory and archive hashes are verified before inclusion.
 
-Publication first stages a draft, then downloads and checks every asset and its
-attestation. Only verified drafts become prereleases. No candidate becomes a
-stable release or updates a `latest` container tag. If publication partially
-fails, retain its version and evidence; fix the cause and choose a new RC.
-Package-registry upload is a separate repeatable operation for a published RC.
+Publication stages a draft, then verifies every downloaded asset and its
+attestation before publishing to the selected GitHub channel. Both channels
+publish versioned container tags. After a partial publication, retain the
+reserved version and its evidence, fix the cause and choose a new version.
+Package-registry publication is a separate repeatable operation.
 
-## Publish a candidate
+## Publish an exact version
 
-After merging reviewed changes and waiting for main CI, choose the next unused
-candidate and a greater native build number. For example:
+After merging reviewed changes and waiting for main CI, set `VERSION` to the
+next unused full-release or candidate version. Set `NATIVE_BUILD` to an
+explicit number greater than the previous published native build. The workflow
+derives the native marketing version from the release version.
 
 ```sh
 gh workflow run release.yml --repo ryancswallace/Jobman-Dashboard --ref main \
-  -f version=v0.1.0-rc.10 -f nativeBuild=12
+  -f version="$VERSION" -f nativeBuild="$NATIVE_BUILD"
 ```
 
 Review and approve the concrete `main` deployment after builds complete. The
@@ -57,8 +60,8 @@ Verify anonymous pulls before advertising a public container; publishing must
 not silently change repository access policy.
 
 The versioned image is
-`ghcr.io/ryancswallace/jobman-dashboard:v0.1.0-rc.10`. Deployment should pin the
-`sha256:` digest in the release's attested `container.json`. It has no shell or
+`ghcr.io/ryancswallace/jobman-dashboard:<version>`. Pin the
+`sha256:` digest in the release's attested `container.json`. The image has no shell or
 package manager, uses UID/GID `10001:10001`, and contains the web tree at
 `/usr/share/jobman-dashboard/web`. Supply explicit private configuration, trust
 anchors and correctly owned data mounts per service role; keep the root filesystem
@@ -81,22 +84,21 @@ python3 scripts/publish-release.py verify-draft \
   --input /absolute/path/to/downloaded-draft-assets
 ```
 
-This example inspects the retained RC9 draft. Success reports `published: false`;
-it does not turn a failed publication into an accepted release. The next run
-still selects a new candidate rather than replacing retained tags or artifacts.
+This example inspects the retained RC9 draft. A successful verification reports
+`published: false`. Use a new version for the next publication attempt.
 
 ## Verify downloads
 
-Download the candidate into a new empty directory. Resolve its tag to the full
+Download the selected release into a new empty directory. Resolve its tag to the full
 source commit and verify the checksum manifest's attestation against the approved
 release workflow and that commit before trusting its contents:
 
 ```sh
-gh release download v0.1.0-rc.10 --repo ryancswallace/Jobman-Dashboard --dir ./rc10
-cd rc10
+gh release download v0.1.1 --repo ryancswallace/Jobman-Dashboard --dir ./dashboard-v0.1.1
+cd dashboard-v0.1.1
 gh attestation verify SHA256SUMS --repo ryancswallace/Jobman-Dashboard \
   --signer-workflow ryancswallace/Jobman-Dashboard/.github/workflows/release.yml \
-  --source-ref refs/heads/main --source-digest <full-approved-commit> \
+  --source-ref refs/heads/main --source-digest 3969de10f5f9d308347eedaae73aae201643e1fc \
   --deny-self-hosted-runners
 sha256sum -c SHA256SUMS
 ```
@@ -109,7 +111,7 @@ integrity; the attestation binds those checksums to the publisher and source.
 
 ## Install, upgrade and remove native Linux packages
 
-Packages are version-named, for example `jobman-dashboard-0-1-0-rc-10`. Install the
+Packages are version-named, for example `jobman-dashboard-0-1-1`. Install the
 verified architecture-specific DEB/RPM/APK with the host's package manager. An APK
 from GitHub is unsigned; `apk add --allow-untrusted <verified-file.apk>` is only
 appropriate after the publisher attestation and checksum checks above. Prefer a
@@ -132,12 +134,12 @@ the current database ledger; otherwise use the coordinated restore procedure.
 Never remove the package behind `current` or a running process. Switch and restart
 first, verify service identity, then remove an obsolete version by its exact
 package name. Removal preserves private configuration/data because the package
-does not own them. Package managers do not automatically activate the next RC;
-installation and activation are deliberately separate operator actions.
+does not own them. Activate a version separately after package installation.
 
 ## Cloudsmith setup
 
-RC10 publication to `jobman/stable` completed in
+The stable v0.1.1 [registry publication](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/42626051345)
+succeeded. Historical RC10 publication to `jobman/stable` completed in
 [run 37535796557](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37535796557).
 All six packages were also downloaded publicly and compared with the verified
 release artifacts; see [the registry verification record](evidence/rc10-cloudsmith.json).
@@ -169,8 +171,8 @@ because it is stored in the Dashboard repository.
    repository is needed, add the **environment variable** `CLOUDSMITH_REPOSITORY`
    in the same `main` environment with the value `owner/repository`. This variable
    contains only the destination, not a credential.
-5. Open **Actions → Publish Dashboard RC Linux packages → Run workflow**, choose
-   branch **main**, and enter the published RC tag, currently `v0.1.0-rc.10`.
+5. Open **Actions → Publish Dashboard Linux packages → Run workflow**, choose
+   branch **main**, and enter an exact published full-release or candidate tag.
    Complete the existing `main` environment approval if prompted. Alternatively,
    use the command below. Successful completion verifies authentication, uploads
    missing packages, and verifies all six DEB/RPM/APK packages for both architectures.
@@ -183,18 +185,17 @@ API key. Keep existing environment protection and release verification enabled.
 
 ```sh
 gh workflow run publish-cloudsmith-packages.yml \
-  --repo ryancswallace/Jobman-Dashboard --ref main -f version=v0.1.0-rc.10
+  --repo ryancswallace/Jobman-Dashboard --ref main -f version="$VERSION"
 ```
 
-This workflow accepts only published RCs, verifies the GitHub publisher and asset
-hashes, refuses conflicting registry entries, and checks registry synchronization.
+This workflow accepts published full releases and candidates. It verifies the
+GitHub publisher and asset hashes, refuses conflicting registry entries, and
+checks registry synchronization.
 Cloudsmith may add its repository signature to RPMs; the publisher compares the
 downloaded RPM header and payload with the source, allowing only the RPM signature
 section to differ. Cloudsmith normalizes Alpine filenames; the publisher matches
 the exact package name, version and architecture and requires the original APK
-checksum. DEB packages must also retain their uploaded checksum. The shared repository's name does not promote a Dashboard RC to a stable
-release: package names and versions retain their RC identity, registry tags
-include `rc`, and the GitHub release remains a prerelease. Use the repository's
+checksum. DEB packages must also retain their uploaded checksum. Package names, versions and registry tags preserve the published channel. Use the repository's
 Cloudsmith-generated APT/YUM/APK setup instructions and signing key for repository
 installation. GitHub release downloads remain available if the optional package
 registry is not configured.

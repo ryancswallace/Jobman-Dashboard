@@ -1,33 +1,31 @@
-# Linux candidate packages and service installation
+# Linux release packages and service installation
 
-Status: the engineering candidate is published and its split services pass actual
-Lab installation/restart checks. Product review is complete under the
-[approved first-release scope](FIRST_RELEASE_SCOPE.md); additional integration
-work is scheduled for later releases. Production installation,
-AD/AD FS changes and distribution require the approvals in the adopted
-implementation prompt. The isolated synthetic Lab has separate testing authority.
+Choose an exact version from [release distribution](DISTRIBUTION.md).
+Historical [split-service Lab results](LAB_SPLIT.md) apply to their recorded
+versions. For production installation, AD/AD FS changes and distribution, follow
+the [operational approval requirements](../RELEASE.md#operational-approval).
 
 Each service can expose its own private operator socket using
 [process observability](PROCESS_OBSERVABILITY.md). The systemd templates create
 separate mode0700 runtime directories. Configure an explicit socket path inside
 the corresponding directory; metrics never share the browser listener.
 
-See [candidate packaging and publication](FINAL_CANDIDATE.md) for the exact-source packaging
+See [release packaging and publication](FINAL_CANDIDATE.md) for the exact-source packaging
 sequence, compatible upstream tags and unsigned native provenance. The bundled
 [run-selection contract](RUN_SELECTION.md) and [release gap audit](RELEASE_GAP_AUDIT.md)
 retain the behavior and acceptance boundaries used for review.
 
 Versioned DEB/RPM/APK packages and GHCR images are described in
-[candidate distribution](DISTRIBUTION.md). Those release packages contain the same
+[release distribution](DISTRIBUTION.md). Those release packages contain the same
 canonical archive bytes; local GoReleaser snapshots remain a separate facility.
 
-## Build and verify an exact candidate
+## Build and verify an exact version
 
 Use a clean committed checkout, the exact versions in `go.version`, `node.version`
 and `npm.version`, Python3, and the checked-in module/npm locks:
 
 ```sh
-python3 scripts/build-release.py --version v0.1.0-rc.1 --output-directory /absolute/new/output
+python3 scripts/build-release.py --version v0.1.1 --output-directory /absolute/new/output
 ```
 
 This builds Linux amd64 and arm64 bundles. Select a single architecture with
@@ -62,10 +60,12 @@ requires an explicit reviewed configuration, not an ambient registry override.
 The existing CI workflow accepts an optional `candidateVersion` on manual
 dispatch. Its candidate job waits for backend/web/PostgreSQL and iPhone checks,
 builds both architectures twice and compares archive checksums before retaining
-the packages as a30day CI artifact. It does not tag or publish a GitHub release:
+the archives as a 30-day CI artifact. Set `REVIEWED_REF` to the reviewed branch
+or tag and supply explicit native version/build inputs:
 
 ```sh
-gh workflow run ci.yml --ref <reviewed-branch-or-commit> -f candidateVersion=v0.1.0-rc.1
+gh workflow run ci.yml --ref "$REVIEWED_REF" \
+  -f candidateVersion=v0.1.1 -f nativeVersion=0.1.1 -f nativeBuild=16
 ```
 
 Validate the publisher's outer checksum file, extract the intended bundle into
@@ -73,16 +73,16 @@ an empty staging directory as an ordinary user, then check its internal hashes:
 
 ```sh
 sha256sum -c SHA256SUMS
-cd jobman-dashboard_v0.1.0-rc.1_linux_arm64
+cd jobman-dashboard_v0.1.1_linux_arm64
 sha256sum -c SHA256SUMS
 ./bin/jobman-dashboard version
 ./bin/jobman-log-broker version
 ```
 
 Execute binaries only on their matching architecture. `version` opens no runtime
-configuration or network connection. A candidate manifest records development
-dependency versions accurately. Compatible stable Diagnose publication is
-post-release work under [FIRST_RELEASE_SCOPE.md](FIRST_RELEASE_SCOPE.md). Never replace a published candidate in place.
+configuration or network connection. Check the exact compiled dependency
+versions in `build.json` and the separate Control deployment in
+[compatibility](COMPATIBILITY.md).
 
 ## Provision identities and storage
 
