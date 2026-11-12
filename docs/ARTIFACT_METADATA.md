@@ -36,5 +36,5 @@ revocation during preparation, unsupported contracts, malformed source pages,
 contradictory-total rejection, real TLS adapter selectors/large sizes, and HTTP rejection of storage-path input.
 A43-test web suite includes artifact page/run navigation. Chrome inspection of
 the explicit two-source synthetic fixture verified50+5 rows, scope breadcrumbs,
-actual run labels and the bytes-unverified disclosure. Real Control integration
-is scheduled as later-release validation under the [approved scope](FIRST_RELEASE_SCOPE.md).
+actual run labels and the bytes-unverified disclosure. These checks use fixture
+responses.

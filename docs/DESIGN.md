@@ -15,7 +15,7 @@ Product requirements define the target behavior. Technology choices, engineering
 
 ## 1. Release boundary and design principles
 
-The product design targets the following in both clients. The first production release includes the implemented baseline; unfinished items, particularly corporate identity acceptance, APNs and managed delivery, follow the approved post-release scope:
+The product design targets the following in both clients. See the [first-release scope](FIRST_RELEASE_SCOPE.md) for the baseline delivered in the first release.
 
 - AD FS sign-in; direct AD group mappings; exact permission unions; access changes during existing sessions.
 - Namespace views, deployment aggregates, and aggregates across deployments, with independent source failures and explicit completeness.
@@ -169,7 +169,7 @@ Replace the single `memberships.role` authority with contributing grants:
 
 Compute capabilities as the set union of every applicable role grant in the same Control namespace. All four current member roles receive the required monitoring capabilities: namespace/jobs/groups/targets/artifact metadata/logs/evidence/report reads and read-only diagnosis requests. Preserve existing Control submit/operate/admin semantics through an explicit role-to-capability catalog, including owner-dependent cancellation checks used by other clients. Migrate every direct singular-role comparison, not only `authorizeNamespace`. No role ordering substitutes for a union.
 
-Convert existing membership rows to audited `legacy/manual` grants for compatibility, then explicitly reconcile the pilot's managed namespaces to AD authority. A migration report must identify legacy grants that would otherwise survive AD group removal. The production AD-managed namespace policy disables or removes those unapproved grants before launch. Retain any operator recovery mechanism separately from ordinary Dashboard access and audit its use. The existing membership PUT operation cannot silently overwrite the entire grant set; version or redefine its provenance-specific behavior and update administrative clients.
+Convert existing membership rows to audited `legacy/manual` grants for compatibility, then explicitly reconcile managed namespaces to AD authority. A migration report must identify legacy grants that would otherwise survive AD group removal. The production AD-managed namespace policy disables or removes those unapproved grants before launch. Retain any operator recovery mechanism separately from ordinary Dashboard access and audit its use. The existing membership PUT operation cannot silently overwrite the entire grant set; version or redefine its provenance-specific behavior and update administrative clients.
 
 Reconciliation performs directory I/O outside database transactions, validates completeness, then atomically changes grants, increments authorization versions, and records audit events. A complete group deletion or verified member removal revokes its grant; transport failure does not. Removing one role preserves permissions supplied by other roles. Deleting/disabling an account prevents background delivery as well as interactive access.
 
@@ -559,9 +559,8 @@ Measure source-level latency and aggregate rendering separately. Set HTTP deadli
 
 ### 13.2 Test groups and evidence scope
 
-Applicable automated checks remain in force for changes that are made. Historical
-passes retain their actual scope. Unperformed integration and manual test groups
-are later-release work under [FIRST_RELEASE_SCOPE.md](FIRST_RELEASE_SCOPE.md).
+See the [implementation record](IMPLEMENTATION_STATUS.md) for completed checks
+and the environments they exercised.
 
 | ID | Tests and release evidence |
 | --- | --- |
@@ -584,7 +583,7 @@ Record actual pass/fail evidence against these groups. The [November 8 scope dec
 
 ## 14. Implementation work packages
 
-Each package includes implementation, contract/docs updates, and the corresponding validation above. This is the full v1 backlog at design level; milestones may demonstrate subsets, but no package containing an agreed feature is optional at release.
+Each package includes implementation, contract/docs updates, and the corresponding validation above. The table records the original development plan. The [first-release scope](FIRST_RELEASE_SCOPE.md) records the accepted release baseline.
 
 | Package | Repository / work | Completion evidence and dependencies |
 | --- | --- | --- |
@@ -601,7 +600,7 @@ Each package includes implementation, contract/docs updates, and the correspondi
 | WP11 Web application | Dashboard web: every screen in §11, routes/scope selection, aggregates, groups/graphs, logs/reports, alert editor/inbox/settings, accessible responsive layouts and recovery states. | T03–T10 web workflows. Can develop against WP01 fixtures; integration requires WP04–WP10. |
 | WP12 Native iPhone application | Dashboard iOS: equivalent screens, native identity/secure storage, async state/polling, bounded logs/graphs, diagnosis, preferences/rules, notifications/private routes, accessibility. | T03–T10 on simulator and real iPhone. Can develop alongside web after WP01/WP02; no scope reduction. |
 | WP13 Packaging and operations | Dashboard + Control: configuration validation, separate migration/runtime identities, Linux packages, broker placement, network/secrets setup, monitoring, backups, upgrade/rollback and incident runbooks. | T11/T12 service installation and restore evidence; begins with WP01 and incorporates every backend package. |
-| WP14 System verification and pilot | All repositories: compatibility matrix, security review of new trust boundaries, cross-client fixtures, load/failure tests, actual AD FS/NFS/Slurm/APNs exercises, accessibility review and pilot fixes. | Record completed T01–T12 evidence accurately; unfinished integration and manual coverage follows the post-release scope. |
+| WP14 System verification | All repositories: compatibility matrix, security review, cross-client fixtures, load and failure tests, integration checks, and accessibility review. | Versioned T01–T12 test evidence with the integrations and environments exercised. |
 | WP15 Internal iPhone release | Dashboard iOS + IT: program/channel decision, app identity/signing/profiles, build/export pipeline, install/upgrade/removal, managed settings if available, renewal ownership. | Internally distributed signed release on representative company-managed phones with T09/T12 evidence; Record the tested devices and distribution channel. |
 
 ### 14.1 Delivery order and reviewable milestones
@@ -612,7 +611,7 @@ Each package includes implementation, contract/docs updates, and the correspondi
 | M1 — Authorized monitoring backbone | WP02–WP05 and WP09 supply current access, source identity, factual queries, group browsing, aggregation, and durable events. Both client shells sign in and browse a real authorized job. |
 | M2 — Complete investigation | WP06–WP08 integrated; both clients investigate actual single jobs, arrays, collections, and graphs, with logs and a generated validated diagnosis. |
 | M3 — Complete alerting and preferences | WP10 integrated in web/iPhone; every agreed scope/outcome, overlap deduplication, durable inbox, device controls, and real background push works across Controls. |
-| M4 — Pilot and release candidate | WP11–WP15 complete; full accessibility/load/failure/restore evidence, actual internal install/upgrade, supported-version matrix, ownership, runbooks, and pilot fixes. |
+| M4 — Release validation | Accessibility, load, failure and restore evidence, installation and upgrade checks, compatibility matrix and operator runbooks. |
 
 Shared contract fixtures let both clients validate authorization, source monitoring, events, and evidence compatibility during development.
 

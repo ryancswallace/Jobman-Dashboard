@@ -3,8 +3,7 @@
 Status: API/worker startup, role-specific configuration, purpose-key separation,
 verified delegation provenance and executable least-privilege database grants are
 implemented and independently reviewed. Exact packaged [Lab split acceptance](LAB_SPLIT.md)
-includes actual role denials, report conversion and worker restart. Production,
-additional full restore, provider and managed-device validation follows the [post-release roadmap](FIRST_RELEASE_SCOPE.md).
+includes role denials, report conversion and worker restart in the Lab environment.
 The combined `serve` mode remains compatible.
 
 DESIGN §§2.1, 2.2 and 12 require independently deployed API and worker processes,
@@ -309,6 +308,5 @@ UIDs, immutable pair reads, DAC write/unlink denials and fail-closed ACL handlin
 That storage test did not alter deployed service identities and does not establish
 whole-process split acceptance.
 
-Actual AD FS, APNs background delivery, company-managed iPhone distribution and
-additional agreed-scale load validation are later-release work under the [approved scope](FIRST_RELEASE_SCOPE.md). Process separation and
-synthetic Lab operation alone do not establish those deployment-specific results.
+See the [split acceptance record](LAB_SPLIT.md) for the tested process,
+database and integration setup.

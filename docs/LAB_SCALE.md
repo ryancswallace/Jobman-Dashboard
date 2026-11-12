@@ -108,10 +108,8 @@ not prove that the deployed source or configuration still matches it.
 
 Additional T11 scenarios outside this metadata HTTP slice include simultaneous
 log follows and group drill-downs, terminal-event bursts, slow dependency behavior,
-memory/queue bounds, and client rendering/accessibility under load. Later
-checkpoints record completed scenarios; any unfinished validation is later-release
-work under [the approved scope](FIRST_RELEASE_SCOPE.md). Keep each result tied to
-its actual scenario and source.
+memory/queue bounds, and client rendering and accessibility under load. Record
+the scenario, source and workload for each result.
 
 
 ### Loopback fixture checkpoint, 2026-11-09 UTC
@@ -132,9 +130,9 @@ decoding and validation. Every request had a five-second deadline and a
 Post-run service RSS was 29,408 KiB. The fixture has no configured event,
 log-delivery or report service, so those capacity limits remain unmeasured in
 this checkpoint. The earlier deployed 100,000-job metadata result below is a
-separate workload. Use the agreed pilot mix to measure sustained event bursts,
-concurrent log follows, report requests and first-useful-render latency with
-resource and alert thresholds before accepting pilot capacity.
+separate workload. When measuring deployment capacity, use a representative mix
+of sustained event bursts, concurrent log follows and report requests. Record
+first-useful-render latency, resource usage and alert thresholds.
 
 ## Recorded acceptance — October 4
 

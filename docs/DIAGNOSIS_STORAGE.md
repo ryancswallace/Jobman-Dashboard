@@ -112,6 +112,5 @@ store. `GOWORK=off python3 scripts/test-lab-postgres.py` uses disposable schemas
 and private synthetic credentials. Tests cover deduplication, aliases, leases,
 revocation, source recovery, retries, retained quota, publication crash recovery
 and paired retention. These tests do not establish production AD FS, live Slurm,
-Apple delivery or additional deployment validation. Unfinished stable dependency
-delivery and additional validation are scheduled after the first production
-release under [the approved scope](FIRST_RELEASE_SCOPE.md).
+or Apple delivery. See the [compatibility guide](COMPATIBILITY.md) for the
+dependency versions included in each release.
