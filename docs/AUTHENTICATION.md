@@ -1,6 +1,6 @@
 # Authentication and private configuration
 
-Status: authentication and monitoring are implemented. Product review is complete under the [approved first-release scope](FIRST_RELEASE_SCOPE.md); corporate AD FS and directory integration validation are scheduled for later releases. The Lab identity provider and local signed-token fixtures establish application behavior only, and do not establish corporate integration or a production rollout.
+Dashboard supports web and native sign-in through a configured identity provider. The [implementation record](IMPLEMENTATION_STATUS.md) identifies the identity providers and directory configurations used in validation.
 
 ## Configuration and commands
 

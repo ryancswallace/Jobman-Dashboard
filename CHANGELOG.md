@@ -6,6 +6,8 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
+- Remove deployment planning checklists from the product guides.
+
 - Outline the logo subtitle in the README and the web and iPhone clients
   so it renders without an installed font.
 

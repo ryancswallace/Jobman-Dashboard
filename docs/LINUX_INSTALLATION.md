@@ -234,8 +234,6 @@ timeouts. No public source endpoint, CORS workaround or CDN is required.
    restored backlog must not be sent blindly. Verify source authorization and
    immutable report/evidence pairs before explicitly releasing it.
 
-The proposed RPO15minutes/RTO4hours still require an operating owner and measured
-restore acceptance. A package build alone proves neither. Actual AD FS, APNs,
-company-managed iPhone distribution and further deployment-specific validation
-follow the [post-release roadmap](FIRST_RELEASE_SCOPE.md). Existing measured
-evidence remains in [implementation status](IMPLEMENTATION_STATUS.md).
+Use the deployment's recovery objectives when testing restores. The
+[implementation record](IMPLEMENTATION_STATUS.md) includes measured recovery
+results for the tested environments.

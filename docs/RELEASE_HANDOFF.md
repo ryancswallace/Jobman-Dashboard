@@ -12,12 +12,9 @@ succeeded. Both stable releases embed Core v1.10.1 and Diagnose v0.7.0-rc.3.
 Control runs separately. See [compatibility](COMPATIBILITY.md) and the
 [release process](../RELEASE.md).
 
-The [November 8 first-release decision](FIRST_RELEASE_SCOPE.md) records Ryan's
-completed product review, includes agent reliability, and moves all other
-unfinished work to later releases. Earlier acceptance conditions in the historical
-handoffs below are superseded; their versioned evidence and artifact identities
-remain unchanged. Unverified integrations are accepted limitations, not
-outstanding first-release approvals.
+The [November 8 first-release decision](FIRST_RELEASE_SCOPE.md) records the
+accepted product scope, including agent reliability. The historical handoffs
+below describe their versioned evidence and artifact identities.
 
 ## Historical RC11 handoff
 
@@ -57,12 +54,9 @@ stable release. The candidate embeds Core `v1.9.0` and Diagnose `v0.7.0-rc.1`;
 both Linux manifests retain `finalReleaseEligible: false` and
 `controlCompatibilityVerified: false`.
 
-RC11 has no new Lab activation or external acceptance evidence. Corporate
-AD FS/direct AD, real APNs, managed signing/distribution, additional accessibility
-and pilot/operations work, and compatible stable Diagnose acceptance are
-scheduled for later releases under the approved scope. The native archive remains unsigned and non-installable. Historical RC10
-Lab and distribution evidence below applies only to its recorded artifacts; this
-post-publication receipt supplements the immutable RC11 build-time documentation.
+RC11 publication verified the artifacts and unsigned native archive. The
+historical RC10 Lab and distribution evidence below applies to its recorded
+artifacts.
 
 ## Historical RC10 handoff — retained unchanged
 
@@ -131,11 +125,9 @@ Original [RC8](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37
 and [RC9](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37512314090)
 runs and their failures remain evidence; neither is relabeled as a successful release.
 
-Corporate AD FS/direct AD, real APNs, signed company-managed-device delivery,
-manual accessibility, additional pilot/operations work and stable Diagnose
-validation are scheduled after the first production release under the
-[approved scope](FIRST_RELEASE_SCOPE.md). No unperformed validation is claimed. The earlier synthetic Lab Chrome-access blocker
-and old PR-approval backlog are resolved; their RC7 statements below are historical.
+The earlier synthetic Lab Chrome-access blocker and PR-approval backlog were
+resolved after RC7. See the [first-release scope](FIRST_RELEASE_SCOPE.md) and
+the versioned evidence below.
 Cloudsmith distribution completed successfully on October 6 in
 [run 37535796557](https://github.com/ryancswallace/Jobman-Dashboard/actions/runs/37535796557),
 using the personal API key and shared `jobman/stable` repository. All six Linux
@@ -293,20 +285,3 @@ checkpoints record successful browser checks; no new browser-review prerequisite
 is created by this historical result. Simulator/Keycloak evidence does not establish actual
 AD FS, APNs, physical Keychain behavior, manual accessibility or company-managed
 phone acceptance.
-
-## Later-release integration inputs
-
-| Prerequisite | Concrete input / action | Owner |
-| --- | --- | --- |
-| Corporate identity | AD FS issuer/version, registered web/native clients and audience/claim mappings; approved direct-AD endpoint, group mapping and test identities; run live sign-in, union and active-revocation checks | Ryan to identify IAM/AD FS owner |
-| Apple push | Approved APNs team/topic/key credentials, provider egress and device connectivity; verify background delivery, denied/revoked access and notification navigation on a real phone | Ryan to identify Apple/network owners |
-| Signed internal iPhone delivery | Existing distribution channel/MDM, approved app identifier, signing certificate/profile and managed test iPhone; sign/export, install and test under actual management policy | Ryan and company device-management owner |
-| Browser and accessibility | Approved live-browser test environment plus manual web/iPhone accessibility checks | Ryan and test participants |
-| Upstream delivery | Eligible non-author GitHub approvals; protected merges and compatible stable releases, followed by Dashboard dependency updates and required checks | Repository owners / eligible reviewers |
-| Pilot and operations | Private hosting allocation, operating/renewal owners and pilot acceptance; approve the concrete production installation and recovery plan | Ryan to identify infrastructure/operator owners |
-
-Production AD/AD FS/MDM/network changes, production deployment/migration, paid
-capacity/enrollment and company distribution require the concrete final approval
-specified in the adopted implementation prompt. Candidate GitHub delivery and
-synthetic Lab work are already authorized. The November 8 scope decision postpones these integration checks; it does not
-record them as passed or reintroduce them as first-release conditions.
