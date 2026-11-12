@@ -7,15 +7,15 @@ Updated: November 8, 2026
 Product decision owner: Ryan Wallace  
 Scope baseline: [Approved first-release scope](FIRST_RELEASE_SCOPE.md) and [requirements](REQUIREMENTS.md)
 
-This design retains the full product architecture and roadmap for private web and native iPhone monitoring of Jobman Control. The November 8 decision accepts the implemented baseline and its limitations for the first production release, with agent reliability included. All other unfinished work described here is scheduled for later releases. Ryan's product review is complete; the design does not imply unperformed integration checks have passed.
+This design describes the architecture for private web and native iPhone monitoring of Jobman Control. The [first-release scope](FIRST_RELEASE_SCOPE.md) records the accepted features and limitations.
 
 The recommended implementation is a Go application service and workers, PostgreSQL for Dashboard-owned state, a React/TypeScript web client, and a Swift/SwiftUI iPhone client. Both clients use the same Dashboard API. Each Control deployment remains authoritative for its jobs and namespace permissions. Dashboard combines authorized results, delivers log bytes, produces read-only diagnosis reports, and maintains personal alerts and preferences.
 
-Product decisions in the requirements are binding. Technology selections, numeric engineering defaults, and new contracts below are design proposals. Ryan and Codex will develop together, with Codex performing most hands-on implementation (D14). Production targets company-managed iPhones; Ryan's unmanaged personal phone is available for testing (D18). APNs ownership/connectivity, internal distribution, pilot timing, hosting resources, and production maintenance ownership remain open. These inputs are collected for later integration and operations work; they do not reopen first-release review or acceptance.
+Product requirements define the target behavior. Technology choices, engineering defaults, and proposed contracts are recorded below.
 
 ## 1. Release boundary and design principles
 
-The product design targets the following in both clients. The first production release includes the implemented baseline; unfinished items, particularly corporate identity acceptance, APNs and managed delivery, follow the approved post-release scope:
+The product design targets the following in both clients. See the [first-release scope](FIRST_RELEASE_SCOPE.md) for the baseline delivered in the first release.
 
 - AD FS sign-in; direct AD group mappings; exact permission unions; access changes during existing sessions.
 - Namespace views, deployment aggregates, and aggregates across deployments, with independent source failures and explicit completeness.
@@ -169,7 +169,7 @@ Replace the single `memberships.role` authority with contributing grants:
 
 Compute capabilities as the set union of every applicable role grant in the same Control namespace. All four current member roles receive the required monitoring capabilities: namespace/jobs/groups/targets/artifact metadata/logs/evidence/report reads and read-only diagnosis requests. Preserve existing Control submit/operate/admin semantics through an explicit role-to-capability catalog, including owner-dependent cancellation checks used by other clients. Migrate every direct singular-role comparison, not only `authorizeNamespace`. No role ordering substitutes for a union.
 
-Convert existing membership rows to audited `legacy/manual` grants for compatibility, then explicitly reconcile the pilot's managed namespaces to AD authority. A migration report must identify legacy grants that would otherwise survive AD group removal. The production AD-managed namespace policy disables or removes those unapproved grants before launch. Retain any operator recovery mechanism separately from ordinary Dashboard access and audit its use. The existing membership PUT operation cannot silently overwrite the entire grant set; version or redefine its provenance-specific behavior and update administrative clients.
+Convert existing membership rows to audited `legacy/manual` grants for compatibility, then explicitly reconcile managed namespaces to AD authority. A migration report must identify legacy grants that would otherwise survive AD group removal. The production AD-managed namespace policy disables or removes those unapproved grants before launch. Retain any operator recovery mechanism separately from ordinary Dashboard access and audit its use. The existing membership PUT operation cannot silently overwrite the entire grant set; version or redefine its provenance-specific behavior and update administrative clients.
 
 Reconciliation performs directory I/O outside database transactions, validates completeness, then atomically changes grants, increments authorization versions, and records audit events. A complete group deletion or verified member removal revokes its grant; transport failure does not. Removing one role preserves permissions supplied by other roles. Deleting/disabling an account prevents background delivery as well as interactive access.
 
@@ -474,7 +474,7 @@ The web query layer uses account/scope-qualified keys, request cancellation, ded
 
 The native app separates transport, authentication, repositories, presentation state, and SwiftUI views. Network/log/graph work runs outside the main actor; a scope/account change cancels old tasks before publishing their results. Use ephemeral URLSession caching behavior for sensitive APIs and Keychain for credentials. Persist benign preferences/connection configuration only; no Core Data/SwiftData database of jobs or logs is required. Native storage is not an offline monitoring feature.
 
-Propose iOS 18 as the initial minimum development target, to be validated against IT's phone inventory and supported security/update policy before the pilot. Pin the release Xcode/SDK toolchain after the distribution channel is known. Web acceptance covers current and previous major Safari, Chrome, Edge, and Firefox versions selected at release cutoff. Responsive web includes tablet layouts; a native iPad layout is deferred.
+The initial development target was iOS 18. The native project records the supported build configuration. Web acceptance covers current and previous major Safari, Chrome, Edge, and Firefox versions selected at release cutoff. Responsive web includes tablet layouts; a native iPad layout is deferred.
 
 Support Dynamic Type, VoiceOver, reduced motion, large touch targets, and light/dark appearance. Log text needs adjustable legibility and an accessible loaded-range summary. Preserve navigation and selection while refreshing; do not reset a reader to the newest row or scroll position on every poll.
 
@@ -532,13 +532,12 @@ Retention jobs are incremental, bounded, observable, and safe with active reader
 
 Create the iPhone bundle identity, entitlements, app icon/assets, signing configuration, APNs topic/environment, version/build numbering, archive/export automation, and install/upgrade instructions. Protect signing keys and profiles in an approved macOS build environment. Keep simulator/development builds reproducible before the production distribution channel is selected.
 
-Production devices are company-managed iPhones. IT must identify the existing Apple program/accounts, approved internal channel, signing owner, and any MDM service. Apple's [business distribution options](https://developer.apple.com/business/get-started/) do not make “internal” synonymous with one program. Choose the actual channel before defining final signing/export settings; development/ad hoc installation is only an integration tool, not an assumed long-term distribution plan.
+Choose signing and export settings for the selected distribution channel. Use
+the [native packaging guide](../ios/README.md) for build instructions. For
+managed deployments, verify installation, upgrade, removal, authentication,
+private links, and push on a representative managed device.
 
-Ryan can test on a personally owned iPhone with no management controls. Use it for early native interaction, accessibility, authentication, and notification testing as the required signing, private-network access, and APNs credentials become available. Until then, simulator and fixture-backed testing can proceed. Track results from this device separately: final installation/upgrade and management-policy acceptance must also run on representative company-managed phones. The personal test device does not establish corporate VPN access or resolve APNs connectivity and ownership.
-
-Later managed-device validation includes installation and upgrade, retained preferences with safe reauthentication, native AD FS sign-in over VPN, push receipt with the app closed, private deep links, notification denial, token rotation, sign-out/account switch, the organization's actual trust/configuration controls, and app removal. Assign signing, provisioning-profile, Apple account, and APNs key renewal owners. Native iPad testing is not part of this first release.
-
-## 13. Validation coverage and later acceptance plan
+## 13. Validation coverage
 
 ### 13.1 Engineering targets
 
@@ -560,9 +559,8 @@ Measure source-level latency and aggregate rendering separately. Set HTTP deadli
 
 ### 13.2 Test groups and evidence scope
 
-Applicable automated checks remain in force for changes that are made. Historical
-passes retain their actual scope. Unperformed integration and manual test groups
-are later-release work under [FIRST_RELEASE_SCOPE.md](FIRST_RELEASE_SCOPE.md).
+See the [implementation record](IMPLEMENTATION_STATUS.md) for completed checks
+and the environments they exercised.
 
 | ID | Tests and release evidence |
 | --- | --- |
@@ -577,7 +575,7 @@ are later-release work under [FIRST_RELEASE_SCOPE.md](FIRST_RELEASE_SCOPE.md).
 | T09 Push and inbox | Real iPhone alert while closed; APNs retry/ambiguous acknowledgement/token rejection; denied/muted push with usable inbox; generic payload, off-VPN tap, device/account unbinding, access loss before send/open, 30-day expiry. |
 | T10 Client behavior | All screens and error states, scope/account switches canceling old responses, list/scroll restoration, back/forward/routes, hidden/inactive polling, memory bounds, no persistent job/log data, accessibility and browser/device matrix. |
 | T11 Scale/resilience | Accepted one/two-source load; simultaneous viewers/log follows/group drill-downs; terminal-event bursts; slow Control/NFS/AD/APNs/database; bounded queues, latency/freshness targets, process restart, migration and backup/restore drills. |
-| T12 Packaging/operations | Clean reproducible builds, contract generation checks, fresh install and supported upgrade, secrets/config validation, internal install/upgrade on company-managed iPhones, TLS/VPN/DNS/APNs routes, documented credential rotation and operational ownership. Record earlier personal-phone development testing separately. |
+| T12 Packaging/operations | Clean reproducible builds, contract generation checks, fresh install and supported upgrade, secrets/config validation, internal install/upgrade on company-managed iPhones, TLS/VPN/DNS/APNs routes, documented credential rotation and operational ownership. Record the tested devices and distribution channel. |
 
 Use synthetic fixtures and secret canaries for automated tests. Run Go unit/race and real PostgreSQL integration tests for backend changes; validate portable/evidence/report contracts against pinned fixtures. Add client state/transport tests and browser/XCTest workflow coverage where they establish behavior, with shared golden API examples across languages. Perform actual AD FS, NFS, Slurm, and APNs exercises in the approved integration environment; mocks cannot establish those infrastructure facts.
 
@@ -585,7 +583,7 @@ Record actual pass/fail evidence against these groups. The [November 8 scope dec
 
 ## 14. Implementation work packages
 
-Each package includes implementation, contract/docs updates, and the corresponding validation above. This is the full v1 backlog at design level; milestones may demonstrate subsets, but no package containing an agreed feature is optional at release.
+Each package includes implementation, contract/docs updates, and the corresponding validation above. The table records the original development plan. The [first-release scope](FIRST_RELEASE_SCOPE.md) records the accepted release baseline.
 
 | Package | Repository / work | Completion evidence and dependencies |
 | --- | --- | --- |
@@ -602,8 +600,8 @@ Each package includes implementation, contract/docs updates, and the correspondi
 | WP11 Web application | Dashboard web: every screen in §11, routes/scope selection, aggregates, groups/graphs, logs/reports, alert editor/inbox/settings, accessible responsive layouts and recovery states. | T03–T10 web workflows. Can develop against WP01 fixtures; integration requires WP04–WP10. |
 | WP12 Native iPhone application | Dashboard iOS: equivalent screens, native identity/secure storage, async state/polling, bounded logs/graphs, diagnosis, preferences/rules, notifications/private routes, accessibility. | T03–T10 on simulator and real iPhone. Can develop alongside web after WP01/WP02; no scope reduction. |
 | WP13 Packaging and operations | Dashboard + Control: configuration validation, separate migration/runtime identities, Linux packages, broker placement, network/secrets setup, monitoring, backups, upgrade/rollback and incident runbooks. | T11/T12 service installation and restore evidence; begins with WP01 and incorporates every backend package. |
-| WP14 System verification and pilot | All repositories: compatibility matrix, security review of new trust boundaries, cross-client fixtures, load/failure tests, actual AD FS/NFS/Slurm/APNs exercises, accessibility review and pilot fixes. | Record completed T01–T12 evidence accurately; unfinished integration and manual coverage follows the post-release scope. |
-| WP15 Internal iPhone release | Dashboard iOS + IT: program/channel decision, app identity/signing/profiles, build/export pipeline, install/upgrade/removal, managed settings if available, renewal ownership. | Internally distributed signed release on representative company-managed phones with T09/T12 evidence; Ryan's unmanaged phone supports earlier development checks. Channel decision can remain open during earlier development. |
+| WP14 System verification | All repositories: compatibility matrix, security review, cross-client fixtures, load and failure tests, integration checks, and accessibility review. | Versioned T01–T12 test evidence with the integrations and environments exercised. |
+| WP15 Internal iPhone release | Dashboard iOS + IT: program/channel decision, app identity/signing/profiles, build/export pipeline, install/upgrade/removal, managed settings if available, renewal ownership. | Internally distributed signed release on representative company-managed phones with T09/T12 evidence; Record the tested devices and distribution channel. |
 
 ### 14.1 Delivery order and reviewable milestones
 
@@ -613,9 +611,9 @@ Each package includes implementation, contract/docs updates, and the correspondi
 | M1 — Authorized monitoring backbone | WP02–WP05 and WP09 supply current access, source identity, factual queries, group browsing, aggregation, and durable events. Both client shells sign in and browse a real authorized job. |
 | M2 — Complete investigation | WP06–WP08 integrated; both clients investigate actual single jobs, arrays, collections, and graphs, with logs and a generated validated diagnosis. |
 | M3 — Complete alerting and preferences | WP10 integrated in web/iPhone; every agreed scope/outcome, overlap deduplication, durable inbox, device controls, and real background push works across Controls. |
-| M4 — Pilot and release candidate | WP11–WP15 complete; full accessibility/load/failure/restore evidence, actual internal install/upgrade, supported-version matrix, ownership, runbooks, and pilot fixes. |
+| M4 — Release validation | Accessibility, load, failure and restore evidence, installation and upgrade checks, compatibility matrix and operator runbooks. |
 
-The development model is Ryan working with Codex, with Codex performing most hands-on implementation and validation. Use small, tested slices for Ryan to review and try on the available personal phone. Shared contract fixtures support progress in both clients without assuming separate staffed web and iOS teams. Critical dependencies are authorization and identity, source monitoring/event contracts, shared evidence compatibility, and actual Apple delivery infrastructure. Infrastructure-dependent proofs are scheduled after the first production release; they are no longer first-release acceptance conditions. Estimate dates from M0 evidence and the confirmed development model. Pilot timing, hosting capacity, and production maintenance ownership remain unspecified.
+Shared contract fixtures let both clients validate authorization, source monitoring, events, and evidence compatibility during development.
 
 ### 14.2 Migration and rollout sequence
 
@@ -624,24 +622,12 @@ The development model is Ryan working with Codex, with Codex performing most han
 3. Apply additive Control migrations, capability discovery, principal aliases and grant provenance; compare existing/manual access with proposed AD access. Explicitly approve the operator-managed grant migration and verify removals before enabling managed enforcement.
 4. Deploy updated Control read/event/diagnostic contracts and any required compatible agents. Backfill only supported facts; mark gaps. Enable per-source delegated trust and directory reconciliation.
 5. Install Dashboard database/services, brokers, report storage, and web build. Verify source identities/store ACLs; establish event checkpoints without historical push flooding.
-6. Install the signed iPhone pilot on company-managed phones through the approved channel, building on earlier personal-phone development testing. Validate VPN/identity/APNs and the actual management controls, then enable pilot subscriptions. Expand namespaces/users after acceptance evidence and owner review.
+6. For deployments that include the native client, install the signed app through the selected channel. Verify private network access, identity, and any enabled push delivery before enabling subscriptions.
 7. Publish versioned configuration/runbooks and the full first-release feature matrix. Keep rollback binaries/configuration and database restore procedures available; disable delivery/delegation immediately if trust or migration validation fails.
 
 Use expand/contract migrations and tested rollback limits. Rolling back a service binary must not silently restore obsolete single-role authority or remove active revocation. If an old binary cannot safely read the new grant model, rollback requires a controlled restore/reconciliation procedure and service hold. Document that before rollout.
 
-## 15. Decisions and integration inputs
-
-### 15.1 Confirmed answers and later integration inputs
-
-| Item | Confirmed status and later input | Related post-release work |
-| --- | --- | --- |
-| D08 — APNs operations | Unknown for now: whether the server and phones may connect to Apple's push service, who supplies/maintains the organization's APNs credentials, and who operates delivery. | Later background push integration and physical-device validation. Event/rule/inbox implementation can proceed using fixtures. |
-| D14 — Delivery constraints | Confirmed: Codex develops with Ryan and does most hands-on implementation. Still unspecified: pilot target date, private hosting resources/budget, and production maintenance/on-call owner. | Dates/resources and operating ownership are collected for the later organization rollout. |
-| D18 — Internal distribution | Confirmed: company-managed production phones; Ryan has an unmanaged personal phone for testing. Still unknown: Apple program/account, approved installation/update channel, signing owner, MDM details, and removal process. | Final app packaging and installation/upgrade acceptance on company-managed phones. Personal-phone development testing can proceed as its prerequisites become available. |
-
-Ryan's first-release review is complete. APNs, internal distribution and additional operating arrangements are post-release work. Their later inputs do not create new first-release review requests.
-
-### 15.2 Engineering proposals to validate
+## 15. Engineering proposals to validate
 
 These choices make the design implementable; they do not reopen the confirmed feature scope. Use the proposed defaults for development unless evidence from the integration proof calls for revision. Record any change in this document and the compatibility/operations guides.
 
@@ -655,9 +641,9 @@ These choices make the design implementable; they do not reopen the confirmed fe
 | Storage and recovery defaults | Report/evidence cache 30 days; source feed 30 days; deduplication at least 35 days; content-free audit 90 days; proposed RPO/RTO in §12.3. Confirm capacity and organizational retention policy. |
 | Log topology | NFS broker plus additional brokers for genuinely host-local roots; inventory hosts/mapping versions and verify inherited cross-user ACLs. |
 
-Collect the actual AD FS version/issuer/audiences/claim rules, directory read endpoint and stable group IDs, Control endpoints/instance identities/versions, NFS/local roots, certificate trust and VPN routes, representative jobs/groups, and Apple account/company-managed device inventory. Record the personal test phone's model and iOS version when preparing device tests. Configuration examples should use synthetic identifiers until those values are supplied; do not embed organization secrets in the repository.
+Use synthetic identifiers in examples and supply real credentials through the configured secret delivery mechanism.
 
-The largest implementation risks are the new delegated-service trust boundary, complete direct-group reconciliation during outages, evidence/report compatibility across repositories, and actual NFS/iPhone/APNs behavior. Each has an early proof in M0 and a later release test. An installable Apple package still needs signing and a suitable distribution channel; managed delivery is accepted as later-release work.
+The largest implementation risks are the new delegated-service trust boundary, complete direct-group reconciliation during outages, evidence/report compatibility across repositories, and actual NFS/iPhone/APNs behavior. Each has an early proof in M0 and a later release test.
 
 ## 16. Requirement traceability
 

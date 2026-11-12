@@ -163,6 +163,6 @@ Recovery, cutoff inheritance, global holds, lease fencing, atomic rollback,
 source-set checks and bounded represented-user reconciliation have unit/race and
 real synthetic Lab PostgreSQL coverage. Deployed worker-service identity replay
 and explicit apply preserve original event/inbox identities in
-[split acceptance](LAB_SPLIT.md). Full database-restore/evaluator/provider recovery
-exercises are later-release validation under the [approved scope](FIRST_RELEASE_SCOPE.md). There is no claim of complete historic
-delivery or exactly-once notification presentation.
+[split acceptance](LAB_SPLIT.md). The linked evidence covers the recorded
+recovery scenarios. There is no claim of complete historic delivery or
+exactly-once notification presentation.

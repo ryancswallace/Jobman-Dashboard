@@ -1,7 +1,7 @@
 # Dashboard development container
 
 Open this repository in a Dev Containers-compatible editor and choose Reopen in
-Container. The definition pins Go 1.26.10, Node 26.5.1 and npm 11.17.0, with locked
+Container. The definition pins Go 1.26.11, Node 26.5.1 and npm 11.17.0, with locked
 Docker-outside-of-Docker and GitHub CLI features. `make setup` installs repository
 quality tools and locked dependencies. Python 3, ShellCheck, PostgreSQL client,
 Git and editor integrations are included.

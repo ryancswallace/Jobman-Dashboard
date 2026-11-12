@@ -17,7 +17,7 @@ npm run dev
 Vite binds to `127.0.0.1`; its development proxy forwards `/api` and `/auth` to `127.0.0.1:8088`. Run the explicit synthetic backend separately from the repository root:
 
 ```sh
-env -u GOROOT GOTOOLCHAIN=go1.26.10 \
+env -u GOROOT GOTOOLCHAIN=go1.26.11 \
   GOCACHE=/private/tmp/jobman-dashboard-go-cache \
   go run ./cmd/jobman-dashboard --fixture --listen 127.0.0.1:8088
 ```

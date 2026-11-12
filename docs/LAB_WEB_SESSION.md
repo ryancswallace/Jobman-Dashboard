@@ -91,5 +91,5 @@ Record the test commit, deployed candidate/configuration revision, command and
 sanitized pass/failure log after execution. The test must not be described as live
 acceptance until it actually runs. Automated HTTP cookie-attribute checks do not
 prove browser SameSite enforcement, rendered web navigation, accessibility or a
-managed iPhone flow. Existing browser-policy restrictions remain in force. Actual
-AD FS and corporate directory acceptance are post-release validation under the [approved scope](FIRST_RELEASE_SCOPE.md).
+managed iPhone flow. Existing browser-policy restrictions remain in force. The
+recorded identity checks use the Lab provider and synthetic directory.

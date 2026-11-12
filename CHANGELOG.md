@@ -6,6 +6,9 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
+- Update the Go toolchain to 1.26.11 for standard-library security fixes.
+- Remove deployment planning checklists from the product guides.
+
 - Outline the logo subtitle in the README and the web and iPhone clients
   so it renders without an installed font.
 

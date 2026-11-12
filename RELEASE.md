@@ -44,10 +44,9 @@ release, create accounts or run migrations. Container builds use the separate
 source Dockerfile and are not pushed automatically. Avoid treating snapshot
 metadata as a claim of reproducible, accepted release bytes.
 
-## Publication and later delivery
+## Publication
 
-Corporate identity acceptance, real APNs, managed signing/distribution, pilot
-checks are post-release work under the approved scope. Review any update to the
+Review any update to the
 embedded Diagnose module against Dashboard's deterministic report and evidence
 contracts. Preserve exact dependency pins and report their versions.
 The protected publisher creates a non-prerelease/latest full release for stable

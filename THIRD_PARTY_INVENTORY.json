@@ -532,7 +532,7 @@
       "source": {
         "url": "https://go.dev/"
       },
-      "version": "go1.26.10"
+      "version": "go1.26.11"
     },
     {
       "declaredLicense": "MIT",
@@ -736,9 +736,9 @@
   "schemaVersion": 1,
   "scope": "Observed Go dependency union for both Linux services and rendered browser modules/helpers. Upstream declarations and notice text are evidence, not legal classification or deployment acceptance.",
   "sourceLocks": {
-    "go.mod": "02fce3216fb9d35f7da4e4f48f7830eb53db21e25d24cff179d3a5172323fb2a",
+    "go.mod": "ec02ce476165192c84673128ea18ea91487144dddc14f58eb371faa9323582ff",
     "go.sum": "a2b953cd445fa466dc24e0ba2a080986dcb5874982ff365e03e13be3faf68378",
-    "go.version": "5ae79ef74661d43e70de64fdaad7531cab44185357110f441268bafae5e74956",
+    "go.version": "8c17d6c935046cbac3e214b44956b226d1662ad18f0e7182b3e2f5ab2bbf6e65",
     "node.version": "3f51982d0527dd8c06b61bfb283e519d04d3e13330e81117d7a4e5d455b54406",
     "npm.version": "a38e383f1e9080b0dd9001481f6e56b341000de90a05061b66734350ad3adc41",
     "web/package-lock.json": "ef3a2089ca41687f2026d4d073f8c8af53bc2cbbcddb013daa04001c6d33c79f",

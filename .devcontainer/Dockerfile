@@ -1,9 +1,9 @@
-ARG GO_VERSION=1.26.10
+ARG GO_VERSION=1.26.11
 ARG GO_FEATURE_VERSION=1.26
 
 ARG NODE_VERSION=26.5.1
 FROM node:${NODE_VERSION}-bookworm-slim@sha256:9e6f9357d371591e32ab6f2d8a26d63bdd0d17c29eee3f4f3e7e454d9634bf73 AS node
-FROM golang:${GO_VERSION}-bookworm@sha256:5de7c99eb78ca5e515a4c340235d0955ec5964a5071c492c15503d7c267da473 AS toolchain
+FROM golang:${GO_VERSION}-bookworm@sha256:dc40a13b61304647ed7e5d581d246b86413dfc29d63c6d018310feb93cd98fc0 AS toolchain
 FROM mcr.microsoft.com/devcontainers/go:2-${GO_FEATURE_VERSION}-bookworm@sha256:090a56c6c9c4e80a1573c18c1225eb851b8c86c199fc929b07ea2a67f7b4850f
 
 COPY --from=toolchain /usr/local/go /usr/local/go

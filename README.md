@@ -20,7 +20,7 @@ Lab evidence identifies the exact tested revisions and limitations.
 
 ## Development
 
-Use Go **1.26.10** (`go.version`), Node **26.5.1** and the committed npm lockfile. Full Xcode is required for the iPhone simulator and physical-device builds; the native core is also a Swift package.
+Use Go **1.26.11** (`go.version`), Node **26.5.1** and the committed npm lockfile. Full Xcode is required for the iPhone simulator and physical-device builds; the native core is also a Swift package.
 
 ```sh
 make web

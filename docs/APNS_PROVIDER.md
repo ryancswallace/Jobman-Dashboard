@@ -40,10 +40,9 @@ Apple primary references checked while implementing the provider:
 
 Local tests use a TLS/HTTP2 server and verify signatures, headers, the complete
 payload, environment separation, response classification, timestamp fencing and
-retry bounds. Real provider credentials, phone delivery and company-managed-device
-acceptance are post-release work under the [approved scope](FIRST_RELEASE_SCOPE.md). The [durable delivery worker](NOTIFICATION_PIPELINE.md)
-is wired into the configured runtime; local transport and storage tests do not
-establish end-to-end delivery to a real phone.
+retry bounds. The [durable delivery worker](NOTIFICATION_PIPELINE.md) uses the
+configured provider. Verify end-to-end delivery on a physical device with the
+APNs configuration and distribution channel used in the deployment.
 
 ## Operator configuration
 

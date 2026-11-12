@@ -3866,7 +3866,7 @@ SHA-256: `96f408bfae65bf137fc2525d3ecb030271c50c1e90799f87abf8846d8dd505cc`
     rights granted to you under this License for this implementation of Go
     shall terminate as of the date such litigation is filed.
 
-## go-toolchain: Go standard library go1.26.10
+## go-toolchain: Go standard library go1.26.11
 
 Source: <https://go.dev/>
 

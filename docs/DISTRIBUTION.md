@@ -3,9 +3,7 @@
 Dashboard publishes full releases (`vX.Y.Z`) and engineering candidates
 (`vX.Y.Z-rc.N`). GitHub marks full releases as latest and engineering candidates as prereleases. Product review is complete
 for the [approved first-production-release scope](FIRST_RELEASE_SCOPE.md).
-Corporate AD FS/direct AD, APNs, signed managed-device delivery, manual
-accessibility and additional pilot/operations work are scheduled for later
-releases. The iPhone archive is unsigned and retained for provenance.
+The unsigned iPhone archive records native build provenance.
 
 Download from the [stable release page](https://github.com/ryancswallace/Jobman-Dashboard/releases/latest)
 or select an exact published version from the [release record](RELEASE_HANDOFF.md).
