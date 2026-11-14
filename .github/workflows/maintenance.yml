@@ -6,16 +6,17 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: dashboard-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: jobman-dashboard-maintenance
+  cancel-in-progress: false
 jobs:
   validate:
     name: Validate repository invariants
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
