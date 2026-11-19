@@ -4166,9 +4166,9 @@ SHA-256: `77c9ee6a9c5d5782fb0c50b50d101189116314c14f7df0a1b0d385fc96a7ba49`
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
 
-## npm: rolldown 1.2.16
+## npm: rolldown 1.2.19
 
-Source: <https://registry.npmjs.org/rolldown/-/rolldown-1.2.16.tgz>
+Source: <https://registry.npmjs.org/rolldown/-/rolldown-1.2.19.tgz>
 
 ### LICENSE
 
@@ -4268,9 +4268,9 @@ SHA-256: `da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93`
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
 
-## npm: vite 8.3.6
+## npm: vite 8.3.8
 
-Source: <https://registry.npmjs.org/vite/-/vite-8.3.6.tgz>
+Source: <https://registry.npmjs.org/vite/-/vite-8.3.8.tgz>
 
 ### LICENSE.md
 
