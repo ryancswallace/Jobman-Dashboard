@@ -667,12 +667,12 @@
         }
       ],
       "source": {
-        "integrity": "sha512-bWvlMpFKiTfDKfnK7FC2MPgPeWCf/Kpwsq49ApdW+FQaBZb6O6dZ4MAPbPUjp7hYQrw/RobqCzn64BRrQecGHw==",
+        "integrity": "sha512-QIiV1J9d0pzN4jeeTH4sjPy0AZ6cAy2cG0ExeoE1+U8Rvj+hR3gYkokx0YbeUNGlZqiQJJ2utcETe0oKXwzsuA==",
         "lockPath": "node_modules/rolldown",
-        "packageJSONSHA256": "525884560d75c4eecb362453e6bbf92b1618d2261ddfbb1a806f164be0813f84",
-        "url": "https://registry.npmjs.org/rolldown/-/rolldown-1.2.16.tgz"
+        "packageJSONSHA256": "73ea5ca898ac22574e23d66e54dc9c5b3714f9d8c1be934412824d62f25e21fc",
+        "url": "https://registry.npmjs.org/rolldown/-/rolldown-1.2.19.tgz"
       },
-      "version": "1.2.16"
+      "version": "1.2.19"
     },
     {
       "declaredLicense": "MIT",
@@ -725,12 +725,12 @@
         }
       ],
       "source": {
-        "integrity": "sha512-UI7dK29NnS54Fk+mmo7o+jI6U8Fp7hDl+X5Q1k45WH+d4dSlbLVUETGQ+hfkNgvLQGyoElPj837nZyv4MBc0VA==",
+        "integrity": "sha512-LzOn3h9rG/0vhLdXrV4yJ4QFA9eEoqCl+Yx+kGJd7aB9w6nfNgVHKSYwLPZUHrz4ZGa+t+kXjV9itvcHDLQouA==",
         "lockPath": "node_modules/vite",
-        "packageJSONSHA256": "c190c4c3dadb457bedc5d756a2269cd648b134a293da9f4d873c01fc66f4186c",
-        "url": "https://registry.npmjs.org/vite/-/vite-8.3.6.tgz"
+        "packageJSONSHA256": "149cf436b89044371ae3cb35ac0e687ee75c6e8412962c7ce671f3d1a4a09d82",
+        "url": "https://registry.npmjs.org/vite/-/vite-8.3.8.tgz"
       },
-      "version": "8.3.6"
+      "version": "8.3.8"
     }
   ],
   "schemaVersion": 1,
@@ -741,7 +741,7 @@
     "go.version": "8c17d6c935046cbac3e214b44956b226d1662ad18f0e7182b3e2f5ab2bbf6e65",
     "node.version": "3f51982d0527dd8c06b61bfb283e519d04d3e13330e81117d7a4e5d455b54406",
     "npm.version": "a38e383f1e9080b0dd9001481f6e56b341000de90a05061b66734350ad3adc41",
-    "web/package-lock.json": "ef3a2089ca41687f2026d4d073f8c8af53bc2cbbcddb013daa04001c6d33c79f",
-    "web/package.json": "b934bed0fcea25b1bac1802a84be4604332ce7b057e65c67cb59d03f6d251be9"
+    "web/package-lock.json": "7137c22607bb25fd946eba63ebda2fd6850733bdd252498bc9039689168a3432",
+    "web/package.json": "81da7cb83d7801d896561e5636dd1d3405a19a94f5e224e662549fa8e84fb7d4"
   }
 }
