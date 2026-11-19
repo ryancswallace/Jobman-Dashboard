@@ -27,7 +27,7 @@ RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -buildvcs=false \
     -ldflags="-X github.com/ryancswallace/jobman-dashboard/internal/buildinfo.Version=${VERSION} -X github.com/ryancswallace/jobman-dashboard/internal/buildinfo.Revision=${VCS_REF} -X github.com/ryancswallace/jobman-dashboard/internal/buildinfo.BuiltAt=${BUILD_DATE}" \
     -o /out/ ./cmd/jobman-dashboard ./cmd/jobman-log-broker
 
-FROM alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS runtime
+FROM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS runtime
 RUN apk add --no-cache ca-certificates tini tzdata \
     && addgroup -S -g 10001 dashboard \
     && adduser -S -D -u 10001 -G dashboard -h /var/lib/jobman-dashboard dashboard \
