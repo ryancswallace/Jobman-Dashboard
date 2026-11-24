@@ -215,6 +215,17 @@ it.each([
   },
 );
 
+it("names the account button using the visible name and opens settings", async () => {
+  history.replaceState(null, "", "/");
+  render(<App />);
+  const account = await screen.findByRole("button", {
+    name: "Synthetic viewer, account settings",
+  });
+  expect(account).toHaveTextContent(/^Synthetic viewer$/);
+  await userEvent.click(account);
+  await screen.findByRole("heading", { level: 1, name: "Settings" });
+});
+
 it("audits the open scope picker and alert editor", async () => {
   history.replaceState(null, "", "/alerts");
   render(<App />);

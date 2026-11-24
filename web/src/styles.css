@@ -345,6 +345,9 @@ small,
 .namespace-option {
   padding-left: 29px;
 }
+.account-button .avatar::before {
+  content: attr(data-initial);
+}
 .account-button {
   flex-shrink: 0;
   border: 0;
