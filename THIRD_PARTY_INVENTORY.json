@@ -630,17 +630,17 @@
       "observations": [
         {
           "kind": "bundled-module",
-          "module": "node_modules/react-router/dist/development/chunk-6KYCQHYJ.mjs",
-          "sourceSHA256": "2183388276a7a1e5731bdf456f2ffb2a0079af00c9f9a0e9a2b2c337a237c6cc"
+          "module": "node_modules/react-router/dist/development/chunk-YDNE64FV.mjs",
+          "sourceSHA256": "8be30fb4068bf8454de7bbc4dae80f30cef7dba7f30af3e6da2f9d879f7fac38"
         }
       ],
       "source": {
-        "integrity": "sha512-dTgvcXDOrLPrlLHrcZAqWveiK1hMSqN+rGAJzegP8HtmNkfRxOoshGWBNX3ZJ0cZjOHkRdlUJtaIhZMLLyGyPw==",
+        "integrity": "sha512-SP8KqKfRLlJzqzPseC+r6yYFsqPEavtQCC4BKV810tBGijjESLtwVPam+gPOO+wYeXrYN/TNy2CAykQVcNg4iQ==",
         "lockPath": "node_modules/react-router",
-        "packageJSONSHA256": "520a73d59a03e461c465b9171184d6850691819cde13aa766be1efb12c7b2b48",
-        "url": "https://registry.npmjs.org/react-router/-/react-router-7.18.5.tgz"
+        "packageJSONSHA256": "79f6918cd643d595560120c497450e253befb867e8afd63af086fa7156e37cf5",
+        "url": "https://registry.npmjs.org/react-router/-/react-router-7.18.6.tgz"
       },
-      "version": "7.18.5"
+      "version": "7.18.6"
     },
     {
       "declaredLicense": "MIT",
@@ -741,7 +741,7 @@
     "go.version": "8c17d6c935046cbac3e214b44956b226d1662ad18f0e7182b3e2f5ab2bbf6e65",
     "node.version": "3f51982d0527dd8c06b61bfb283e519d04d3e13330e81117d7a4e5d455b54406",
     "npm.version": "a38e383f1e9080b0dd9001481f6e56b341000de90a05061b66734350ad3adc41",
-    "web/package-lock.json": "7137c22607bb25fd946eba63ebda2fd6850733bdd252498bc9039689168a3432",
-    "web/package.json": "81da7cb83d7801d896561e5636dd1d3405a19a94f5e224e662549fa8e84fb7d4"
+    "web/package-lock.json": "28b53281577d12ffc04cc6cf006eeb0ad766cc55419aec22fae991600629e0b0",
+    "web/package.json": "060f812e5dd7471d5bc0c64505fd37bd6f2deb0e8046a72a50bd20549c54d230"
   }
 }

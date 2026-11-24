@@ -4134,9 +4134,9 @@ SHA-256: `da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93`
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
 
-## npm: react-router 7.18.5
+## npm: react-router 7.18.6
 
-Source: <https://registry.npmjs.org/react-router/-/react-router-7.18.5.tgz>
+Source: <https://registry.npmjs.org/react-router/-/react-router-7.18.6.tgz>
 
 ### LICENSE.md
 

@@ -6,6 +6,7 @@ Notable changes are recorded here. Historical engineering evidence remains in
 
 ## Unreleased
 
+- Keep the visible account name in the web settings button’s accessible name.
 - Update the Go toolchain to 1.26.11 for standard-library security fixes.
 - Remove deployment planning checklists from the product guides.
 
