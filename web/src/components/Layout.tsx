@@ -179,11 +179,15 @@ export function Layout() {
             <button
               className="account-button"
               onClick={() => navigate("/settings")}
-              aria-label={`Account settings for ${bootstrap.account.displayName}`}
+              aria-label={`${bootstrap.account.displayName}, account settings`}
             >
-              <span className="avatar" aria-hidden="true">
-                {bootstrap.account.displayName.slice(0, 1).toUpperCase()}
-              </span>
+              <span
+                className="avatar"
+                aria-hidden="true"
+                data-initial={bootstrap.account.displayName
+                  .slice(0, 1)
+                  .toUpperCase()}
+              />
               <span>{bootstrap.account.displayName}</span>
             </button>
           </div>
